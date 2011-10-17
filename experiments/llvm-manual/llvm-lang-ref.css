@@ -1,0 +1,78 @@
+/* Configure normal serif font to use Gentium (Regular, Italic) for normal text and
+ * Gentium Basic Bold for bold text.
+ * Good fallback for Ubuntu: Liberation Serif
+ */
+@font-face { font-family: Gentium; font-style: normal; font-weight: normal; src: url('GenR102.TTF'); }
+@font-face { font-family: Gentium; font-style: italic; font-weight: normal; src: url('GenI102.TTF'); }
+@font-face { font-family: Gentium; font-style: normal; font-weight: bold; src: url('GenBasB.ttf'); }
+
+@page {
+	size: a4;
+	margin: 2cm;
+}
+
+/* Overall styles */
+body { font-family: Gentium, 'Liberation Serif', serif; line-height: 1.75; }
+code, tt, pre { font-family: 'DejaVu Sans Mono', monospace; font-size: 0.8em; }
+a { color: inherit; text-decoration: none; }
+
+/* hide elements like HTML logos, etc. */
+body > hr:last-of-type, body > address:last-child { display: none; }
+
+/* Header and table of contents */
+h1 { font-size: 3em; margin: 3em 2em; padding: 0; line-height: 1.5; text-align: center; }
+
+/* general toc stuff */
+body > ol { margin: 1em 0; padding: 0; counter-reset: list-item; page: toc; page-break-before: right; }
+body > ol li { margin: 0; padding: 0; counter-increment: list-item; }
+body > ol li::marker { content: counters(list-item, '.', decimal); }
+
+/* first level (chapters) */
+body > ol > li { margin-top: 0.5em; }
+body > ol > li::marker { content: counters(list-item, '.', upper-roman); }
+body > ol > li::marker, body > ol > li > a { font-weight: bold; font-size: 1.1em; }
+body > ol > li > a::after { content: leader(' ') target-counter(attr(href), page); text-align: right; }
+
+/* deper levels */
+body > ol ol { margin: 0 0 0 2em; padding: 0; list-style: decimal; }
+body > ol ol li { margin-top: 0; }
+body > ol ol li > a {  }
+body > ol ol li > a::after { content: ' ' leader('.') '  ' target-counter(attr(href), page) !important; }
+
+div.doc_author { page: toc; font-size: 1.25em; padding: 2em 0; text-align: center; page-break-before: never; }
+
+/* page headers and footers */
+@page {
+	@top { margin: 0 -1cm; padding: 0; }
+	@bottom { content: counter(page); vertical-align: top; padding-top: 1em; }
+}
+
+@page:left {
+	@top { content: 'Chapter ' counter(chapter, upper-roman) '.   ' string(chapter-title); text-align: left; }
+}
+
+@page:right {
+	@top { content: string(subchapter-title); text-align: right; }
+}
+
+@page:first {
+	@top { content: ''; }
+	@top { content: ''; }
+}
+
+@page toc {
+	@top { content: 'Table of Contents'; }
+}
+
+
+/* chapters */
+h2 { page-break-before: right; counter-increment: chapter; string-set: chapter-title content(); }
+h2:nth-of-type(2) { page-break-before: auto; }
+
+h3 { string-set: subchapter-title content(); }
+
+/* content */
+table { margin: 1em; border-spacing: 0; border: none; border-collapse: collapse; }
+table tr:nth-child(odd) { background: #eaeaea; } 
+table th, table td { padding: 0.125em 0.5em; border: 1pt solid gray; }
+table th { font-size: 0.77em; }
