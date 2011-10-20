@@ -286,68 +286,41 @@ function Failer() { }
 Failer.prototype.used = false;
 
 //the OMeta "class" and basic functionality
-var tracer_level = 0;
-var tracer_last_idx = 0;
-var tracer_level_prefix = function(level){
-	var prefix = ""
-	for(var i = 0; i < level; i++)
-		prefix += "  "
-	return prefix
-}
 
 OMeta = {
 _apply: function(rule) {
-	
-	//if (rule != "anything"){
-	//	console.log("" + tracer_level_prefix(tracer_level) + ' applying rule ' + rule + ' at "' + this.input.lst.slice(this.input.idx, this.input.idx + 10) + '..."')
-	//}
-	
-	// TRACER CODE
-	console.log( tracer_level_prefix(tracer_level) + rule );
-	tracer_level++;
-	try {
-		
-		var memoRec = this.input.memo[rule];
-		if (memoRec == undefined) {
-		  var origInput = this.input,
-		      failer    = new Failer();
-		  if (this[rule] === undefined)
-		    throw 'tried to apply undefined rule "' + rule + '"';
-		  this.input.memo[rule] = failer;
-		  this.input.memo[rule] = memoRec = {ans: this[rule].call(this), nextInput: this.input};
-		  if (failer.used) {
-		    var sentinel = this.input;
-		    while (true) {
-		      try {
-		        this.input = origInput;
-		        var ans = this[rule].call(this);
-		        if (this.input == sentinel)
-		          throw fail;
-		        memoRec.ans       = ans;
-		        memoRec.nextInput = this.input;
-		      }
-		      catch (f) {
-		        if (f != fail)
-		          throw f;
-		        break;
-		      }
-		    }
-		  }
-		}
-		else if (memoRec instanceof Failer) {
-		  memoRec.used = true;
-		  throw fail;
-		}
-		this.input = memoRec.nextInput;
-  	
-  } finally {
-  	tracer_level--;
-  	if (this.input.idx > tracer_last_idx){
-  		console.log(tracer_level_prefix(tracer_level) + 'consumed "' + this.input.lst.slice(tracer_last_idx, this.input.idx) + '"');
-  		tracer_last_idx = this.input.idx;
-  	}
+  var memoRec = this.input.memo[rule];
+  if (memoRec == undefined) {
+    var origInput = this.input,
+        failer    = new Failer();
+    if (this[rule] === undefined)
+      throw 'tried to apply undefined rule "' + rule + '"';
+    this.input.memo[rule] = failer;
+    this.input.memo[rule] = memoRec = {ans: this[rule].call(this), nextInput: this.input};
+    if (failer.used) {
+      var sentinel = this.input;
+      while (true) {
+        try {
+          this.input = origInput;
+          var ans = this[rule].call(this);
+          if (this.input == sentinel)
+            throw fail;
+          memoRec.ans       = ans;
+          memoRec.nextInput = this.input;
+        }
+        catch (f) {
+          if (f != fail)
+            throw f;
+          break;
+        }
+      }
+    }
   }
-  
+  else if (memoRec instanceof Failer) {
+    memoRec.used = true;
+    throw fail;
+  }
+  this.input = memoRec.nextInput;
   return memoRec.ans;
 },
 
@@ -355,48 +328,12 @@ _apply: function(rule) {
 _applyWithArgs: function(rule) {
   for (var idx = arguments.length - 1; idx > 0; idx--)
     this._prependInput(arguments[idx]);
-  
-  // TRACER CODE
-  var arg_list = [];
-  for (var i = 1; i < arguments.length; i++)
-  	arg_list.push(arguments[i]);
-  console.log( tracer_level_prefix(tracer_level) + rule + '(' + arg_list.join(', ') + ')' );
-  
-  tracer_level++;
-	try {
-		var result = this[rule].call(this);
-  } finally {
-  	tracer_level--;
-  	if (this.input.idx > tracer_last_idx){
-  		console.log(tracer_level_prefix(tracer_level) + 'consumed "' + this.input.lst.slice(tracer_last_idx, this.input.idx) + '"');
-  		tracer_last_idx = this.input.idx;
-  	}
-  }
-	
-	return result;
+  return this[rule].call(this);
 },
 _superApplyWithArgs: function(recv, rule) {
   for (var idx = arguments.length - 1; idx > 1; idx--)
     recv._prependInput(arguments[idx]);
-  
-  // TRACER CODE
-  var arg_list = [];
-  for (var i = 1; i < arguments.length; i++)
-  	arg_list.push(arguments[i]);
-  console.log( tracer_level_prefix(tracer_level) + '^' + rule + '(' + arg_list.join(', ') + ')' );
-  
-  tracer_level++;
-	try {
-	  var result = this[rule].call(recv);
-  } finally {
-  	tracer_level--;
-  	if (recv.input.idx > tracer_last_idx){
-  		console.log(tracer_level_prefix(tracer_level) + 'consumed "' + recv.input.lst.slice(tracer_last_idx, recv.input.idx) + '"');
-  		tracer_last_idx = recv.input.idx;
-  	}
-  }
-	
-	return result;
+  return this[rule].call(recv);
 },
 _prependInput: function(v) {
   this.input = new OMInputStream(v, this.input);
@@ -719,10 +656,6 @@ fromTo: function () {
 initialize: function() { },
 // match and matchAll are a grammar's "public interface"
 _genericMatch: function(input, rule, args, matchFailed) {
-	// TRACER CODE
-	tracer_level = 0;
-	tracer_last_idx = 0;
-
   if (args == undefined)
     args = [];
   var realArgs = [rule];
