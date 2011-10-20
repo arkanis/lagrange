@@ -14,38 +14,38 @@ var grammar_name = process.argv[3]
 var grammar_start_rule = process.argv[4]
 var sample_file = process.argv[5]
 
+var error_handler = function(msg){
+	return function(state, index){
+		var characters = state.input.lst, line_no = 0, line_start = 0, line_end = 0
+		
+		// Calculate the line number of the error and remember the last line start
+		for (var i = 0; i < index && i < characters.length; i++){
+			if (characters[i] == '\n'){
+				line_no++
+				line_start = i+1
+			}
+		}
+		
+		// Search for the end of line
+		for (var i = line_start; i < characters.length; i++){
+			if (characters[i] == '\n'){
+				line_end = i
+				break
+			}
+		}
+		
+		var col_no = index - line_start
+		var pre_error = characters.slice(line_start, index)
+		var post_error = characters.slice(index, line_end)
+		
+		throw msg + '\n' + pre_error + ' PARSER ERROR --> ' + post_error
+	}
+}
+
 // Load and use an OMeta grammar. The grammar objects are created in the module
 // namespace.
-var load_grammar = function(grammar_file){
+var load_grammar = function(grammar_file, callback){
 	var grammar = fs.readFileSync(grammar_file, 'utf-8')
-	var error_handler = function(msg){
-		return function(state, index){
-			var characters = state.input.lst, line_no = 0, line_start = 0, line_end = 0
-			
-			// Calculate the line number of the error and remember the last line start
-			for (var i = 0; i < index && i < characters.length; i++){
-				if (characters[i] == '\n'){
-					line_no++
-					line_start = i+1
-				}
-			}
-			
-			// Search for the end of line
-			for (var i = line_start; i < characters.length; i++){
-				if (characters[i] == '\n'){
-					line_end = i
-					break
-				}
-			}
-			
-			var col_no = index - line_start
-			var pre_error = characters.slice(line_start, index)
-			var post_error = characters.slice(index, line_end)
-			
-			throw msg + '\n' + pre_error + ' PARSER ERROR --> ' + post_error
-		}
-	}
-	
 	var tree = ometa.BSOMetaJSParser.matchAll(grammar, 'topLevel', undefined, error_handler("Error while parsing OMeta grammar"));
 	var parserString = ometa.BSOMetaJSTranslator.match(tree, 'trans', undefined, error_handler("Error while translating grammar"));
 	
@@ -63,5 +63,5 @@ try {
 // Load sample code
 console.log('Matching grammar ' + grammar_name + ' against ' + sample_file)
 var sample_code = fs.readFileSync(sample_file, 'utf8')
-var result = global[grammar_name].matchAll(sample_code, grammar_start_rule)
+var result = global[grammar_name].matchAll(sample_code, grammar_start_rule, undefined, error_handler("Error while parsing sameple code"))
 console.log(result)
