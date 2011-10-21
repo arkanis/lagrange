@@ -42,15 +42,18 @@ trace_file.write(['<!DOCTYPE html><html><head>',
 	'<script src="trace.js"></script>',
 	'</head><body>\n'].join(''))
 
+var prettify_string = function(str){
+	return str.replace('\n', '\\n').replace('\t', '\\t')
+}
+
 function recursive_writer(data){
-	
 	trace_file.write(['<div><p>', '<code class="rule">', data.rule, '</code>'].join(''))
 	
 	if (data.args && data.args.length > 0)
 		trace_file.write(['( <code class="args">', util.inspect(data.args, false, null), '</code> )'].join(''))
 	
 	if (data.consumed)
-		trace_file.write(['<code class="consumed">', util.inspect(data.consumed), '</code>'].join(''))
+		trace_file.write(['<code class="consumed">', prettify_string(data.consumed), '</code>'].join(''))
 	
 	trace_file.write(['→ <code class="matched">', util.inspect(data.matched, false, null), '</code>', '</p>\n'].join(''))
 	
