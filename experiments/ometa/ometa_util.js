@@ -64,6 +64,8 @@ exports.inject_tracer = function(grammar_object){
   
   var tracer_level = 0
   var tracer_last_idx = 0
+  var tracer_data = undefined
+  var tracer_data_current_node = undefined
   
   var level_prefix = function(level){
   	return repeat_str('  ', level)
@@ -71,13 +73,15 @@ exports.inject_tracer = function(grammar_object){
   
   var tracer = function(original_func, rule_prefix){
 		return function(rule){
-			if (rule != 'anything'){
-				var arg_list = Array.prototype.slice.call(arguments, 1);
-				if (arg_list.length > 0)
-					console.error( level_prefix(tracer_level) + rule_prefix + rule + '(' + arg_list.join(', ') + ')' );
-				else
-					console.error( level_prefix(tracer_level) + rule_prefix + rule );
-			}
+			var arg_list = Array.prototype.slice.call(arguments, 1);		  
+		  var new_node = { rule: rule, args: arg_list, children: [] }
+		  var parent_node = tracer_data_current_node
+		  
+		  if (parent_node)
+		  	parent_node.children.push(new_node)
+		  else
+		  	tracer_data = new_node
+		  tracer_data_current_node = new_node
 		  
 		  tracer_level++;
 		  try {
@@ -85,19 +89,15 @@ exports.inject_tracer = function(grammar_object){
 		  } finally {
 		    tracer_level--;
 		    
-		    /*
-		    var consumed = this.input.idx > tracer_last_idx, matched = !!result
-		    if (consumed || matched){
-		    	var report_msg = [ level_prefix(tracer_level), '→' ]
-		    	if (consumed)
-		    		report_msg.push( ' consumed "' + this.input.lst.slice(tracer_last_idx, this.input.idx) + '"' )
-		    	if (matched)
-		    		report_msg.push( ' matched: ' + result )
-		    	console.error(report_msg.join(''))
-		    	
+		    if (this.input.idx > tracer_last_idx){
+		    	new_node.consumed = this.input.lst.slice(tracer_last_idx, this.input.idx)
 		    	tracer_last_idx = this.input.idx
 		    }
-		    */
+		    
+		    if (!!result)
+		    	new_node.matched = result
+		    
+		    tracer_data_current_node = parent_node
 		  }
 		  
 		  return result;
@@ -119,6 +119,10 @@ exports.inject_tracer = function(grammar_object){
 		tracer_level = 0;
 		tracer_last_idx = 0;
 		return original_genericMatch.apply(this, arguments);
+	}
+	
+	grammar_object.trace = function(){
+		return tracer_data
 	}
 	
 }

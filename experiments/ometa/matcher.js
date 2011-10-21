@@ -1,6 +1,7 @@
 var fs = require('fs')
 var path = require('path')
 var om = require('./ometa_util.js')
+var util = require('util')
 
 //
 // Process command line arguments
@@ -30,3 +31,44 @@ console.log('Matching grammar ' + grammar_name + ' against ' + sample_file)
 var sample_code = fs.readFileSync(sample_file, 'utf8')
 var result = global[grammar_name].matchAll(sample_code, grammar_start_rule, undefined, om.pretty_error_handler("Error while parsing sameple code"))
 console.log(result)
+
+var trace_data = global[grammar_name].trace()
+var trace_file = fs.createWriteStream('trace.html')
+
+trace_file.write(['<!DOCTYPE html><html><head>',
+	'<title>OMeta Tracer Tree</title>',
+	'<link rel="stylesheet" href="trace.css" />',
+	'<script src="jquery-1.6.4.min.js"></script>',
+	'<script src="trace.js"></script>',
+	'</head><body>\n'].join(''))
+
+function recursive_writer(data){
+	
+	trace_file.write(['<div><p>', '<code class="rule">', data.rule, '</code>'].join(''))
+	
+	if (data.args && data.args.length > 0)
+		trace_file.write(['( <code class="args">', util.inspect(data.args, false, null), '</code> )'].join(''))
+	
+	if (data.consumed)
+		trace_file.write(['<code class="consumed">', util.inspect(data.consumed), '</code>'].join(''))
+	
+	trace_file.write(['→ <code class="matched">', util.inspect(data.matched, false, null), '</code>', '</p>\n'].join(''))
+	
+	if (data.children.length > 0){
+		trace_file.write('<ul>')
+		
+		for(var i = 0; i < data.children.length; i++){
+			trace_file.write('<li>\n')
+			recursive_writer(data.children[i])
+			trace_file.write('</li>')
+		}
+		
+		trace_file.write('</ul>')
+	}
+	
+	trace_file.write('</div>\n')
+}
+
+recursive_writer(trace_data)
+trace_file.write('</body></html>')
+trace_file.destroySoon()
