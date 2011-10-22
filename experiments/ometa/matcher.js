@@ -29,13 +29,20 @@ try {
 // Load sample code
 console.log('Matching grammar ' + grammar_name + ' against ' + sample_file)
 var sample_code = fs.readFileSync(sample_file, 'utf8')
-var result = global[grammar_name].matchAll(sample_code, grammar_start_rule, undefined, om.pretty_error_handler("Error while parsing sameple code"))
+try {
+	var result = global[grammar_name].matchAll(sample_code, grammar_start_rule, undefined, om.pretty_error_handler("Error while parsing sameple code"))
+} catch(e) {
+	console.error(e)
+}
 console.log(result)
 
+
+// Write the trace HTML file
 var trace_data = global[grammar_name].trace()
 var trace_file = fs.createWriteStream('trace.html')
 
 trace_file.write(['<!DOCTYPE html><html><head>',
+	'<meta charset="utf-8" />',
 	'<title>OMeta Tracer Tree</title>',
 	'<link rel="stylesheet" href="trace.css" />',
 	'<script src="jquery-1.6.4.min.js"></script>',
@@ -75,3 +82,42 @@ function recursive_writer(data){
 recursive_writer(trace_data)
 trace_file.write('</body></html>')
 trace_file.destroySoon()
+
+// Write the DOT graph file for the AST
+if (result){
+	var dot_node_index = 0
+	var dot = require('child_process').spawn('dot', ['-Tsvg'])
+	var svg_file = fs.createWriteStream('trace.svg')
+	
+	dot.stdout.on('data', function(data){
+		svg_file.write(data)
+	})
+	
+	dot.stderr.on('data', function(data){
+		console.error('dot error: %s', data)
+	})
+	
+	dot.stdin.write('digraph AST {\n')
+	
+	function recursive_node_writer(node){
+		var this_index = dot_node_index
+		
+		if (node instanceof Array) {
+			dot.stdin.write('n' + this_index + ' [label="' + node[0] + '", shape=box];\n')
+			
+			var children = node.slice(1)
+			for (var i = 0; i < children.length; i++){
+				var child_index = ++dot_node_index
+				recursive_node_writer(children[i])
+				dot.stdin.write('n' + this_index + ' -> n' + child_index + ';\n')
+			}
+		} else {
+			dot.stdin.write('n' + this_index + ' [label="' + node + '", shape=box];\n')
+		}
+	}
+	
+	recursive_node_writer(result)
+	
+	dot.stdin.write('}')
+	dot.stdin.end()
+}

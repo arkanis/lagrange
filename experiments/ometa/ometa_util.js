@@ -73,7 +73,17 @@ exports.inject_tracer = function(grammar_object){
   
   var tracer = function(original_func, rule_prefix){
 		return function(rule){
-			var arg_list = Array.prototype.slice.call(arguments, 1);		  
+			var arg_list = Array.prototype.slice.call(arguments, 1);
+			/* No longer neede, bug maybe handy in case of a non terminating grammar
+			if (rule != 'anything'){
+				
+				if (arg_list.length > 0)
+					console.error( level_prefix(tracer_level) + rule_prefix + rule + '(' + arg_list.join(', ') + ')' );
+				else
+					console.error( level_prefix(tracer_level) + rule_prefix + rule );
+			}
+			*/
+		  
 		  var new_node = { rule: rule, args: arg_list, children: [] }
 		  var parent_node = tracer_data_current_node
 		  
