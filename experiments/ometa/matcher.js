@@ -38,6 +38,7 @@ console.log(result)
 
 
 // Write the trace HTML file
+console.log('Writing HTML trace file…')
 var trace_data = global[grammar_name].trace()
 var trace_file = fs.createWriteStream('trace.html')
 
@@ -84,6 +85,7 @@ trace_file.write('</body></html>')
 trace_file.destroySoon()
 
 // Write the DOT graph file for the AST
+console.log('Generating AST graph…')
 if (result){
 	var dot_node_index = 0
 	var dot = require('child_process').spawn('dot', ['-Tsvg'])
@@ -112,7 +114,7 @@ if (result){
 				dot.stdin.write('n' + this_index + ' -> n' + child_index + ';\n')
 			}
 		} else {
-			dot.stdin.write('n' + this_index + ' [label="' + node + '", shape=box];\n')
+			dot.stdin.write('n' + this_index + ' [label="' + node + '"];\n')
 		}
 	}
 	
