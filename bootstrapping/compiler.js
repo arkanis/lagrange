@@ -66,7 +66,6 @@ var visualize_ast = function(ast, output_file){
 
 // Creates an HTML report out of the trace data of the `traced_grammar` object.
 // The report is written to `output_file`.
-//
 var write_trace_report = function(traced_grammar, output_file){
 	if (traced_grammar.trace === undefined){
 		console.warning('Could not create trace report from grammar. Grammar has no trace data.')
@@ -117,6 +116,9 @@ var write_trace_report = function(traced_grammar, output_file){
 }
 
 
+
+
+
 //
 // Compile
 //
@@ -128,17 +130,48 @@ var source_code = fs.readFileSync(source_file, 'utf8')
 // Parser pass
 console.log('Parsing ' + source_file + '…')
 eval( om.load('passes/parser.js') )
-var ast = Parser.matchAll(source_code, 'start', undefined, om.pretty_error_handler("Error while parsing " + source_file))
+var ast = Parser.matchAll(source_code, 'start', undefined, om.pretty_error_handler('Error while parsing ' + source_file))
 
 // Visualize AST
 visualize_ast(ast, 'debug/ast.svg')
+
+// Convert AST to XML
+console.log('Converting AST to XML…')
+eval( om.load('passes/ast_to_xml.js') )
+var xml_ast = AstToXml.match(ast, 'start', undefined, om.pretty_error_handler('Error while converting AST to XML'))
+fs.writeFileSync('debug/ast.xml', xml_ast)
+
+var jQuery = require('jquery')
+var jast = jQuery(xml_ast)
+
+// Run jQuery passes
+var prepared_jast = require('./passes/llvm_prepare').transform(jast)
+
+// Convert jQuery DOM to AST
+console.log('Converting jQuery AST to AST…')
+function recursive_converter(node){
+	if (node.nodeType == 3) {
+		return node.nodeValue
+	} if(node._nodeName == 'undefined') {
+		return undefined
+	} else {
+		var ast_node = [ node._nodeName ]
+		$(node).contents().each(function(){
+			ast_node.push( recursive_converter(this) )
+		})
+		return ast_node
+	}
+}
+prepared_ast = recursive_converter(prepared_jast.get(0))
+visualize_ast(prepared_ast, 'debug/jast.svg')
+console.log(prepared_ast)
 
 // Backend code generation
 console.log('Generating code for ' + source_file + '…')
 eval( om.load('passes/llvm_translator.js') )
 om.inject_tracer(LagrangePreparator)
 try {
-	var llvm_code = LagrangePreparator.match(ast, 'start', undefined, om.pretty_error_handler("Error while generating LLVM code for " + source_file))
+	var llvm_code = LagrangePreparator.match(ast, 'start', undefined, om.pretty_error_handler('Error while generating LLVM code for ' + source_file))
 	write_trace_report(LagrangePreparator, 'debug/llvm_translator_trace.html')
 	console.log(llvm_code)
 } catch(e) {
