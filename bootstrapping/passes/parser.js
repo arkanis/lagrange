@@ -1,8 +1,6 @@
-var mayNil = function(node){
-	return node ? node : 'nil'
-}
-
-ometa SimpleLagrangeParser {
+ometa Parser {
+	
+	start = module,
 	
 	char_range char:x char:y = char:c ?(x <= c && c <= y)                         -> c,
 	

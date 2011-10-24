@@ -13,7 +13,7 @@ var Context = {
 				nodes.push([ this.string_table[str], str ])
 		}
 		return nodes;
-	}
+	},
 	
 	decl_nodes: function(){
 	}
