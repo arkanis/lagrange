@@ -95,7 +95,7 @@ exports.inject_tracer = function(grammar_object){
 		  
 		  tracer_level++;
 		  try {
-		    var result = original_applyWithArgs.apply(this, arguments);
+		    var result = original_func.apply(this, arguments);
 		  } finally {
 		    tracer_level--;
 		    
