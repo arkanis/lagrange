@@ -1,3 +1,11 @@
-v0.75 meta module
+v0.1 meta module
 
-public import std.io, std.foo
+public import std.io as io only(read.raw, write as w), std.foo
+import fudel except(bar) rename(foo as foo_new)
+import std.elg("test").views.user.html
+
+extern.c printf(string format, ... | word)
+
+main(){
+	printf("hello world!")
+}
