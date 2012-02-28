@@ -1,0 +1,45 @@
+// This meta function generates serialize and deserialize functions. To do this
+// by hand is a very repetitive task. It is only intended to work with data
+// types supported by the stream `write` and `read` functions.
+meta serializable in(Node this) out(nullable(Node)) {
+  // Get all variable declarations in the current context (which is assumed to
+  // be a type definition)
+  auto members = this.siblings("var")
+  
+  // Generate the source code of the `serialize` function. Each member is
+  // written to the stream. Function overloading takes care of selecting the
+  // proper write function.
+  auto serializer_code = "function serialize in(stream_t stream) {\n"
+  foreach member in members
+    serializer_code ~= "stream.write(" ~ member.name ~ ")"
+  serializer_code ~= "}"
+  
+  // Generate deserializer code. The stream `read` function takes the target
+  // variable as reference and writes the data into it.
+  auto deserializer_code = "function deserialize in(stream_t stream) {\n"
+  foreach member in members
+    deserializer_code ~= "stream.read(" ~ member.name ~ ")"
+  deserializer_code ~= "}"
+  
+  // Append two new AST nodes to the parent context. These nodes are created
+  // out of the generated source code.
+  this.parent().append(serializer_code).append(deserializer_code)
+  
+  // The compiler will replace the AST of this meta function call with the node
+  // returned by the function. Returning `null` makes the compiler delete the
+  // meta function call node.
+  return null
+}
+
+type settings_t {
+  uint width
+  uint height
+  ubyte brightness
+  bool filter
+  
+  // Many more variable definitions
+  …
+  
+  // Call to metea function that generates serialize() and deserialize()
+  serializable()
+}

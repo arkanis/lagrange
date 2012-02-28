@@ -1,0 +1,61 @@
+import c.libavcodec.avcodec
+import c.libswscale.swscale
+
+decode in(ubyte[] data, uword width, uword height, function.in(ubyte[] pic) handler)
+       out(word)
+{
+  // Init libavcodec and fetch the H264 decoder
+  avcodec_register_all()
+  auto codec = avcodec_find_decoder CODEC_ID_H264
+  if !codec_ptr // Codec not found
+    return 1
+  
+  // Init the decoder
+  auto codec_context = avcodec_alloc_context3 codec
+  if avcodec_open(codec_context, codec) < 0 // Could not init codec
+    return 1
+  
+  // Configure the software scaler to convert images into another color space (or
+  // size, or alignment, etc). Usually codecs output PIX_FMT_YUV420P.
+  auto scaler = sws_getContext(width, height, codec_context.pix_fmt,
+    width, height, PIX_FMT_RGB24,
+    SWS_FAST_BILINEAR, null, null, null);
+  
+  // Allocate the buffer for the decoded RGB24 picture
+  ubyte[] decoded_picture
+  decoded_picture.length = width * height * 3
+  
+  auto frame = avcodec_alloc_frame()
+  AVPacket packet
+  word frame_decoded
+  uword bytes_decoded = 0
+  
+  while bytes_decoded < data.length {
+    // Fill packet with raw data
+    packet.data = data.ptr + bytes_decoded
+    packet.size = data.length - bytes_decoded
+    
+    auto bytes_consumed = avcodec_decode_video2 codec_context, frame, ptr(frame_decoded), ptr(packet)
+    if bytes_consumed < 0 // something went wrong in the decoder
+      return 2
+    
+    if frame_decoded {
+      // Frame was decoded, convert it to RGB24
+      sws_scale scaler, frame.data, frame.linesize,
+        0, height, decoded_picture.ptr, ptr(width)
+      // Call the handler with the decoded picture
+      handler(decoded_picture)
+    }
+  }
+  
+  // Free the scaler and decoder
+  sws_freeContext scaler
+  avcodec_close codec_context
+  av_free codec_context
+  
+  return 0
+}
+
+decode h264_bitstream_data, width, height, (pic){
+  // This inline function is called once for each decoded RGB24 picture
+}

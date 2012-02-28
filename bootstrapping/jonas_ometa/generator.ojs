@@ -1,0 +1,169 @@
+/**
+ * A small conviniance function that just joins all its arguments. Idea by Jona.
+ */
+function join(elem, elem){
+	return [].join.call(arguments, '')
+}
+
+
+/**
+ * Code generator context. Used to store the symbol table and keep track of the
+ * type of registers, etc.
+ */
+function CodeContext(){
+	this.source = ""
+	this.string_table = []
+	this.scope_stack = []
+	this.reg_count = 0
+	
+	this.gen_number = function(){
+	  return this.reg_count++;
+	}
+	
+	this.enter_scope = function(){
+		this.scope_stack.push([])
+		return this
+	};
+	
+	this.leave_scope = function(){
+		this.scope_stack.pop()
+		return this
+	};
+	
+	this.def = function(name, obj){
+		this.scope_stack[this.scope_stack.length - 1][name] = obj
+		return this
+	}
+	
+	this.resolve = function(name){
+		for(var i = this.scope_stack.length - 1; i >= 0; i--){
+			if (this.scope_stack[i][name] != undefined)
+				return this.scope_stack[i][name]
+		}
+		
+		throw join('Could not resolve', name, 'in the current scope stack')
+	}
+	
+	this.emit = function(new_code){
+		joined_code = [].join.call(arguments, '')
+		//console.log('emitted:', joined_code)
+		this.source += joined_code
+		return this
+	};
+	
+	this.emit_reg = function(type, expr_code){
+		var reg_name = join('%r', this.reg_count)
+		this.reg_count++
+		joined_expr_code = [].slice.call(arguments, 1).join('')
+		//console.log('emitted reg', reg_name, ':', joined_expr_code)
+		this.source += join(reg_name, ' = ', joined_expr_code)
+		this.def(reg_name, type)
+		return reg_name
+	};
+	
+	this.type_of_reg = function(reg_name){
+		return this.resolve(reg_name)
+	};
+	
+	// A small private helper that returns the LLVM type for the string
+	// Note: the +1 is because of the NULL terminator
+	var string_type = function(string_content){
+		return join('[', string_content.length + 1, ' x i8]')
+	}
+	
+	this.collect_string = function(string_content){
+		var i = this.string_table.indexOf(string_content)
+		if (i === -1)
+			i = this.string_table.push(string_content) - 1
+		
+		return {name: join('@s', i), type: string_type(string_content)}
+	};
+	
+	/**
+	 * Generates LLVM internal constants for all entries in the string table.
+	 * The LLVM code is _prepended_ to the normal code
+	 * DOES NOT WORK WITH UNICODE CHARS (chars longer than 1 byte)!
+	 */
+	this.emit_string_table = function(){
+		var entries = []
+		for(var i = 0; i < this.string_table.length; i++){
+			var llvm_str = this.string_table[i].replace(/[^\u0020-\u008F]/, function(match){
+				var hex = match[0].charCodeAt(0).toString(16)
+				return '\\' + (hex.length == 1 ? '0' + hex : hex)
+			})
+			entries.push( join('@s', i, ' = internal constant ', string_type(this.string_table[i]), ' c"', llvm_str, '\\00"') )
+		}
+		this.source = join(entries.join('\n'), '\n\n', this.source)
+		return this
+	}
+}
+
+var code = new CodeContext()
+
+
+ometa Generator {
+	
+	// Generic walk rule with warnings
+	walk = ~string [:type apply(type):res]                                        -> res
+	     | ~string [:type :props anything*:children]                              -> console.warn('no rule for', type)
+	     | ~undefined :obj                                                        -> console.warn('no rule for obj:', obj),
+	
+	// Generic walk rule, requires a rule for each AST node
+	//walk = ~string [:type apply(type):res]                                        -> res,
+	
+	
+	Module :props = !code.enter_scope() walk* !code.leave_scope()
+	                !code.emit_string_table()                                     -> code['source'],
+	
+	// Declarations
+	Declare :props = FuncDecl*:fds                                                -> code.emit( fds.join("\n"), '\n\n' ),
+	FuncDecl       = ['Function' :props string:name FuncDeclIn:i FuncDeclOut:o]
+	                 !code.def(name, {ret: o, args: i})                           -> join('declare ', o, ' @', name, i),
+	FuncDeclIn     = ['In' :props ArgType*:args]                                  -> join('(', args.join(', '), ')'),
+	FuncDeclOut    = ['Out' :props]                                               -> 'void'
+	               | ['Out' :props ArgType:arg]                                   -> arg
+	               | ['Out' :props ArgType+:args]                                 -> join('{', args.join(', '), '}'),
+	
+	ArgType = ['Arg' :props walk:type string?]                                    -> type
+	        | ['Varargs' :props]                                                  -> '...',
+	
+	// Function definitions
+	Function :props = string:name walk:i walk:o
+	                  !code.def(name, {ret: o, args: i}).emit('define ', o, ' @', name, i)
+	                  walk:body,
+	In       :props = walk*:args                                                  -> join('(', args.join(', '), ')'),
+	Out      :props = walk:arg                                                    -> arg
+	                | walk+:args                                                  -> join('{', args.join(', '), '}')
+	                | empty                                                       -> 'void',
+	
+	Arg      :props = walk:type string:name                                       -> join(type, ' %', name),
+	Arg      :props = walk:type                                                   -> type,
+	Varargs  :props = empty                                                       -> '...',
+	
+	// Blocks (e.g. function body)
+	Block :props = !code.emit('{\n').enter_scope() walk* !code.leave_scope().emit('\n}'),
+	
+	// Statements
+	Call   :props = string:name CallArgs*:args !(code.resolve(name)):func         -> code.emit_reg('i32', 'call ', func.ret, ' ', func.args, '* @', name, '(', args.join(', '), ')\n'),
+	CallArgs      = walk:reg_name                                                 -> join(code.type_of_reg(reg_name), ' ', reg_name),
+	Return :props = walk:reg_name                                                 -> code.emit('ret ', code.type_of_reg(reg_name), ' ', reg_name),
+	
+	// Literals
+	String  :props = string:content !(code.collect_string(content)):str_const     -> code.emit_reg('i8*', 'getelementptr ', str_const.type, '* ', str_const.name, ', i32 0, i32 0\n'),
+	Float   :props = number:value                                                 -> code.emit_reg('double', 'fadd double ', value, ' 0\n'),
+	Integer :props = number:value                                                 -> code.emit_reg('i64', 'add i64 ', value, ', 0\n'),
+	
+	// Types
+	PtrType  :props = walk:t                                                      -> join(t, '*'),
+	Type     :props = 'byte'                                                      -> 'i8'
+	                | 'short'                                                     -> 'i16'
+	                | 'int'                                                       -> 'i32'
+	                | 'long'                                                      -> 'i64'
+	                | 'word'                                                      -> 'i64'
+}
+
+module.exports = {
+	generate: function(ast){
+		return Generator.match(ast, 'walk')
+	}
+}
