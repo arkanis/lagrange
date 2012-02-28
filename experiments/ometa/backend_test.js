@@ -14,7 +14,7 @@ var code = fs.readFileSync(input_file, 'utf8')
 
 // Spawn and setup the LLVM and GCC pipe
 var spawn = require('child_process').spawn
-var llvm = spawn('llc-2.8')
+var llvm = spawn('llc-2.9')
 var gcc = spawn('gcc', ['-x', 'assembler', '-', '-o', output_file])
 
 llvm.stdout.on('data', function(data){
