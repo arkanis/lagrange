@@ -297,6 +297,7 @@ states_t grow_lr0_automation(grammar_p grammar, action_p* action_table_out_ptr, 
 				
 				bool state_duplicated = false;
 				size_t k;
+				size_t target_index;
 				for(k = 0; k < state_count; k++) {
 					if ( item_set_equals(&states[k], &new_state) ) {
 						state_duplicated = true;
@@ -304,25 +305,25 @@ states_t grow_lr0_automation(grammar_p grammar, action_p* action_table_out_ptr, 
 					}
 				}
 				
+				// State already present, so use this as index
 				if (state_duplicated) {
-					size_t target_index = k;
-					if ( is_terminal(grammar->symbols[j]) ) {
-						// action[i, j] = shift(target_index)
-					} else {
-						// action[i, j] = ?
-						
-					}
-					
+					target_index = k;
+				
+				// Create a new state in our state-table
+				} else {
+					state_count++;
+					states = realloc(states, state_count * sizeof(item_set_t));
+					states[state_count - 1] = new_state;
+					target_index = state_count - 1;
+
+					// also create a row in our action table:
+					add_action_table_row();
 				}
-				
-				
-				
-				if (state_duplicated)
-					continue;
-				
-				state_count++;
-				states = realloc(states, state_count * sizeof(item_set_t));
-				states[state_count - 1] = new_state;
+
+				// use this information to complete parse table:
+				if ( is_terminal(grammar->symbols[j]) ) {
+					// action[i, j] = shift(target_index)				
+				}				
 			}
 		}
 		
