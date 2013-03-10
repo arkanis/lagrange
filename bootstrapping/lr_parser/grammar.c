@@ -322,8 +322,8 @@ states_t grow_lr0_automation(grammar_p grammar, action_p* action_table_out_ptr, 
 
 				// use this information to complete parse table:
 				if ( is_terminal(grammar->symbols[j]) ) {
-					// action[i, j] = shift(target_index)				
-				}				
+					action_table[ati(i, j)] = (action_t){ LR_SHIFT, .shift_state = target_index };
+				}
 			}
 		}
 		
@@ -334,6 +334,31 @@ states_t grow_lr0_automation(grammar_p grammar, action_p* action_table_out_ptr, 
 	*action_table_out_ptr = action_table;
 	*goto_table_out_ptr = goto_table;
 	return (states_t){ state_count, states };
+}
+
+void print_action_table(action_p action_table, size_t state_count, grammar_p g){
+	printf("action table:\n");
+	for(size_t i = 0; i < state_count; i++){
+		for(size_t j = 0; j < g->terminal_count; j++){
+			action_t action = action_table[i*g->terminal_count + j];
+			switch(action.type){
+				case LR_SHIFT:
+					printf(" s%02zu", action.shift_state);
+					break;
+				case LR_REDUCE:
+					printf(" r%02zu", action.production_idx);
+					break;
+				case LR_ACCEPT:
+					printf(" acc");
+					break;
+				case LR_ERROR:
+					printf("    ");
+					break;
+			}
+		}
+		
+		printf("\n");
+	}
 }
 
 void test_increment_closure(grammar_p g){
@@ -385,6 +410,7 @@ int main(int argc, char** argv){
 	action_p action_table = NULL;
 	ssize_t* goto_table = NULL;
 	states_t states = grow_lr0_automation(&grammar, &action_table, &goto_table);
+	print_action_table(action_table, states.length, &grammar);
 	
 	
 	/*
