@@ -1,0 +1,124 @@
+/**
+ * Flattens a nested list of AST nodes into a non-nested list.
+ * 
+ * For example the following node list
+ * 
+ *   [node1, [node2, node3], node4]
+ * 
+ * is flattened to
+ * 
+ *   [node1, node2, node3, node4]
+ * 
+ * Only one nesting level is flattend. This is useful for rules that only return
+ * one node but logically return many nodes (e.g. a variable definition).
+ */
+function flatten(nodes){
+  var flattened = []
+  for(var i = 0; i < nodes.length; i++){
+    if ( typeof nodes[i] == 'object' ) {
+      if ( typeof nodes[i][0] == 'string' )
+        flattened.push(nodes[i])
+      else
+        flattened = flattened.concat(nodes[i])
+    } else {
+      throw join("Flatten can only work with a list of arrays (AST nodes) but the list contained something else: ", nodes[i])
+    }
+  }
+  return flattened
+}
+
+ometa Parser {
+	// Whitespace rules
+	nl = '\n' | seq('\r\n'),
+	ws = ' ' | '\t' | '\u000B' | '\u000C',
+	
+	// End and mid of statement
+	eos = ws* (nl | ';'),
+	mos = (ws | nl)*,
+	
+	// Basic rules
+	token :k = mos seq(k),
+	identifier = < letter (letterOrDigit | '_')* >,
+	
+	
+	// Module
+	module = (declare | definition)*:defs eos end                                 -> [#Module, {}].concat(flatten(defs)),
+	
+	// Declarations (external stuff)
+	declare = "declare" ( "(" "C":cc ")" )? ( "{" decl_entry*:ds "}"    -> ds
+	                                        | "do" decl_entry*:ds "end" -> ds
+	                                        | decl_entry:d              -> [d]
+	                                        ):decls                               -> [#Declare, cc == undefined ? {} : {cc: 'C'}].concat(decls),
+	// EXT: put signatures for types, affixes, etc. here, too
+	decl_entry = func_sig:sig eos                                                 -> sig,
+	
+	// Definitions
+	definition = func_def | global_def,
+	
+	// Variable definition
+	global_def    = mos type:t listOf(#var_def_entry, ','):vars eos               -> vars.map(function(v){ return [#Global, {}, t].concat(v); }),
+	var_def       = mos type:t listOf(#var_def_entry, ','):vars eos               -> vars.map(function(v){ return [#Var, {}, t].concat(v); }),
+	var_def_entry = mos identifier:i ( "=" mos expression:e )?                    -> [/* ID inserted by rules above */ i, e],
+	
+	// Function definitions
+	func_def = func_sig:sig block:body                                            -> sig.concat([body]),
+	func_sig = "function" mos identifier:name func_mod*:mods                      -> [#Function, {}, name].concat(mods)
+	         | mos identifier:name func_mod+:mods                                 -> [#Function, {}, name].concat(mods),
+	func_mod = in_mod | out_mod,
+	
+	type_def = mos identifier:name type_def_modifier*:mods block:body             -> [#Type, {}, name, mods, body],
+	type_def_modifier = in_mod,
+	
+	affix_def = mos identifier:name func_def_modifier*:mods block:body            -> [#Affix, {}, name, mods, body],
+	operator_def = mos identifier:name func_def_modifier*:mods block:body         -> [#Operator, {}, name, mods, body],
+	
+	// Modifiers
+	in_mod      = "in" "(" in_mod_args:args ")"                                   -> [#In, {}].concat(args),
+	in_mod_args = in_mod_var_args:va                                              -> [va]
+	            | in_mod_arg:first "," in_mod_args:rest                           -> [first].concat(rest)
+	            | in_mod_arg:arg                                                  -> [arg],
+	in_mod_var_args  = mos ``...''                                                -> [#Varargs, {}],
+	in_mod_arg       = mos type:t mos identifier:n                                -> [#Arg, {}, t, n],
+	out_mod     = "out" "(" listOf(#out_mod_arg, ','):args ")"                    -> [#Out, {}].concat(args),
+	out_mod_arg = mos type:t                                                      -> [#Arg, {}, t],
+	
+	// Block
+	block = ( "{" statement*:stms "}" | "do" statement*:stms "end" )              -> [#Block, {}].concat(flatten(stms)),
+	
+	// Statements
+	statement = ret_stm | call_stm | var_def,
+	call_stm  = mos identifier:callee ( "(" listOf(#call_arg, ','):args ")"
+	                                  | listOf(#call_arg, ','):args
+	                                  ) eos                                       -> [#Call, {}, callee].concat(args),
+	call_arg  = mos expression:v                                                  -> v,
+	ret_stm   = "return" mos expression:v eos                                     -> [#Return, {}, v],
+	
+	// Expressions
+	expression = identifier:name                                                  -> [#Var, {}, name]
+	           | string_lit
+	           | float_lit
+	           | integer_lit,
+	
+	// Literals
+	string_lit     = '"' ( string_esc_seq | ~'"' char )*:v '"'                    -> [#String, {}, v.join('')],
+	string_esc_seq = '\\' ( 'n'                                                   -> '\n'
+	                      | 'r'                                                   -> '\r'
+	                      | 't'                                                   -> '\t'
+	                      ),
+	float_lit   = <digit+ '.' digit+>:v                                           -> [#Float, {}, parseFloat(v)],
+	integer_lit = ``0x'' <(digit | 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | '_')+>:v   -> [#Integer, {radix: #hex}, parseInt(v.replace('_', ''), 16)]
+	            | ``0o'' <('0'|'1'|'2'|'3'|'4'|'5'|'6'|'7'|'_')+>:v               -> [#Integer, {radix: #oct}, parseInt(v.replace('_', ''), 8)]
+	            | ``0b'' <('0' | '1' | '_')+>:v                                   -> [#Integer, {radix: #bin}, parseInt(v.replace('_', ''), 2)]
+	            | <digit (digit | '_')*>:v                                        -> [#Integer, {radix: #dec}, parseInt(v.replace('_', ''), 10)],
+	
+	// Types
+	type     = type:t '.' ``ptr''                                                 -> [#PtrType, {}, t]
+	         | raw_type:t                                                         -> t,
+	raw_type = 'u'?:us ( ``byte'' | ``short'' | ``int'' | ``long'' | ``word'' ):t -> [#Type, {unsigned: (us != undefined)}, t]
+}
+
+module.exports = {
+	parse: function(code){
+		return Parser.matchAll(code, 'module')
+	}
+}

@@ -1,0 +1,25 @@
+import std.io
+
+type stack_t in(type_t content_t) {
+  content_t[] entries
+  
+  push in(content_t entry) out(this.type) {
+    entries.length += 1
+    entries[-1] = entry
+    return this
+  }
+  
+  pop out(content_t entry) {
+    entry = entries[-1]
+    entries.length -= 1
+    return entry
+  }
+}
+
+function main {
+  stack_t(uint) stuff
+  stuff.push(0).push(8)
+  stuff.push 15
+  
+  println stuff.pop(), stuff.pop(), stuff.pop()
+}

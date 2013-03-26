@@ -1,0 +1,9 @@
+declare(C) printf in(ubyte.ptr format, ...) out(word)
+
+word error = 5, foo = 5.7
+
+function main in(word argc, ubyte.ptr.ptr argv) out(word) {
+	word what = 1
+	printf "Hello World!\n"
+	return 0
+}

@@ -1,0 +1,9 @@
+declare printf in(word format, word rest) out(word)
+declare do
+	exit in(word code)
+	function foo
+end
+
+function main in(word argc, word argv) out(word) {
+	printf("hello world!", 1_23, 0b1100_0101_11, 2.544)
+}
