@@ -13,10 +13,15 @@ typedef struct {
 } scanner_t, *scanner_p;
 
 typedef enum {
-	T_BEGIN, T_END, T_READ, T_WRITE, T_ID, T_INTLITERAL,
-	T_LPAREN, T_RPAREN, T_SEMICOLON, T_COMMA, T_ASSIGNOP,
-	T_PLUSOP, T_MINUSOP, T_EOF, T_ERROR
+	T_BEGIN, T_END, T_READ, T_WRITE,
+	T_ID, T_INTLITERAL,
+	T_LPAREN, T_RPAREN, T_SEMICOLON, T_COMMA,
+	T_ASSIGNOP, T_PLUSOP, T_MINUSOP,
+	T_EOF, T_ERROR
 } token_type_t;
+
+extern const char* token_names[] ;
+extern const char* token_descriptions[];
 
 typedef struct {
 	token_type_t type;

@@ -11,6 +11,22 @@
 
 #include "scanner.h"
 
+const char* token_names[] = {
+	"T_BEGIN", "T_END", "T_READ", "T_WRITE",
+	"T_ID", "T_INTLITERAL",
+	"T_LPAREN", "T_RPAREN", "T_SEMICOLON", "T_COMMA",
+	"T_ASSIGNOP", "T_PLUSOP", "T_MINUSOP",
+	"T_EOF", "T_ERROR"
+};
+
+const char* token_descriptions[] = {
+	"begin", "end", "read", "write",
+	"id", "intliteral",
+	"(", "(", ";", ",",
+	":=", "+", "-",
+	"eof", "error"
+};
+
 
 static bool    at_eof(scanner_p scan);
 static int     get(scanner_p scan);
@@ -59,7 +75,7 @@ void scanner_destroy(scanner_p scan){
 
 token_t scanner_read(scanner_p scan){
 	token_t token_at_current_pos(token_type_t type){
-		return (token_t){ type, scan->data + scan->pos, 1 };
+		return (token_t){ type, scan->data + scan->pos - 1, 1 };
 	}
 	
 	int in;
@@ -74,7 +90,7 @@ token_t scanner_read(scanner_p scan){
 			continue;
 		} else if ( isalpha(in) ) {
 			// identifier
-			tok = token_at_current_pos(T_INTLITERAL);
+			tok = token_at_current_pos(T_ID);
 			for(int c = get(scan); isalnum(c) || c == '_'; c = get(scan))
 				tok.length++;
 			unget(scan);
@@ -146,7 +162,8 @@ static int get(scanner_p scan){
 }
 
 static void unget(scanner_p scan){
-	scan->pos--;
+	if ( !at_eof(scan) )
+		scan->pos--;
 }
 
 static token_t id_or_reserved(token_t token){
