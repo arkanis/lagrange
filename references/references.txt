@@ -1,0 +1,47 @@
+Creating a C-like language parser in C/C++
+	http://ubuntuforums.org/showthread.php?t=1141982
+	Especially the later posts put hand-written parsers into perspective: They're used by almost every compiler.
+
+How to write a very basic compiler
+	http://programmers.stackexchange.com/questions/17824/should-i-use-a-parser-generator-or-should-i-roll-my-own-custom-lexer-and-parser
+	Good resources but the top answer is a bit generator centric.
+
+How to write a very basic compiler
+	http://programmers.stackexchange.com/questions/165543/how-to-write-a-very-basic-compiler
+	Good general tipps on writing your own compiler. Basically just what Gittinger did.
+
+
+# Further resources not yet scanned
+
+Let's Build a Compiler, by Jack Crenshaw
+	http://www.compilers.iecc.com/crenshaw/
+
+What are some resources for writing a parser in C?
+	https://www.quora.com/What-are-some-resources-for-writing-a-parser-in-C
+
+Regular Expression Matching Can Be Simple And Fast (but is slow in Java, Perl, PHP, Python, Ruby, ...)
+	https://swtch.com/~rsc/regexp/regexp1.html
+	Looks like a very good article about building a basic regex engine. Maybe useful for a lexer but in practice for not much else, I guess.
+
+Earley Parsing Explained
+	http://loup-vaillant.fr/tutorials/earley-parsing/
+	Easy but very powerful.
+
+
+# Magic integer division
+
+Efficent division in assembly (x86_64)
+	http://ubuntuforums.org/showthread.php?t=1674841
+	Might shed some light into the MUL, IMUL and DIV instructions.
+
+Integer division by constants
+	https://blogs.msdn.microsoft.com/devdev/2005/12/12/integer-division-by-constants/
+	Some tricks about integer division
+
+How can I reverse optimized integer division/modulo by constant operations?
+	http://reverseengineering.stackexchange.com/questions/1397/how-can-i-reverse-optimized-integer-division-modulo-by-constant-operations
+	A bit hard to understand explaination of magic integer division.
+
+libdivide
+	http://libdivide.com/
+	Runtime implementation of magic integer division.
