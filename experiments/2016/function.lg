@@ -1,0 +1,5 @@
+function main in(int argc, ptr argv) out(int) {
+	int x = 1 + 2
+	print "hello \t world!\n"
+	return x
+}
