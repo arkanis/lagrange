@@ -1,2 +1,0 @@
-#!/bin/bash
-scala -cp ./bin:./lib/kiama_2.9.2-1.4.0.jar:./lib/jline-1.0.jar de.arkanis.lagrange.interpreter.Main
