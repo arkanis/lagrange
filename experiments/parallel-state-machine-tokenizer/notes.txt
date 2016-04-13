@@ -1,0 +1,55 @@
+function main {
+	return 1 + 2
+}
+
+Tokens
+
+"function"
+ws → (9, 10, 32) \t \n space
+id → a-zA-z_ a-zA-Z_0-9*
+"{"
+"return"
+num → 1-9 0-9*
+"+"
+"}"
+
+token_t
+	str_t keyword
+	range_t[] first_ranges
+	range_t[] rest_ranges
+
+range_t
+	start
+	end
+
+token file
+
+s	function
+s	{
+s	}
+s	return
+r	num
+rf	1 9
+rr	0 9
+r	ws
+rra	9 10
+rra	32 32
+
+program to generate headerfile with token IDs?
+name of the token IDs in header files (e.g. for "{")? every token needs a name and type
+
+s	FUNC	function
+s	BO	{
+s	BC	}
+s	RET	return
+r	NUM
+	f	1 9
+	r	0 9
+r	WS
+	...
+
+
+read tokens
+sort keyword tokens by length (longest first)
+range tokens after keyword tokens
+search for conflicting token specs?
