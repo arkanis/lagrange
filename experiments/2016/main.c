@@ -1,51 +1,72 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
 #include "lexer.h"
 #include "parser.h"
 
+void* sgl_fload(const char* filename, size_t* size);
+
 int main(int argc, char** argv) {
-	if (argc > 2) {
-		fprintf(stderr, "usage: %s [source-file]\n", argv[0]);
+	if (argc != 2) {
+		fprintf(stderr, "usage: %s source-file\n", argv[0]);
 		return 1;
 	}
 	
-	FILE* input = stdin;
-	if (argc == 2) {
-		input = fopen(argv[1], "rb");
-		if (input == NULL) {
-			perror("fopen()");
-			return 1;
-		}
-	}
+	size_t source_size = 0;
+	char* source = sgl_fload(argv[1], &source_size);
+	tokenized_file_p file = tokenize_str(source, source_size, argv[1], stderr);
 	
-	tok_init();
-	token_p tokens = NULL;
-	size_t token_count = 0;
-	
-	token_t t;
-	do {
-		t = tok_next(input, stderr);
-		if (t.type == T_COMMENT || t.type == T_WS) {
-			printf("%.*s", (int)t.length, t.str_val);
+	for(size_t i = 0; i < file->token_count; i++) {
+		token_p t = &file->tokens[i];
+		if (t->type == T_COMMENT || t->type == T_WS) {
+			printf("%.*s", t->size, t->source);
 		} else {
 			char buffer[128];
-			tok_dump(t, buffer, sizeof(buffer));
+			token_dump(t, buffer, sizeof(buffer));
 			printf("%s ", buffer);
 		}
-		
-		token_count++;
-		tokens = realloc(tokens, sizeof(token_t) * token_count);
-		tokens[token_count-1] = t;
-	} while (t.type != T_EOF);
+	}
 	printf("\n");
 	
-	if (input != stdin)
-		fclose(input);
+	parse_module(file);
 	
-	parse_module(tokens, token_count);
-	
-	for(size_t i = 0; i < token_count; i++)
-		tok_free(tokens[i]);
+	tokenized_file_free(file);
+	free(source);
 	
 	return 0;
+}
+
+void* sgl_fload(const char* filename, size_t* size) {
+	long filesize = 0;
+	char* data = NULL;
+	int error = -1;
+	
+	FILE* f = fopen(filename, "rb");
+	if (f == NULL)
+		return NULL;
+	
+	if ( fseek(f, 0, SEEK_END)              == -1       ) goto fail;
+	if ( (filesize = ftell(f))              == -1       ) goto fail;
+	if ( fseek(f, 0, SEEK_SET)              == -1       ) goto fail;
+	if ( (data = malloc(filesize + 1))      == NULL     ) goto fail;
+	// TODO: proper error detection for fread and get proper error code with ferror
+	if ( (long)fread(data, 1, filesize, f)  != filesize ) goto free_and_fail;
+	fclose(f);
+	
+	data[filesize] = '\0';
+	if (size)
+		*size = filesize;
+	return (void*)data;
+	
+	free_and_fail:
+		error = errno;
+		free(data);
+	
+	fail:
+		if (error == -1)
+			error = errno;
+		fclose(f);
+	
+	errno = error;
+	return NULL;
 }

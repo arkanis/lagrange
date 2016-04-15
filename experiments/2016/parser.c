@@ -14,141 +14,51 @@ typedef struct {
 } parser_t, *parser_p;
 
 
-token_p peek(parser_p parser) {
-	if (parser->pos + 1 < parser->token_count)
-		return &parser->tokens[parser->pos+1];
+int next_filtered_token_at(parser_p parser, size_t pos) {
+	size_t offset = 0;
+	while (pos + offset < parser->token_count) {
+		token_type_t type = parser->tokens[pos + offset].type;
+		// Return the offset if we found a filtered token there
+		if ( type != T_WS && type != T_COMMENT )
+			return offset;
+		offset++;
+	}
 	
-	fprintf(stderr, "peeked beyond EOF!\n");
-	return NULL;
+	// We're either beyond the last token or found no filtered token beyond pos
+	return -1;
 }
 
-token_type_t peek_type(parser_p parser) {
-	return peek(parser)->type;
-}
-
-token_t consume(parser_p parser) {
-	if (parser->pos < parser->token_count)
-		return parser->tokens[parser->pos++];
+#define consume(parser) consume_impl((parser), __FUNCTION__, __LINE__)
+token_p consume_impl(parser_p parser, const char* caller, int line) {
+	int offset = next_filtered_token_at(parser, parser->pos);
+	// Return NULL if there are no more filtered tokens
+	if (offset == -1)
+		return NULL;
 	
-	fprintf(stderr, "consumed token beyond EOF!\n");
-	abort();
-}
-
-token_t consume_type(parser_p parser, token_type_t type) {
-	token_t t = consume(parser);
-	if (t.type == type)
-		return t;
+	parser->pos += offset;
+	token_p current_token = &parser->tokens[parser->pos];
+	parser->pos++;
 	
-	fprintf(stderr, "consumed wrong token! expected type %d, got %d\n", type, t.type);
-	abort();
+	char token_desc[128];
+	token_dump(current_token, token_desc, sizeof(token_desc));
+	printf("%s:%d consume %s\n", caller, line, token_desc);
+	token_annotate_line(current_token);
+	
+	return current_token;
 }
-
-
-
-tree_p parse_func_def(parser_p parser);
-tree_p parse_var_def(parser_p parser);
-bool is_stmt_start(token_type_t type);
-tree_p parse_stmt(parser_p parser);
-bool is_expr_start(token_type_t type);
-tree_p parse_expr(parser_p parser);
-
 
 //
 // Definitions
 //
 
-tree_p parse_module(token_p tokens, size_t token_count) {
-	parser_t parser_storage = { tokens, token_count, 0 };
+tree_p parse_module(tokenized_file_p file) {
+	parser_t parser_storage = { file->tokens, file->token_count, 0 };
 	parser_p parser = &parser_storage;
 	
-	printf("module:\n");
-	while (true) {
-		if ( peek_type(parser) == T_FUNC ) {
-			parse_func_def(parser);
-		} else if ( is_expr_start(peek_type(parser)) ) {
-			parse_var_def(parser);
-		} else {
-			break;
-		}
-	}
-	consume_type(parser, T_EOF);
+	token_p t;
+	do {
+		t = consume(parser);
+	} while (t->type != T_EOF);
 	
 	return NULL;
-}
-
-tree_p parse_func_def(parser_p parser) {
-	printf("  func");
-	consume_type(parser, T_FUNC);
-	token_t id = consume_type(parser, T_ID);
-	printf(" id %.*s:\n", (int)id.length, id.str_val);
-	consume_type(parser, T_CBO);
-	
-	while ( is_stmt_start(peek_type(parser)) )
-		parse_stmt(parser);
-	
-	consume_type(parser, T_CBC);
-	
-	return NULL;
-}
-
-tree_p parse_var_def(parser_p parser) {
-	parser = parser;
-	abort();
-}
-
-
-//
-// Statements
-//
-
-bool is_stmt_start(token_type_t type) {
-	switch(type) {
-		case T_RET:
-			return true;
-		default:
-			return is_expr_start(type);
-	}
-}
-
-tree_p parse_stmt(parser_p parser) {
-	printf("    stmt:\n");
-	consume_type(parser, T_RET);
-	parse_expr(parser);
-	consume_type(parser, T_EOS);
-	return NULL;
-}
-
-
-//
-// Expressions
-//
-
-bool is_expr_start(token_type_t type) {
-	switch(type) {
-		case T_ID:
-		case T_RBO:
-		case T_INT:
-		case T_STR:
-			return true;
-		default:
-			return false;
-	}
-}
-
-tree_p parse_expr(parser_p parser) {
-	token_t t = consume(parser);
-	switch(t.type) {
-		case T_ID:
-			printf("      expr id: %.*s\n", (int)t.length, t.str_val);
-			return NULL;
-		case T_INT:
-			printf("      expr int: %d\n", t.int_val);
-			return NULL;
-		case T_STR:
-			printf("      expr str: \"%.*s\"\n", (int)t.length, t.str_val);
-			return NULL;
-		default:
-			abort();
-			return NULL;
-	}
 }
