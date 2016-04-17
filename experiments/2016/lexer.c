@@ -78,7 +78,7 @@ int token_dump(token_p token, char* buffer, size_t buffer_size) {
 	return -1;
 }
 
-void token_annotate_line(token_p token) {
+void token_print_line(token_p token) {
 	char* line_start = token->source;
 	char* line_end = token->source;
 	while (line_start > token->file->source && *(line_start-1) != '\n')
@@ -167,7 +167,7 @@ token_t next_token(tokenizer_p tokenizer) {
 		case '(':
 			return new_token(tokenizer, T_RBO, -1, 1);
 		case ')':
-			return new_token(tokenizer, T_RBO, -1, 1);
+			return new_token(tokenizer, T_RBC, -1, 1);
 		case ',':
 			return new_token(tokenizer, T_COMMA, -1, 1);
 		case '=':
