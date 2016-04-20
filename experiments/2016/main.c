@@ -28,7 +28,10 @@ int main(int argc, char** argv) {
 	}
 	printf("\n");
 	
-	parse_module(file);
+	node_p tree = parse(file, parse_expr);
+	printf("\n");
+	node_print(tree, stdout, 0);
+	//parse_module(file);
 	
 	tokenized_file_free(file);
 	free(source);

@@ -2,6 +2,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #include "lexer.h"
 
@@ -11,6 +12,7 @@ typedef struct {
 	int line;
 	tokenized_file_p file;
 	FILE* errors;
+	bool at_eof;
 } tokenizer_t, *tokenizer_p;
 
 static int     consume_char(tokenizer_p tokenizer);
@@ -33,6 +35,7 @@ tokenized_file_p tokenize_str(char* source, size_t size, const char* name, FILE*
 	tokenizer.line = 1;
 	tokenizer.file = file;
 	tokenizer.errors = errors;
+	tokenizer.at_eof = false;
 	
 	token_t t;
 	do {
@@ -103,8 +106,10 @@ void token_print_line(token_p token) {
 //
 
 static int consume_char(tokenizer_p tokenizer) {
-	if (tokenizer->pos >= tokenizer->file->source_size)
+	if (tokenizer->pos >= tokenizer->file->source_size) {
+		tokenizer->at_eof = true;
 		return EOF;
+	}
 	
 	int c = tokenizer->file->source[tokenizer->pos];
 	tokenizer->pos++;
@@ -116,7 +121,11 @@ static int consume_char(tokenizer_p tokenizer) {
 }
 
 static void revert_char(tokenizer_p tokenizer) {
-	if (tokenizer->pos == 0)
+	// Don't revert if we're at the first char or if we're at the EOF
+	// Otherwise some loops (e.g. int lexing loop) will hand since it
+	// allways reverts the EOF, parses one digit, reverts the EOF, etc.
+	// This is the same behavour as with ungetc().
+	if (tokenizer->pos == 0 || tokenizer->at_eof)
 		return;
 	
 	int c = tokenizer->file->source[tokenizer->pos];
@@ -206,6 +215,7 @@ token_t next_token(tokenizer_p tokenizer) {
 	}
 	
 	if ( c == '/' ) {
+		int old_c = c;
 		c = consume_char(tokenizer);
 		
 		if (c == '/') {
@@ -249,6 +259,7 @@ token_t next_token(tokenizer_p tokenizer) {
 		
 		// Not a comment, put the peeked char back into stream so the / will be matched as an T_ID
 		revert_char(tokenizer);
+		c = old_c;
 	}
 	
 	if (c == '"') {
@@ -294,13 +305,13 @@ token_t next_token(tokenizer_p tokenizer) {
 		}
 	}
 	
-	if ( isalpha(c) || c == '+' || c == '-' || c == '*' || c == '/' ) {
+	if ( isalpha(c) || c == '+' || c == '-' || c == '*' || c == '/' || c == '_' ) {
 		token_t t = new_token(tokenizer, T_ID, -1, 1);
 		
 		do {
 			t.size++;
 			c = consume_char(tokenizer);
-		} while ( isalnum(c) );
+		} while ( isalnum(c) || c == '_' );
 		revert_char(tokenizer);
 		t.size--;
 		
@@ -314,6 +325,11 @@ token_t next_token(tokenizer_p tokenizer) {
 		return t;
 	}
 	
-	fprintf(tokenizer->errors, "Unknown character: '%c' (%d), ignoring\n", c, c);
-	return next_token(tokenizer);
+	// Abort on any unknown char. Ignoring them will just get us surprised...
+	fprintf(tokenizer->errors, "Unknown character: '%c' (%d), aborting\n", c, c);
+	abort();
+	return (token_t){0};
+	
+	//fprintf(tokenizer->errors, "Unknown character: '%c' (%d), ignoring\n", c, c);
+	//return next_token(tokenizer);
 }

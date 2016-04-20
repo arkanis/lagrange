@@ -8,10 +8,10 @@
 // Parser state and utility stuff
 //
 
-typedef struct {
+struct parser_s {
 	tokenized_file_p file;
 	size_t pos;
-} parser_t, *parser_p;
+};
 
 
 int next_filtered_token_at(parser_p parser, size_t pos, bool ignore_ws_eos) {
@@ -78,7 +78,7 @@ token_p consume_type_impl(parser_p parser, token_type_t type, const char* caller
 	if (t->type == type)
 		return t;
 	
-	token_p current_token = &parser->file->tokens[parser->pos];
+	token_p current_token = &parser->file->tokens[parser->pos-1];
 	
 	char token_desc[128];
 	token_dump(current_token, token_desc, sizeof(token_desc));
@@ -107,6 +107,15 @@ tree_p parse_module(tokenized_file_p file) {
 }
 */
 
+
+node_p parse(tokenized_file_p file, parser_rule_func_t rule) {
+	parser_t parser = { file, 0 };
+	return rule(&parser);
+}
+
+node_p parse_expr_ex(parser_p parser, bool collect_uops);
+
+/*
 tree_p parse_func_def(parser_p parser);
 tree_p parse_var_def(parser_p parser);
 bool is_stmt_start(token_type_t type);
@@ -193,22 +202,41 @@ bool is_expr_start(token_type_t type) {
 			return false;
 	}
 }
+*/
 
-tree_p parse_expr(parser_p parser) {
+node_p parse_expr(parser_p parser) {
+	return parse_expr_ex(parser, true);
+}
+
+node_p parse_expr_ex(parser_p parser, bool collect_uops) {
+	node_p node = NULL;
+	
 	token_p t = consume(parser);
 	switch(t->type) {
-		case T_ID:
-			printf("      expr id: %.*s\n", t->size, t->source);
+		case T_ID: {
+			sym_p sym_node = node_alloc(sym, NULL);
+			sym_node->name = t->source;
+			sym_node->size = t->size;
+			node = (node_p)sym_node;
 			break;
-		case T_INT:
-			printf("      expr int: %d\n", t->int_val);
+			}
+		case T_INT: {
+			int_p int_node = node_alloc(int, NULL);
+			int_node->value = t->int_val;
+			node = (node_p)int_node;
 			break;
-		case T_STR:
-			printf("      expr str: \"%.*s\"\n", t->str_size, t->str_val);
+			}
+		case T_STR: {
+			str_p str_node = node_alloc(str, NULL);
+			str_node->value = t->str_val;
+			str_node->size = t->str_size;
+			node = (node_p)str_node;
 			break;
+			}
 		case T_RBO:
-			printf("      expr paren:\n");
-			parse_expr(parser);
+			// TODO: remember somehow that this node was surrounded by brackets!
+			// Otherwise exact syntax reconstruction will be impossible.
+			node = parse_expr(parser);
 			consume_type(parser, T_RBC);
 			break;
 		default:
@@ -216,12 +244,25 @@ tree_p parse_expr(parser_p parser) {
 			return NULL;
 	}
 	
-	if (peek_type(parser) == T_ID) {
+	if (collect_uops && peek_type(parser) == T_ID) {
 		// Got an operator
-		consume_type(parser, T_ID);
-		parse_expr(parser);
-		return NULL;
+		uops_p uops_node = node_alloc(uops, NULL);
+		node->parent = (node_p)uops_node;
+		buf_append(uops_node->list, node);
+		
+		while (peek_type(parser) == T_ID) {
+			token_p id = consume_type(parser, T_ID);
+			sym_p op_node = node_alloc(sym, uops_node);
+			op_node->name = id->source;
+			op_node->size = id->size;
+			buf_append(uops_node->list, (node_p)op_node);
+			
+			node_p next_expr = parse_expr_ex(parser, false);
+			buf_append(uops_node->list, next_expr);
+		}
+		
+		return (node_p)uops_node;
 	}
 	
-	return NULL;
+	return node;
 }
