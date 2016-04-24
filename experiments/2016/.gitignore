@@ -1,3 +1,4 @@
 *.o
 main
 ast
+tests/*_test

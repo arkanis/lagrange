@@ -7,90 +7,87 @@
 #include "lexer.h"
 
 
-typedef struct {
-	size_t pos;
-	int line;
-	tokenized_file_p file;
-	FILE* errors;
-	bool at_eof;
-} tokenizer_t, *tokenizer_p;
+//
+// Token printing functions
+//
 
-static int     consume_char(tokenizer_p tokenizer);
-static void    revert_char(tokenizer_p tokenizer);
-static token_t new_token(tokenizer_p tokenizer, token_type_t type, int start_offset, int size);
-static void    append_token_str(token_p token, char c);
-static token_t next_token(tokenizer_p tokenizer);
-
-
-tokenized_file_p tokenize_str(char* source, size_t size, const char* name, FILE* errors) {
-	tokenized_file_p file = malloc(sizeof(tokenized_file_t));
-	file->name = name;
-	file->source = source;
-	file->source_size = size;
-	file->tokens = NULL;
-	file->token_count = 0;
-	
-	tokenizer_t tokenizer;
-	tokenizer.pos = 0;
-	tokenizer.line = 1;
-	tokenizer.file = file;
-	tokenizer.errors = errors;
-	tokenizer.at_eof = false;
-	
-	token_t t;
-	do {
-		t = next_token(&tokenizer);
-		
-		file->token_count++;
-		file->tokens = realloc(file->tokens, file->token_count * sizeof(file->tokens[0]));
-		file->tokens[file->token_count-1] = t;
-	} while (t.type != T_EOF);
-	
-	return file;
-}
-
-void tokenized_file_free(tokenized_file_p file) {
-	for(size_t i = 0; i < file->token_count; i++) {
-		if (file->tokens[i].type == T_STR)
-			free(file->tokens[i].str_val);
+static void token_print_escaped_str(FILE* stream, const char* str, int len) {
+	for(int i = 0; i < len && i < 20 && str[i] != '\0'; i++) {
+		switch(str[i]) {
+			case '\n': fprintf(stream, "\\n"); break;
+			case '\t': fprintf(stream, "\\t"); break;
+			default:   putc(str[i], stream);   break;
+		}
 	}
-	
-	free(file->tokens);
-	free(file);
 }
 
-int token_dump(token_p token, char* buffer, size_t buffer_size) {
-	switch(token->type) {
-		case T_COMMENT: snprintf(buffer, buffer_size, "comment(\"%.*s\")", token->size, token->source);  break;
-		case T_WS:      snprintf(buffer, buffer_size, "ws(\"%.*s\")", token->size, token->source);       break;
-		case T_WS_EOS:  snprintf(buffer, buffer_size, "ws_eos(\"%.*s\")", token->size, token->source);   break;
-		case T_FUNC:    snprintf(buffer, buffer_size, "func");                                           break;
-		case T_ID:      snprintf(buffer, buffer_size, "id(%.*s)", token->size, token->source);           break;
-		case T_CBO:     snprintf(buffer, buffer_size, "\"{\"");                                          break;
-		case T_CBC:     snprintf(buffer, buffer_size, "\"}\"");                                          break;
-		case T_RBO:     snprintf(buffer, buffer_size, "\"(\"");                                          break;
-		case T_RBC:     snprintf(buffer, buffer_size, "\")\"");                                          break;
-		case T_COMMA:   snprintf(buffer, buffer_size, "\",\"");                                          break;
-		case T_ASSIGN:  snprintf(buffer, buffer_size, "\"=\"");                                          break;
-		case T_RET:     snprintf(buffer, buffer_size, "return");                                         break;
-		case T_INT:     snprintf(buffer, buffer_size, "int(%d)", token->int_val);                        break;
-		case T_EOF:     snprintf(buffer, buffer_size, "EOF");                                            break;
-		case T_STR:     snprintf(buffer, buffer_size, "str(\"%.*s\")", token->str_size, token->str_val); break;
+void token_print(FILE* stream, token_p token, uint32_t flags) {
+	if (flags & TP_SOURCE) {
+		fprintf(stream, "%.*s", token->src_len, token->src_str);
+	} else if ( (flags & TP_DUMP) || (flags & TP_INLINE_DUMP) ) {
+		switch(token->type) {
+			case T_COMMENT:
+				fprintf(stream, "comment(");
+				if (flags & TP_DUMP)
+					fprintf(stream, "%.*s", token->src_len, token->src_str);
+				else
+					token_print_escaped_str(stream, token->src_str, token->str_len);
+				fprintf(stream, ")");
+				break;
+			case T_WS:
+				fprintf(stream, "ws(\"");
+				if (flags & TP_DUMP)
+					fprintf(stream, "%.*s", token->src_len, token->src_str);
+				else
+					token_print_escaped_str(stream, token->src_str, token->str_len);
+				fprintf(stream, "\")");
+				break;
+			case T_WS_EOS:
+				fprintf(stream, "ws_eos(\"");
+				if (flags & TP_DUMP)
+					fprintf(stream, "%.*s", token->src_len, token->src_str);
+				else
+					token_print_escaped_str(stream, token->src_str, token->str_len);
+				fprintf(stream, "\")");
+				break;
+			
+			case T_STR:
+				fprintf(stream, "str(\"");
+				if (flags & TP_DUMP)
+					fprintf(stream, "%.*s", token->str_len, token->str_val);
+				else
+					token_print_escaped_str(stream, token->str_val, token->str_len);
+				fprintf(stream, "\")");
+				break;
+			case T_INT:     fprintf(stream, "int(%ld)",       token->int_val);                  break;
+			case T_ID:      fprintf(stream, "id(%.*s)",      token->src_len, token->src_str);  break;
+			
+			case T_CBO:     fprintf(stream, "\"{\"");  break;
+			case T_CBC:     fprintf(stream, "\"}\"");  break;
+			case T_RBO:     fprintf(stream, "\"(\"");  break;
+			case T_RBC:     fprintf(stream, "\")\"");  break;
+			case T_COMMA:   fprintf(stream, "\",\"");  break;
+			case T_ASSIGN:  fprintf(stream, "\"=\"");  break;
+			
+			case T_FUNC:    fprintf(stream, "func");   break;
+			case T_RET:     fprintf(stream, "return"); break;
+			
+			case T_EOF:     fprintf(stream, "EOF");    break;
+		}
 	}
-	
-	return -1;
 }
 
-void token_print_line(token_p token) {
-	char* line_start = token->source;
-	char* line_end = token->source;
-	while (line_start > token->file->source && *(line_start-1) != '\n')
+void token_print_line(FILE* stream, token_p token, int first_line_indent) {
+	char* line_start = token->src_str;
+	while (line_start > token->list->src_str && *(line_start-1) != '\n')
 		line_start--;
-	while (*line_end != '\n' && line_end < token->file->source + token->file->source_size)
+	char* line_end = token->src_str;
+	while (*line_end != '\n' && line_end < token->list->src_str + token->list->src_len)
 		line_end++;
-	printf("%.*s\n", (int)(line_end - line_start), line_start);
+	fprintf(stream, "%.*s\n", (int)(line_end - line_start), line_start);
 	
-	for(char* c = line_start; c < token->source; c++) {
+	fprintf(stream, "%*s", first_line_indent, "");
+	for(char* c = line_start; c < token->src_str; c++) {
 		if ( isspace(*c) )
 			printf("%c", *c);
 		else
@@ -100,186 +97,231 @@ void token_print_line(token_p token) {
 }
 
 
-
 //
-// Local helper functions
+// Private lexer support functions
 //
 
-static int consume_char(tokenizer_p tokenizer) {
-	if (tokenizer->pos >= tokenizer->file->source_size) {
-		tokenizer->at_eof = true;
+typedef struct {
+	size_t pos;
+	token_list_p tokens;
+	FILE* errors;
+} lexer_t, *lexer_p;
+
+static int peek_at_offset(lexer_p lexer, size_t offset) {
+	if (lexer->pos + offset >= (size_t)lexer->tokens->src_len)
 		return EOF;
+	return lexer->tokens->src_str[lexer->pos + offset];
+}
+
+static int peek1(lexer_p lexer) {
+	return peek_at_offset(lexer, 0);
+}
+
+static int peek2(lexer_p lexer) {
+	return peek_at_offset(lexer, 1);
+}
+
+static token_t new_token(lexer_p lexer, token_type_t type, int chars_to_consume) {
+	if (lexer->pos + chars_to_consume > (size_t)lexer->tokens->src_len) {
+		fprintf(lexer->errors, "Tried to consume a char beyond EOF!\n");
+		abort();
 	}
 	
-	int c = tokenizer->file->source[tokenizer->pos];
-	tokenizer->pos++;
-	
-	if (c == '\n')
-		tokenizer->line++;
-	
-	return c;
+	token_t token = (token_t){
+		.list = lexer->tokens,
+		
+		.type = type,
+		.src_str = lexer->tokens->src_str + lexer->pos,
+		.src_len = chars_to_consume,
+		
+		.str_val = NULL,
+		.str_len = 0
+	};
+	lexer->pos += chars_to_consume;
+	return token;
 }
 
-static void revert_char(tokenizer_p tokenizer) {
-	// Don't revert if we're at the first char or if we're at the EOF
-	// Otherwise some loops (e.g. int lexing loop) will hand since it
-	// allways reverts the EOF, parses one digit, reverts the EOF, etc.
-	// This is the same behavour as with ungetc().
-	if (tokenizer->pos == 0 || tokenizer->at_eof)
+static void putc_into_token(lexer_p lexer, token_p token, int c) {
+	// Ignore any EOF that are put into a token
+	// TODO: Go idea? Might better abort() to catch errors and enless loops more easier.
+	if (c == EOF)
 		return;
 	
-	int c = tokenizer->file->source[tokenizer->pos];
-	tokenizer->pos--;
+	if (lexer->pos + 1 > (size_t)lexer->tokens->src_len) {
+		fprintf(lexer->errors, "Tried to consume a char beyond EOF!\n");
+		abort();
+	} else if (lexer->tokens->src_str + lexer->pos != token->src_str + token->src_len) {
+		fprintf(lexer->errors, "Tried to put a char into a token thats end isn't the current lexer position!\n");
+		abort();
+	} else if (lexer->tokens->src_str[lexer->pos] != c) {
+		fprintf(lexer->errors, "Tried to consume a char ('%c') that's not the current char ('%c')\n", c, lexer->tokens->src_str[lexer->pos]);
+		abort();
+	}
 	
-	if (c == '\n')
-		tokenizer->line--;
-}
-
-static token_t new_token(tokenizer_p tokenizer, token_type_t type, int start_offset, int size) {
-	return (token_t){
-		.type = type,
-		.line = tokenizer->line,
-		.source = tokenizer->file->source + tokenizer->pos + start_offset,
-		.size = size,
-		.file = tokenizer->file,
-		.str_size = 0,
-		.str_val = NULL
-	  };
+	lexer->pos++;
+	token->src_len++;
 }
 
 static void append_token_str(token_p token, char c) {
-	token->str_size++;
-	token->str_val = realloc(token->str_val, token->str_size);
-	token->str_val[token->str_size-1] = c;
+	token->str_len++;
+	token->str_val = realloc(token->str_val, token->str_len);
+	token->str_val[token->str_len-1] = c;
 }
 
+
+//
+// Public lexer functions
+//
+
+static token_t next_token(lexer_p lexer);
+
+token_list_p lex_str(char* src_str, int src_len, const char* filename, FILE* errors) {
+	token_list_p list = calloc(1, sizeof(token_list_t));
+	list->src_str = src_str;
+	list->src_len = src_len;
+	list->filename = filename;
+	
+	lexer_p lexer = &(lexer_t){
+		.pos    = 0,
+		.tokens = list,
+		.errors = errors
+	};
+	
+	token_t t;
+	do {
+		t = next_token(lexer);
+		
+		list->tokens_len++;
+		list->tokens_ptr = realloc(list->tokens_ptr, list->tokens_len * sizeof(list->tokens_ptr[0]));
+		list->tokens_ptr[list->tokens_len-1] = t;
+	} while (t.type != T_EOF);
+	
+	return list;
+}
+
+void lex_free(token_list_p list) {
+	for(size_t i = 0; i < list->tokens_len; i++) {
+		if (list->tokens_ptr[i].type == T_STR)
+			free(list->tokens_ptr[i].str_val);
+	}
+	
+	free(list->tokens_ptr);
+	free(list);
+}
 
 
 //
 // The lexer itself
 //
 
-struct { const char* keyword; token_type_t type; } keywords[] = {
+static struct { const char* keyword; token_type_t type; } keywords[] = {
 	{ "function", T_FUNC },
 	{ "return", T_RET }
 };
 
-token_t next_token(tokenizer_p tokenizer) {
-	int c = consume_char(tokenizer);
+static token_t next_token(lexer_p lexer) {
+	int c = peek1(lexer);
 	switch(c) {
 		case EOF:
-			return new_token(tokenizer, T_EOF, 0, 0);
+			return new_token(lexer, T_EOF, 0);
 		case '{':
-			return new_token(tokenizer, T_CBO, -1, 1);
+			return new_token(lexer, T_CBO, 1);
 		case '}':
-			return new_token(tokenizer, T_CBC, -1, 1);
+			return new_token(lexer, T_CBC, 1);
 		case '(':
-			return new_token(tokenizer, T_RBO, -1, 1);
+			return new_token(lexer, T_RBO, 1);
 		case ')':
-			return new_token(tokenizer, T_RBC, -1, 1);
+			return new_token(lexer, T_RBC, 1);
 		case ',':
-			return new_token(tokenizer, T_COMMA, -1, 1);
+			return new_token(lexer, T_COMMA, 1);
 		case '=':
-			return new_token(tokenizer, T_ASSIGN, -1, 1);
+			return new_token(lexer, T_ASSIGN, 1);
 	}
 	
 	if ( isspace(c) ) {
-		token_t t = new_token(tokenizer, T_WS, -1, 0);
+		token_t t = new_token(lexer, (c == '\n') ? T_WS_EOS : T_WS, 1);
 		
-		do {
-			t.size++;
+		while ( isspace(c = peek1(lexer)) ) {
+			putc_into_token(lexer, &t, c);
 			// If a white space token contains a new line it becomes a possible end of statement
 			if (c == '\n')
 				t.type = T_WS_EOS;
-			c = consume_char(tokenizer);
-		} while ( isspace(c) );
-		revert_char(tokenizer);
+		}
 		
 		return t;
 	}
 	
 	if ( c != '0' && isdigit(c) ) {
-		token_t t = new_token(tokenizer, T_INT, -1, 1);
+		token_t t = new_token(lexer, T_INT, 1);
 		
-		int value = 0;
-		do {
+		int value = c - '0';
+		while ( isdigit(c = peek1(lexer)) ) {
+			putc_into_token(lexer, &t, c);
 			value = value * 10 + (c - '0');
-			c = consume_char(tokenizer);
-			t.size++;
-		} while ( isdigit(c) );
-		revert_char(tokenizer);
-		t.size--;
+		}
 		
 		t.int_val = value;
 		return t;
 	}
 	
 	if ( c == '/' ) {
-		int old_c = c;
-		c = consume_char(tokenizer);
-		
-		if (c == '/') {
-			token_t t = new_token(tokenizer, T_COMMENT, -2, 1);
+		if ( peek2(lexer) == '/' ) {
+			token_t t = new_token(lexer, T_COMMENT, 2);
 			
-			do {
-				t.size++;
-				c = consume_char(tokenizer);
-			} while ( !(c == '\n' || c == EOF) );
-			revert_char(tokenizer);
-			t.size--;
+			while ( c = peek1(lexer), !(c == '\n' || c == EOF) ) {
+				putc_into_token(lexer, &t, c);
+			}
 			
 			return t;
-		} else if (c == '*') {
-			token_t t = new_token(tokenizer, T_COMMENT, -2, 2);
+		} else if ( peek2(lexer) == '*' ) {
+			token_t t = new_token(lexer, T_COMMENT, 2);
 			
 			int nesting_level = 1;
 			while ( nesting_level > 0 ) {
-				c = consume_char(tokenizer);
-				t.size++;
-				
-				if (c == '*') {
-					c = consume_char(tokenizer);
-					t.size++;
-					
-					if (c == '/') {
-						nesting_level--;
-					}
-				} else if (c == '/') {
-					c = consume_char(tokenizer);
-					t.size++;
-					
-					if (c == '*') {
-						nesting_level++;
-					}
+				if ( peek1(lexer) == '*' && peek2(lexer) == '/' ) {
+					nesting_level--;
+					putc_into_token(lexer, &t, '*');
+					putc_into_token(lexer, &t, '/');
+				} else if ( peek1(lexer) == '/' && peek2(lexer) == '*' ) {
+					nesting_level++;
+					putc_into_token(lexer, &t, '/');
+					putc_into_token(lexer, &t, '*');
+				} else if ( peek1(lexer) == EOF ) {
+					fprintf(lexer->errors, "unterminated multiline comment!\n");
+					break;
+				} else {
+					c = peek1(lexer);
+					putc_into_token(lexer, &t, c);
 				}
 			}
 			
 			return t;
 		}
-		
-		// Not a comment, put the peeked char back into stream so the / will be matched as an T_ID
-		revert_char(tokenizer);
-		c = old_c;
 	}
 	
 	if (c == '"') {
-		token_t t = new_token(tokenizer, T_STR, -1, 1);
+		token_t t = new_token(lexer, T_STR, 1);
 		
-		while(1) {
-			c = consume_char(tokenizer);
-			t.size++;
+		while (true) {
+			c = peek1(lexer);
+			putc_into_token(lexer, &t, c);
+			
 			switch(c) {
-				case EOF:
-					fprintf(tokenizer->errors, "unterminated string!\n");
-					return t;
 				case '"':
 					return t;
+				default:
+					append_token_str(&t, c);
+					break;
+					
+				case EOF:
+					fprintf(lexer->errors, "unterminated string!\n");
+					return t;
 				case '\\':
-					c = consume_char(tokenizer);
-					t.size++;
+					c = peek1(lexer);
+					putc_into_token(lexer, &t, c);
 					switch(c) {
 						case EOF:
-							fprintf(tokenizer->errors, "unterminated escape code in string!\n");
+							fprintf(lexer->errors, "unterminated escape code in string!\n");
 							return t;
 						case '\\':
 							append_token_str(&t, '\\');
@@ -294,29 +336,30 @@ token_t next_token(tokenizer_p tokenizer) {
 							append_token_str(&t, '\t');
 							break;
 						default:
-							fprintf(tokenizer->errors, "unknown escape code in string: \\%c, ignoring\n", c);
+							fprintf(lexer->errors, "unknown escape code in string: \\%c, ignoring\n", c);
 							break;
 					}
-					break;
-				default:
-					append_token_str(&t, c);
 					break;
 			}
 		}
 	}
 	
-	if ( isalpha(c) || c == '+' || c == '-' || c == '*' || c == '/' || c == '_' ) {
-		token_t t = new_token(tokenizer, T_ID, -1, 1);
+	switch(c) {
+		case '+':
+		case '-':
+		case '*':
+		case '/':
+			return new_token(lexer, T_ID, 1);
+	}
+	
+	if ( isalpha(c) || c == '_' ) {
+		token_t t = new_token(lexer, T_ID, 1);
 		
-		do {
-			t.size++;
-			c = consume_char(tokenizer);
-		} while ( isalnum(c) || c == '_' );
-		revert_char(tokenizer);
-		t.size--;
+		while ( c = peek1(lexer), (isalnum(c) || c == '_') )
+			putc_into_token(lexer, &t, c);
 		
 		for(size_t i = 0; i < sizeof(keywords) / sizeof(keywords[0]); i++) {
-			if ( strncmp(t.source, keywords[i].keyword, t.size) == 0 ) {
+			if ( strncmp(t.src_str, keywords[i].keyword, t.src_len) == 0 ) {
 				t.type = keywords[i].type;
 				break;
 			}
@@ -326,10 +369,7 @@ token_t next_token(tokenizer_p tokenizer) {
 	}
 	
 	// Abort on any unknown char. Ignoring them will just get us surprised...
-	fprintf(tokenizer->errors, "Unknown character: '%c' (%d), aborting\n", c, c);
+	fprintf(lexer->errors, "Unknown character: '%c' (%d), aborting\n", c, c);
 	abort();
 	return (token_t){0};
-	
-	//fprintf(tokenizer->errors, "Unknown character: '%c' (%d), ignoring\n", c, c);
-	//return next_token(tokenizer);
 }

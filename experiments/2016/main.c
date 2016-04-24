@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include "lexer.h"
-#include "parser.h"
+//#include "parser.h"
 
 void* sgl_fload(const char* filename, size_t* size);
 
@@ -12,29 +12,29 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 	
-	size_t source_size = 0;
-	char* source = sgl_fload(argv[1], &source_size);
-	tokenized_file_p file = tokenize_str(source, source_size, argv[1], stderr);
+	size_t src_len = 0;
+	char* src_str = sgl_fload(argv[1], &src_len);
+	token_list_p list = lex_str(src_str, src_len, argv[1], stderr);
 	
-	for(size_t i = 0; i < file->token_count; i++) {
-		token_p t = &file->tokens[i];
-		if (t->type == T_COMMENT || t->type == T_WS) {
-			printf("%.*s", t->size, t->source);
-		} else {
-			char buffer[128];
-			token_dump(t, buffer, sizeof(buffer));
-			printf("%s ", buffer);
-		}
+	for(size_t i = 0; i < list->tokens_len; i++) {
+		token_p t = &list->tokens_ptr[i];
+		//token_print(stdout, t, TP_INLINE_DUMP);
+		//printf("\n");
+		if (t->type == T_COMMENT || t->type == T_WS)
+			token_print(stdout, t, TP_SOURCE);
+		else
+			token_print(stdout, t, TP_DUMP);
 	}
 	printf("\n");
 	
-	node_p tree = parse(file, parse_expr);
+	/*
+	node_p tree = parse(list, parse_expr);
 	printf("\n");
 	node_print(tree, stdout, 0);
-	//parse_module(file);
-	
-	tokenized_file_free(file);
-	free(source);
+	//parse_module(list);
+	*/
+	lex_free(list);
+	free(src_str);
 	
 	return 0;
 }
