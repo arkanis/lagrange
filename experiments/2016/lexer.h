@@ -25,6 +25,7 @@ typedef enum {
 	T_FUNC,
 	T_RET,
 	
+	T_ERROR,
 	T_EOF
 } token_type_t;
 
@@ -54,6 +55,7 @@ struct token_list_s {
 	
 	token_p tokens_ptr;
 	size_t  tokens_len;
+	size_t  error_count;
 };
 
 

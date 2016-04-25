@@ -72,7 +72,8 @@ void token_print(FILE* stream, token_p token, uint32_t flags) {
 			case T_FUNC:    fprintf(stream, "func");   break;
 			case T_RET:     fprintf(stream, "return"); break;
 			
-			case T_EOF:     fprintf(stream, "EOF");    break;
+			case T_ERROR:   fprintf(stream, "error(%.*s)", token->str_len, token->str_val);  break;
+			case T_EOF:     fprintf(stream, "EOF");                                          break;
 		}
 	}
 }
@@ -94,6 +95,15 @@ void token_print_line(FILE* stream, token_p token, int first_line_indent) {
 			printf(" ");
 	}
 	printf("^\n");
+}
+
+int token_line(token_p token) {
+	int line = 1;
+	for(char* c = token->src_str; c >= token->list->src_str; c--) {
+		if (*c == '\n')
+			line++;
+	}
+	return line;
 }
 
 
@@ -168,6 +178,12 @@ static void append_token_str(token_p token, char c) {
 	token->str_val[token->str_len-1] = c;
 }
 
+static void make_into_error_token(token_p token, char* message) {
+	token->type = T_ERROR;
+	token->str_val = message;
+	token->str_len = strlen(message);
+}
+
 
 //
 // Public lexer functions
@@ -194,6 +210,9 @@ token_list_p lex_str(char* src_str, int src_len, const char* filename, FILE* err
 		list->tokens_len++;
 		list->tokens_ptr = realloc(list->tokens_ptr, list->tokens_len * sizeof(list->tokens_ptr[0]));
 		list->tokens_ptr[list->tokens_len-1] = t;
+		
+		if (t.type == T_ERROR)
+			list->error_count++;
 	} while (t.type != T_EOF);
 	
 	return list;
@@ -201,7 +220,8 @@ token_list_p lex_str(char* src_str, int src_len, const char* filename, FILE* err
 
 void lex_free(token_list_p list) {
 	for(size_t i = 0; i < list->tokens_len; i++) {
-		if (list->tokens_ptr[i].type == T_STR)
+		token_type_t type = list->tokens_ptr[i].type;
+		if ( type == T_STR )
 			free(list->tokens_ptr[i].str_val);
 	}
 	
@@ -287,7 +307,7 @@ static token_t next_token(lexer_p lexer) {
 					putc_into_token(lexer, &t, '/');
 					putc_into_token(lexer, &t, '*');
 				} else if ( peek1(lexer) == EOF ) {
-					fprintf(lexer->errors, "unterminated multiline comment!\n");
+					make_into_error_token(&t, "unterminated multiline comment");
 					break;
 				} else {
 					c = peek1(lexer);
@@ -314,14 +334,14 @@ static token_t next_token(lexer_p lexer) {
 					break;
 					
 				case EOF:
-					fprintf(lexer->errors, "unterminated string!\n");
+					make_into_error_token(&t, "unterminated string");
 					return t;
 				case '\\':
 					c = peek1(lexer);
 					putc_into_token(lexer, &t, c);
 					switch(c) {
 						case EOF:
-							fprintf(lexer->errors, "unterminated escape code in string!\n");
+							make_into_error_token(&t, "unterminated escape code in string");
 							return t;
 						case '\\':
 							append_token_str(&t, '\\');
@@ -336,7 +356,10 @@ static token_t next_token(lexer_p lexer) {
 							append_token_str(&t, '\t');
 							break;
 						default:
-							fprintf(lexer->errors, "unknown escape code in string: \\%c, ignoring\n", c);
+							// TODO: Figure out how to create a error token that reprsents
+							// a region inside another token (the string)...
+							//make_into_error_token(&t, "unknown escape code in string");
+							fprintf(lexer->errors, "unknown escape code in string (\\%c), ignoring FOR NOW\n", c);
 							break;
 					}
 					break;
@@ -344,6 +367,9 @@ static token_t next_token(lexer_p lexer) {
 		}
 	}
 	
+	// Can't put / operator at the top since it would have a higher priority
+	// than comments ("//"). Resulting in two division operators instead of
+	// an comment.
 	switch(c) {
 		case '+':
 		case '-':
@@ -369,7 +395,7 @@ static token_t next_token(lexer_p lexer) {
 	}
 	
 	// Abort on any unknown char. Ignoring them will just get us surprised...
-	fprintf(lexer->errors, "Unknown character: '%c' (%d), aborting\n", c, c);
-	abort();
-	return (token_t){0};
+	token_t t = new_token(lexer, T_ERROR, 1);
+	make_into_error_token(&t, "stray character in source code");
+	return t;
 }

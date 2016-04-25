@@ -16,15 +16,27 @@ int main(int argc, char** argv) {
 	char* src_str = sgl_fload(argv[1], &src_len);
 	token_list_p list = lex_str(src_str, src_len, argv[1], stderr);
 	
-	for(size_t i = 0; i < list->tokens_len; i++) {
-		token_p t = &list->tokens_ptr[i];
-		//token_print(stdout, t, TP_INLINE_DUMP);
-		//printf("\n");
-		if (t->type == T_COMMENT || t->type == T_WS)
-			token_print(stdout, t, TP_SOURCE);
-		else
-			token_print(stdout, t, TP_DUMP);
+	if (list->error_count == 0) {
+		for(size_t i = 0; i < list->tokens_len; i++) {
+			token_p t = &list->tokens_ptr[i];
+			//token_print(stdout, t, TP_INLINE_DUMP);
+			//printf("\n");
+			if (t->type == T_COMMENT || t->type == T_WS)
+				token_print(stdout, t, TP_SOURCE);
+			else
+				token_print(stdout, t, TP_DUMP);
+		}
+	} else {
+		// Just output errors and exit
+		for(size_t i = 0; i < list->tokens_len; i++) {
+			token_p t = &list->tokens_ptr[i];
+			if (t->type == T_ERROR) {
+				fprintf(stderr, "%s:%d: %s\n", argv[1], token_line(t), t->str_val);
+				token_print_line(stderr, t, 0);
+			}
+		}
 	}
+	
 	printf("\n");
 	
 	/*
