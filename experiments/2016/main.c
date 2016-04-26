@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
 		for(size_t i = 0; i < list->tokens_len; i++) {
 			token_p t = &list->tokens_ptr[i];
 			if (t->type == T_ERROR) {
-				fprintf(stderr, "%s:%d: %s\n", argv[1], token_line(t), t->str_val);
+				fprintf(stderr, "%s:%d:%d: %s\n", argv[1], token_line(t), token_col(t), t->str_val);
 				token_print_line(stderr, t, 0);
 			}
 		}

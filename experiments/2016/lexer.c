@@ -82,6 +82,20 @@ void token_print_line(FILE* stream, token_p token, int first_line_indent) {
 	char* line_start = token->src_str;
 	while (line_start > token->list->src_str && *(line_start-1) != '\n')
 		line_start--;
+	char* line_end = token->src_str + token->src_len;
+	while (*line_end != '\n' && line_end < token->list->src_str + token->list->src_len)
+		line_end++;
+	
+	fprintf(stream, "%.*s\e[1;4m%.*s\e[0m%.*s\n",
+		(int)(token->src_str - line_start), line_start,
+		token->src_len, token->src_str,
+		(int)(line_end - (token->src_str + token->src_len)), token->src_str + token->src_len
+	);
+	
+	/*
+	char* line_start = token->src_str;
+	while (line_start > token->list->src_str && *(line_start-1) != '\n')
+		line_start--;
 	char* line_end = token->src_str;
 	while (*line_end != '\n' && line_end < token->list->src_str + token->list->src_len)
 		line_end++;
@@ -95,6 +109,7 @@ void token_print_line(FILE* stream, token_p token, int first_line_indent) {
 			printf(" ");
 	}
 	printf("^\n");
+	*/
 }
 
 int token_line(token_p token) {
@@ -104,6 +119,13 @@ int token_line(token_p token) {
 			line++;
 	}
 	return line;
+}
+
+int token_col(token_p token) {
+	int col = 0;
+	for(char* c = token->src_str; *c != '\n' && c >= token->list->src_str; c--)
+		col++;
+	return col;
 }
 
 

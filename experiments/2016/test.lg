@@ -1,4 +1,4 @@
 
-"foo\x"
+"foo\"
 foo bar /*
 (foo + bar + 8) * x / batz
