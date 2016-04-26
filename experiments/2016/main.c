@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include "lexer.h"
-//#include "parser.h"
+#include "parser.h"
 
 void* sgl_fload(const char* filename, size_t* size);
 
@@ -16,17 +16,7 @@ int main(int argc, char** argv) {
 	char* src_str = sgl_fload(argv[1], &src_len);
 	token_list_p list = lex_str(src_str, src_len, argv[1], stderr);
 	
-	if (list->error_count == 0) {
-		for(size_t i = 0; i < list->tokens_len; i++) {
-			token_p t = &list->tokens_ptr[i];
-			//token_print(stdout, t, TP_INLINE_DUMP);
-			//printf("\n");
-			if (t->type == T_COMMENT || t->type == T_WS)
-				token_print(stdout, t, TP_SOURCE);
-			else
-				token_print(stdout, t, TP_DUMP);
-		}
-	} else {
+	if (list->error_count > 0) {
 		// Just output errors and exit
 		for(size_t i = 0; i < list->tokens_len; i++) {
 			token_p t = &list->tokens_ptr[i];
@@ -35,16 +25,34 @@ int main(int argc, char** argv) {
 				token_print_line(stderr, t, 0);
 			}
 		}
+		
+		lex_free(list);
+		free(src_str);
+		return 1;
 	}
 	
+	for(size_t i = 0; i < list->tokens_len; i++) {
+		token_p t = &list->tokens_ptr[i];
+		//token_print(stdout, t, TP_INLINE_DUMP);
+		//printf("\n");
+		if (t->type == T_COMMENT || t->type == T_WS) {
+			token_print(stdout, t, TP_SOURCE);
+		} else if (t->type == T_WS_EOS || t->type == T_EOF) {
+			printf(" ");
+			token_print(stdout, t, TP_DUMP);
+			printf(" ");
+		} else {
+			token_print(stdout, t, TP_DUMP);
+		}
+	}
 	printf("\n");
 	
-	/*
+	
 	node_p tree = parse(list, parse_expr);
 	printf("\n");
 	node_print(tree, stdout, 0);
 	//parse_module(list);
-	*/
+	
 	lex_free(list);
 	free(src_str);
 	

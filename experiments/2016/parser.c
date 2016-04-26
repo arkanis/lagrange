@@ -9,15 +9,15 @@
 //
 
 struct parser_s {
-	tokenized_file_p file;
+	token_list_p list;
 	size_t pos;
 };
 
 
 int next_filtered_token_at(parser_p parser, size_t pos, bool ignore_ws_eos) {
 	size_t offset = 0;
-	while (pos + offset < parser->file->token_count) {
-		token_type_t type = parser->file->tokens[pos + offset].type;
+	while (pos + offset < (size_t)parser->list->tokens_len) {
+		token_type_t type = parser->list->tokens_ptr[pos + offset].type;
 		// Return the offset if we found a filtered token there
 		if ( !( type == T_WS || type == T_COMMENT || (ignore_ws_eos && type == T_WS_EOS) ) )
 			return offset;
@@ -37,13 +37,12 @@ token_p consume_impl(parser_p parser, bool ignore_ws_eos, const char* caller, in
 		return NULL;
 	
 	parser->pos += offset;
-	token_p current_token = &parser->file->tokens[parser->pos];
+	token_p current_token = &parser->list->tokens_ptr[parser->pos];
 	parser->pos++;
 	
-	char token_desc[128];
-	token_dump(current_token, token_desc, sizeof(token_desc));
-	printf("%s:%d consume %s\n", caller, line, token_desc);
-	token_print_line(current_token);
+	printf("%s:%d consume ", caller, line);
+	token_print(stdout, current_token, TP_INLINE_DUMP);
+	printf("\n");
 	
 	return current_token;
 }
@@ -56,12 +55,11 @@ token_p peek_impl(parser_p parser, bool ignore_ws_eos, const char* caller, int l
 	if (offset == -1)
 		return NULL;
 	
-	token_p current_token = &parser->file->tokens[parser->pos + offset];
+	token_p current_token = &parser->list->tokens_ptr[parser->pos + offset];
 	
-	char token_desc[128];
-	token_dump(current_token, token_desc, sizeof(token_desc));
-	printf("%s:%d peek %s\n", caller, line, token_desc);
-	token_print_line(current_token);
+	printf("%s:%d consume ", caller, line);
+	token_print(stdout, current_token, TP_INLINE_DUMP);
+	printf("\n");
 	
 	return current_token;
 }
@@ -78,12 +76,12 @@ token_p consume_type_impl(parser_p parser, token_type_t type, const char* caller
 	if (t->type == type)
 		return t;
 	
-	token_p current_token = &parser->file->tokens[parser->pos-1];
+	token_p current_token = &parser->list->tokens_ptr[parser->pos-1];
 	
-	char token_desc[128];
-	token_dump(current_token, token_desc, sizeof(token_desc));
-	printf("%s:%d consume_type, expected %d, got %s\n", caller, line, type, token_desc);
-	token_print_line(current_token);
+	printf("%s:%d consume_type, expected %d, got ", caller, line, type);
+	token_print(stdout, current_token, TP_INLINE_DUMP);
+	printf("\n");
+	
 	abort();
 }
 
@@ -108,8 +106,8 @@ tree_p parse_module(tokenized_file_p file) {
 */
 
 
-node_p parse(tokenized_file_p file, parser_rule_func_t rule) {
-	parser_t parser = { file, 0 };
+node_p parse(token_list_p list, parser_rule_func_t rule) {
+	parser_t parser = { list, 0 };
 	return rule(&parser);
 }
 
@@ -215,8 +213,8 @@ node_p parse_expr_ex(parser_p parser, bool collect_uops) {
 	switch(t->type) {
 		case T_ID: {
 			sym_p sym_node = node_alloc(sym, NULL);
-			sym_node->name = t->source;
-			sym_node->size = t->size;
+			sym_node->name = t->src_str;
+			sym_node->size = t->src_len;
 			node = (node_p)sym_node;
 			break;
 			}
@@ -229,7 +227,7 @@ node_p parse_expr_ex(parser_p parser, bool collect_uops) {
 		case T_STR: {
 			str_p str_node = node_alloc(str, NULL);
 			str_node->value = t->str_val;
-			str_node->size = t->str_size;
+			str_node->size = t->str_len;
 			node = (node_p)str_node;
 			break;
 			}
@@ -253,8 +251,8 @@ node_p parse_expr_ex(parser_p parser, bool collect_uops) {
 		while (peek_type(parser) == T_ID) {
 			token_p id = consume_type(parser, T_ID);
 			sym_p op_node = node_alloc(sym, uops_node);
-			op_node->name = id->source;
-			op_node->size = id->size;
+			op_node->name = id->src_str;
+			op_node->size = id->src_len;
 			buf_append(uops_node->list, (node_p)op_node);
 			
 			node_p next_expr = parse_expr_ex(parser, false);
