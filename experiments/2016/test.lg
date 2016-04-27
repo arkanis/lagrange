@@ -1,2 +1,2 @@
 // something
-(foo + bar + 8) * x / batz
+return (foo + bar + 8) * x / batz

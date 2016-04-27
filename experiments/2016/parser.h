@@ -7,4 +7,5 @@ typedef node_p (*parser_rule_func_t)(parser_p parser);
 
 node_p parse(token_list_p tokens, parser_rule_func_t rule);
 
+node_p parse_stmt(parser_p parser);
 node_p parse_expr(parser_p parser);

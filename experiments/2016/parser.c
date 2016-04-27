@@ -175,12 +175,32 @@ bool is_stmt_start(token_type_t type) {
 			return is_expr_start(type);
 	}
 }
+*/
 
-tree_p parse_stmt(parser_p parser) {
-	printf("    stmt:\n");
-	consume_type(parser, T_RET);
-	parse_expr(parser);
-	consume_type(parser, T_WS_EOS);
+void parse_eos(parser_p parser) {
+	token_p t = consume_with_eos(parser);
+	if ( !(t->type == T_WS_EOS || t->type == T_EOF) ) {
+		printf("%s:%d:%d: expectet EOS or EOF, got:\n", parser->list->filename, token_line(t), token_col(t));
+		token_print_line(stderr, t, 0);
+		abort();
+	}
+}
+
+node_p parse_stmt(parser_p parser) {
+	token_p t = consume(parser);
+	if (t->type == T_RET) {
+		ret_stmt_p stmt = node_alloc(ret_stmt, NULL);
+		node_p expr = parse_expr(parser);
+		stmt->expr = expr;
+		expr->parent = (node_p)stmt;
+		parse_eos(parser);
+		return (node_p)stmt;
+	}
+	
+	printf("%s:%d:%d: expectet 'return', got:\n", parser->list->filename, token_line(t), token_col(t));
+	token_print_line(stderr, t, 0);
+	abort();
+	
 	return NULL;
 }
 
@@ -192,15 +212,14 @@ tree_p parse_stmt(parser_p parser) {
 bool is_expr_start(token_type_t type) {
 	switch(type) {
 		case T_ID:
-		case T_RBO:
 		case T_INT:
 		case T_STR:
+		case T_RBO:
 			return true;
 		default:
 			return false;
 	}
 }
-*/
 
 node_p parse_expr(parser_p parser) {
 	return parse_expr_ex(parser, true);

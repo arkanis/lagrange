@@ -33,8 +33,6 @@ int main(int argc, char** argv) {
 	
 	for(size_t i = 0; i < list->tokens_len; i++) {
 		token_p t = &list->tokens_ptr[i];
-		//token_print(stdout, t, TP_INLINE_DUMP);
-		//printf("\n");
 		if (t->type == T_COMMENT || t->type == T_WS) {
 			token_print(stdout, t, TP_SOURCE);
 		} else if (t->type == T_WS_EOS || t->type == T_EOF) {
@@ -47,11 +45,10 @@ int main(int argc, char** argv) {
 	}
 	printf("\n");
 	
-	
-	node_p tree = parse(list, parse_expr);
+	printf("\n");
+	node_p tree = parse(list, parse_stmt);
 	printf("\n");
 	node_print(tree, stdout, 0);
-	//parse_module(list);
 	
 	lex_free(list);
 	free(src_str);

@@ -86,6 +86,22 @@ struct var_s {
 };
 
 
+struct ret_stmt_s {
+	node_t node;
+	node_p expr;
+};
+
+__attribute__((weak)) node_spec_p ret_stmt_spec = &(node_spec_t){
+	"ret",
+	{ 1,
+		(member_spec_t[]){
+			{ MT_NODE, offsetof(ret_stmt_t, expr), "expr" }
+		}
+	},
+	NULL
+};
+
+
 struct sym_s {
 	node_t node;
 	char* name;

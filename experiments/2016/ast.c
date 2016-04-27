@@ -6,12 +6,17 @@ void node_print(node_p node, FILE* output, int level) {
 	fprintf(output, "%s: ", node->spec->name);
 	if (node->spec->print)
 		node->spec->print(node, output);
+	else
+		fprintf(output, "\n");
 	
 	for(size_t i = 0; i < node->spec->members.len; i++) {
 		member_spec_p member = &node->spec->members.ptr[i];
 		switch(member->type) {
 			case MT_NODE: {
-				node_p member_node = (node_p)( ((uint8_t*)node) + member->offset );
+				// Here we calculate the position of a node_p (position of the member),
+				// so in effect we got a node_p*. When we dereference it we got the
+				// actual value of the property (the pointer to the child node).
+				node_p member_node = *(node_p*)( ((uint8_t*)node) + member->offset );
 				fprintf(output, "%*s%s: ", (level+1)*2, "", member->name);
 				node_print(member_node, output, level+1);
 				} break;
