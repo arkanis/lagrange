@@ -5,6 +5,8 @@
 #include "parser.h"
 
 void* sgl_fload(const char* filename, size_t* size);
+node_p expand_uops(node_p node, uint32_t level, uint32_t flags);
+node_p demo_pass(node_p node, uint32_t level, uint32_t flags);
 
 int main(int argc, char** argv) {
 	if (argc < 2) {
@@ -50,10 +52,95 @@ int main(int argc, char** argv) {
 	printf("\n");
 	node_print(tree, stdout, 0);
 	
+	node_iterate(tree, 0, demo_pass);
+	node_iterate(tree, 0, expand_uops);
+	node_print(tree, stdout, 0);
+	
 	lex_free(list);
 	free(src_str);
 	
 	return 0;
+}
+
+node_p demo_pass(node_p node, uint32_t level, uint32_t flags) {
+	if (flags & NI_PRE)
+		printf("%*sPRE  %p\n", (int)level*2, "", node);
+	else if (flags & NI_POST)
+		printf("%*sPOST %p\n", (int)level*2, "", node);
+	else if (flags & NI_LEAF)
+		printf("%*sLEAF %p\n", (int)level*2, "", node);
+	return node;
+}
+
+node_p expand_uops(node_p node, uint32_t level, uint32_t flags) {
+	// We only want uops nodes with children in them (there should be no uops
+	// nodes without children).
+	if ( !( (flags & NI_PRE) && node->spec == uops_spec ) )
+		return node;
+	
+	uops_p uops = (uops_p)node;
+	
+	// Find weakest operator
+	int weakest_op_idx = -1;
+	int weakest_op_weight = 10000;
+	char weakest_op = '\0';
+	for(int op_idx = 1; op_idx < (int)uops->list.len; op_idx += 2) {
+		
+		int weight = 0;
+		char op = '\0';
+		
+		if (uops->list.ptr[op_idx]->spec == sym_spec) {
+			sym_p sym = (sym_p)uops->list.ptr[op_idx];
+			switch(sym->name[0]) {
+				case '+': weight = 10; op = '+'; break;
+				case '-': weight = 10; op = '-'; break;
+				case '*': weight = 20; op = '*'; break;
+				case '/': weight = 20; op = '/'; break;
+			}
+			printf("got op %.*s, weight: %d\n", (int)sym->size, sym->name, weight);
+			
+			if (weight < weakest_op_weight) {
+				weakest_op_weight = weight;
+				weakest_op_idx = op_idx;
+				weakest_op = op;
+			}
+		} else {
+			fprintf(stderr, "expand_uops(): got non symbol in uops op slot!");
+			abort();
+		}
+	}
+	
+	if (weakest_op_idx == -1) {
+		fprintf(stderr, "expand_uops(): found no op in uops!");
+		abort();
+	}
+	
+	printf("got weakest op at %d, weight: %d\n", weakest_op_idx, weakest_op_weight);
+	
+	// Split uops node into an op node with two uops children
+	op_p op_node = node_alloc(op, uops->node.parent);
+	op_node->op = weakest_op;
+	
+	if (weakest_op_idx == 1) {
+		op_node->a = uops->list.ptr[0];
+	} else {
+		uops_p first = node_alloc(uops, op_node);
+		for(int i = 0; i < weakest_op_idx; i++)
+			buf_append(first->list, uops->list.ptr[i]);
+		op_node->a = (node_p)first;
+	}
+	
+	if (weakest_op_idx == (int)uops->list.len - 2) {
+		op_node->b = uops->list.ptr[uops->list.len - 1];
+	} else {
+		uops_p rest = node_alloc(uops, op_node);
+		for(int i = weakest_op_idx + 1; i < (int)uops->list.len; i++)
+			buf_append(rest->list, uops->list.ptr[i]);
+		op_node->b = (node_p)rest;
+	}
+	
+	return (node_p)op_node;
+	
 }
 
 void* sgl_fload(const char* filename, size_t* size) {

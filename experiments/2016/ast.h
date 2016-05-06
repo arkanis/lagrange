@@ -56,6 +56,12 @@ typedef struct {
 void node_print(node_p node, FILE* output, int level);
 
 
+#define NI_PRE  (1 << 0)
+#define NI_POST (1 << 1)
+#define NI_LEAF (1 << 2)
+typedef node_p (*node_it_func_t)(node_p node, uint32_t level, uint32_t flags);
+node_p node_iterate(node_p node, uint32_t level, node_it_func_t func);
+
 
 typedef struct module_s    module_t,   *module_p;
 typedef struct var_s       var_t,      *var_p;
@@ -66,6 +72,7 @@ typedef struct sym_s       sym_t,      *sym_p;
 typedef struct int_s       int_t,      *int_p;
 typedef struct str_s       str_t,      *str_p;
 typedef struct uops_s      uops_t,     *uops_p;
+typedef struct op_s        op_t,       *op_p;
 
 struct node_s {
 	node_spec_p spec;
@@ -172,4 +179,26 @@ __attribute__((weak)) node_spec_p uops_spec = &(node_spec_t){
 		}
 	},
 	uops_print
+};
+
+
+struct op_s {
+	node_t node;
+	char op;
+	node_p a, b;
+};
+
+static void op_print(node_p node, FILE* out) {
+	fprintf(out, "%c\n", ((op_p)node)->op);
+}
+
+__attribute__((weak)) node_spec_p op_spec = &(node_spec_t){
+	"op",
+	{ 2,
+		(member_spec_t[]){
+			{ MT_NODE, offsetof(op_t, a), "a" },
+			{ MT_NODE, offsetof(op_t, b), "b" }
+		}
+	},
+	op_print
 };

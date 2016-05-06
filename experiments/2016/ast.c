@@ -30,6 +30,38 @@ void node_print(node_p node, FILE* output, int level) {
 		}
 	}
 }
+
+node_p node_iterate(node_p node, uint32_t level, node_it_func_t func) {
+	if (node->spec->members.len == 0) {
+		// Node has no children
+		return func(node, level, NI_LEAF);
+	}
+	
+	// Node has children
+	node = func(node, level, NI_PRE);
+	
+	for(size_t i = 0; i < node->spec->members.len; i++) {
+		member_spec_p member = &node->spec->members.ptr[i];
+		switch(member->type) {
+			case MT_NODE: {
+				// Here we calculate the position of a node_p (position of the member),
+				// so in effect we got a node_p*. When we dereference it we got the
+				// actual value of the property (the pointer to the child node).
+				node_p* member_node = (node_p*)( (void*)node + member->offset );
+				//node_p member_node = *(node_p*)( ((uint8_t*)node) + member->offset );
+				*member_node = node_iterate(*member_node, level + 1, func);
+				} break;
+			case MT_LIST: {
+				buf_t(node_p)* member_list = (void*)( ((uint8_t*)node) + member->offset );
+				for(size_t j = 0; j < member_list->len; j++)
+					member_list->ptr[j] = node_iterate(member_list->ptr[j], level + 1, func);
+				} break;
+		}
+	}
+	
+	return func(node, level, NI_POST);
+}
+
 /*
 int main() {
 	uops_p test = node_alloc(uops, NULL);
