@@ -92,7 +92,7 @@ void test_modrm_instructions() {
 	as_new(as);
 	
 	as_syscall(as);
-	/*
+	
 	for(size_t i = 0; i < 16; i++)
 		as_add(as, reg(i), reg(i));
 	for(size_t i = 0; i < 16; i++)
@@ -108,7 +108,7 @@ void test_modrm_instructions() {
 		as_mov(as, reg(i), imm(0x1122334455667788));
 	for(size_t i = 0; i < 16; i++)
 		as_mov(as, reg(i), reld(0xbeba));
-	*/
+	
 	for(size_t i = 0; i < 16; i++)
 		as_mov(as, reg(i), memd(0xbeba));
 	for(size_t i = 0; i < 16; i++)

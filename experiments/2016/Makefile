@@ -1,6 +1,6 @@
 CFLAGS = -std=gnu99 -Werror -Wall -Wextra -Wno-unused-parameter -g
 
-main: lexer.o parser.o ast.o
+main: lexer.o parser.o ast.o reg_alloc.o asm.o
 tests/lexer_test: tests/lexer_test.c lexer.o
 tests/asm_test: tests/asm_test.c asm.o
 
