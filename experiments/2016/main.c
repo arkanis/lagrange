@@ -242,39 +242,28 @@ raa_t compile_ret_stmt(ret_stmt_p node, asm_p as, ra_p ra) {
 }
 
 raa_t compile_op(op_p node, asm_p as, ra_p ra, int8_t req_reg) {
-	if (node->op == '+') {
+	if (node->op == '+' || node->op == '-') {
 		raa_t a1 = compile_node(node->a, as, ra, req_reg);
 		raa_t a2 = compile_node(node->b, as, ra, -1);
-		as_add(as, reg(a1.reg_index), reg(a2.reg_index));
-		ra_free_reg(ra, as, a2);
-		return a1;
-	} else if (node->op == '-') {
-		raa_t a1 = compile_node(node->a, as, ra, req_reg);
-		raa_t a2 = compile_node(node->b, as, ra, -1);
-		as_sub(as, reg(a1.reg_index), reg(a2.reg_index));
-		ra_free_reg(ra, as, a2);
-		return a1;
-	} else if (node->op == '*') {
-		raa_t a1 = ra_alloc_reg(ra, as, RDX.reg);  // reserve RDX since MUL overwrites it
-		raa_t a2 = compile_node(node->a, as, ra, RAX.reg);
-		raa_t a3 = compile_node(node->b, as, ra, -1);
-		as_mul(as, reg(a3.reg_index));
-		ra_free_reg(ra, as, a1);
-		ra_free_reg(ra, as, a3);
 		
-		if (req_reg != RAX.reg && req_reg != -1) {
-			raa_t a4 = ra_alloc_reg(ra, as, req_reg);
-			as_mov(as, reg(req_reg), RAX);
-			ra_free_reg(ra, as, a2);
-			return a4;
-		} else {
-			return a2;
+		switch(node->op) {
+			case '+':  as_add(as, reg(a1.reg_index), reg(a2.reg_index));  break;
+			case '-':  as_sub(as, reg(a1.reg_index), reg(a2.reg_index));  break;
 		}
-	} else if (node->op == '/') {
-		raa_t a1 = ra_alloc_reg(ra, as, RDX.reg);  // reserve RDX since DIV overwrites it with the remainder
+		
+		ra_free_reg(ra, as, a2);
+		return a1;
+	} else if (node->op == '*' || node->op == '/') {
+		// reserve RDX since MUL and DIV overwrite it
+		raa_t a1 = ra_alloc_reg(ra, as, RDX.reg);
 		raa_t a2 = compile_node(node->a, as, ra, RAX.reg);
 		raa_t a3 = compile_node(node->b, as, ra, -1);
-		as_div(as, reg(a3.reg_index));
+		
+		switch(node->op) {
+			case '*':  as_mul(as, reg(a3.reg_index));  break;
+			case '/':  as_div(as, reg(a3.reg_index));  break;
+		}
+		
 		ra_free_reg(ra, as, a1);
 		ra_free_reg(ra, as, a3);
 		
