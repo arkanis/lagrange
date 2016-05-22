@@ -57,7 +57,7 @@ token_p peek_impl(parser_p parser, bool ignore_ws_eos, const char* caller, int l
 	
 	token_p current_token = &parser->list->tokens_ptr[parser->pos + offset];
 	
-	printf("%s:%d consume ", caller, line);
+	printf("%s:%d peek ", caller, line);
 	token_print(stdout, current_token, TP_INLINE_DUMP);
 	printf("\n");
 	
@@ -165,18 +165,7 @@ static bool is_expr_start(token_type_t type) {
 	}
 }
 
-node_p parse_expr(parser_p parser) {
-	return parse_expr_ex(parser, true);
-}
-
-/**
-
-Idea: make a parse_expr_without_trailing_ops() function and one parse_epxr()
-function that uses the first but only does the uops collection stuff.
-
-**/
-
-node_p parse_expr_ex(parser_p parser, bool collect_uops) {
+node_p parse_expr_without_trailing_ops(parser_p parser) {
 	node_p node = NULL;
 	
 	token_p t = consume(parser);
@@ -208,7 +197,13 @@ node_p parse_expr_ex(parser_p parser, bool collect_uops) {
 			return NULL;
 	}
 	
-	if (collect_uops && peek_type(parser) == T_ID) {
+	return node;
+}
+
+node_p parse_expr(parser_p parser) {
+	node_p node = parse_expr_without_trailing_ops(parser);
+	
+	if (peek_type(parser) == T_ID) {
 		// Got an operator, wrap everything into an uops node and collect the
 		// remaining operators and expressions.
 		node_p uops = node_alloc(NT_UOPS);
@@ -222,7 +217,7 @@ node_p parse_expr_ex(parser_p parser, bool collect_uops) {
 			op_node->id.name.ptr = id->src_str;
 			op_node->id.name.len = id->src_len;
 			
-			node_p expr = parse_expr_ex(parser, false);
+			node_p expr = parse_expr_without_trailing_ops(parser);
 			expr->parent = uops;
 			buf_append(&uops->uops.list, expr);
 		}
