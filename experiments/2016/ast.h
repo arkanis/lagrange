@@ -1,33 +1,38 @@
 #pragma once
+
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
 
-/*
-
-# idea sketchpad
-
-node_alloc(name)
-node_append(func->defs, child)
-
-str_node_t, str_node_p
-str_node_spec
-str_node_new("foo bar")
-
-*/
-
-#define buf_t(content_type_t) struct { size_t len; content_type_t* ptr; }
-#define buf_append(buf, value) do {                                    \
-	(buf).len++;                                                       \
-	(buf).ptr = realloc((buf).ptr, (buf).len * sizeof((buf).ptr[0]));  \
-	(buf).ptr[(buf).len - 1] = (value);                                \
-} while(0)
 
 typedef struct node_s node_t, *node_p;
 
+
+//
+// Simple variable length buffer
+//
+
+#define buf_t(content_type_t) struct { size_t len; content_type_t* ptr; }
+#define buf_append(buf, value) do {                                    \
+	(buf)->len++;                                                       \
+	(buf)->ptr = realloc((buf)->ptr, (buf)->len * sizeof((buf)->ptr[0]));  \
+	(buf)->ptr[(buf)->len - 1] = (value);                                \
+} while(0)
+
+typedef buf_t(node_p) node_list_t, *node_list_p;
+
+
+//
+// Types for node specs
+//
+
 typedef enum {
-	MT_NODE,
-	MT_LIST
+	MT_NODE = 1,
+	MT_NODE_LIST,
+	
+	MT_INT,
+	MT_CHAR,
+	MT_CHAR_LIST
 } member_type_t;
 
 typedef struct {
@@ -36,169 +41,128 @@ typedef struct {
 	char* name;
 } member_spec_t, *member_spec_p;
 
-typedef void (*node_print_func_t)(node_p node, FILE* stream);
-
 typedef struct {
 	char* name;
-	buf_t(member_spec_t) members;
-	// More stuff like function pointers to dump, print, etc. the node
-	node_print_func_t print;
+	member_spec_p members;
 } node_spec_t, *node_spec_p;
 
 
-#define node_alloc(name, parent_node)  ({        \
-	name##_p node = calloc(1, sizeof(name##_t)); \
-	node->node.spec = name##_spec;               \
-	node->node.parent = (node_p)(parent_node);   \
-	node;                                        \
-})
+typedef enum {
+	NT_SYSCALL,
+	
+	NT_ID,
+	NT_INTL,
+	NT_STRL,
+	NT_UOPS,
+	NT_OP
+} node_type_t;
 
-void node_print(node_p node, FILE* output, int level);
 
+//
+// Node definitions
+//
+
+struct node_s {
+	node_type_t type;
+	node_spec_p spec;
+	node_p parent;
+	
+	union {
+		struct {
+			node_p expr;
+		} syscall;
+		
+		struct {
+			buf_t(char) name;
+		} id;
+		
+		struct {
+			int64_t value;
+		} intl;
+		
+		struct {
+			buf_t(char) value;
+		} strl;
+		
+		struct {
+			node_list_t list;
+		} uops;
+		
+		struct {
+			char op;
+			node_p a, b;
+		} op;
+	};
+};
+
+
+//
+// Node specs
+//
+
+__attribute__ ((weak)) node_spec_p node_specs[] = {
+	[ NT_SYSCALL ] = &(node_spec_t){
+		"syscall", (member_spec_t[]){
+			{ MT_NODE, offsetof(node_t, syscall.expr), "expr" },
+			{ 0 }
+		}
+	},
+	
+	[ NT_ID ] = &(node_spec_t){
+		"id", (member_spec_t[]){
+			{ MT_CHAR_LIST, offsetof(node_t, id.name), "name" },
+			{ 0 }
+		}
+	},
+	
+	[ NT_INTL ] = &(node_spec_t){
+		"intl", (member_spec_t[]){
+			{ MT_INT, offsetof(node_t, intl.value), "value" },
+			{ 0 }
+		}
+	},
+	
+	[ NT_STRL ] = &(node_spec_t){
+		"strl", (member_spec_t[]){
+			{ MT_CHAR_LIST, offsetof(node_t, strl.value), "value" },
+			{ 0 }
+		}
+	},
+	
+	[ NT_UOPS ] = &(node_spec_t){
+		"uops", (member_spec_t[]){
+			{ MT_NODE_LIST, offsetof(node_t, uops.list), "list" },
+			{ 0 }
+		}
+	},
+	
+	[ NT_OP ] = &(node_spec_t){
+		"op", (member_spec_t[]){
+			{ MT_CHAR, offsetof(node_t, op.op), "op" },
+			{ MT_NODE, offsetof(node_t, op.a), "a" },
+			{ MT_NODE, offsetof(node_t, op.b), "b" },
+			{ 0 }
+		}
+	}
+};
+
+
+//
+// Node functions
+//
+
+node_p node_alloc(node_type_t type);
+node_p node_alloc_set(node_type_t type, node_p parent, node_p* member);
+node_p node_alloc_append(node_type_t type, node_p parent, node_list_p list);
+
+// node_set(parent, member, child)
+// node_append(parent, list, child)
 
 #define NI_PRE  (1 << 0)
 #define NI_POST (1 << 1)
 #define NI_LEAF (1 << 2)
 typedef node_p (*node_it_func_t)(node_p node, uint32_t level, uint32_t flags);
-node_p node_iterate(node_p node, uint32_t level, node_it_func_t func);
+node_p node_iterate(node_p node, node_it_func_t func);
 
-
-typedef struct module_s    module_t,   *module_p;
-typedef struct var_s       var_t,      *var_p;
-typedef struct func_s      func_t,     *func_p;
-typedef struct ret_stmt_s  ret_stmt_t, *ret_stmt_p;
-
-typedef struct sym_s       sym_t,      *sym_p;
-typedef struct int_s       int_t,      *int_p;
-typedef struct str_s       str_t,      *str_p;
-typedef struct uops_s      uops_t,     *uops_p;
-typedef struct op_s        op_t,       *op_p;
-
-struct node_s {
-	node_spec_p spec;
-	node_p parent;
-};
-
-struct module_s {
-	node_t node;
-	buf_t(node_p) defs;
-	// ADD: module name, symbol table
-};
-
-struct var_s {
-	node_t node;
-	node_p type;
-	char*  name;
-	node_p value;
-};
-
-
-struct ret_stmt_s {
-	node_t node;
-	node_p expr;
-};
-
-__attribute__((weak)) node_spec_p ret_stmt_spec = &(node_spec_t){
-	"ret",
-	{ 1,
-		(member_spec_t[]){
-			{ MT_NODE, offsetof(ret_stmt_t, expr), "expr" }
-		}
-	},
-	NULL
-};
-
-
-struct sym_s {
-	node_t node;
-	char* name;
-	size_t size;
-};
-
-static void sym_print(node_p node, FILE* out) {
-	sym_p sym_node = (sym_p)node;
-	fprintf(out, "%.*s\n", (int)sym_node->size, sym_node->name);
-}
-
-__attribute__((weak)) node_spec_p sym_spec = &(node_spec_t){
-	"sym",
-	{ 0, NULL },
-	sym_print
-};
-
-
-struct int_s {
-	node_t node;
-	int64_t value;
-};
-
-static void int_print(node_p node, FILE* out) {
-	int_p int_node = (int_p)node;
-	fprintf(out, "%ld\n", int_node->value);
-}
-
-__attribute__((weak)) node_spec_p int_spec = &(node_spec_t){
-	"int",
-	{ 0, NULL },
-	int_print
-};
-
-
-struct str_s {
-	node_t node;
-	char* value;
-	size_t size;
-};
-
-static void str_print(node_p node, FILE* out) {
-	str_p str = (str_p)node;
-	fprintf(out, "\"%.*s\"\n", (int)str->size, str->value);
-}
-
-__attribute__((weak)) node_spec_p str_spec = &(node_spec_t){
-	"str",
-	{ 0, NULL },
-	str_print
-};
-
-
-struct uops_s {
-	node_t node;
-	buf_t(node_p) list;
-};
-
-static void uops_print(node_p node, FILE* out) {
-	fprintf(out, "\n");
-}
-
-__attribute__((weak)) node_spec_p uops_spec = &(node_spec_t){
-	"uops",
-	{ 1,
-		(member_spec_t[]){
-			{ MT_LIST, offsetof(uops_t, list), "list" }
-		}
-	},
-	uops_print
-};
-
-
-struct op_s {
-	node_t node;
-	char op;
-	node_p a, b;
-};
-
-static void op_print(node_p node, FILE* out) {
-	fprintf(out, "%c\n", ((op_p)node)->op);
-}
-
-__attribute__((weak)) node_spec_p op_spec = &(node_spec_t){
-	"op",
-	{ 2,
-		(member_spec_t[]){
-			{ MT_NODE, offsetof(op_t, a), "a" },
-			{ MT_NODE, offsetof(op_t, b), "b" }
-		}
-	},
-	op_print
-};
+void node_print(node_p node, FILE* output);
+void node_print_inline(node_p node, FILE* output);

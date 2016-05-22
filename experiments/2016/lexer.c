@@ -42,7 +42,7 @@ void token_print(FILE* stream, token_p token, uint32_t flags) {
 					token_print_escaped_str(stream, token->src_str, token->str_len);
 				fprintf(stream, "\")");
 				break;
-			case T_WS_EOS:
+			case T_WSNL:
 				fprintf(stream, "ws_eos(\"");
 				if (flags & TP_DUMP)
 					fprintf(stream, "%.*s", token->src_len, token->src_str);
@@ -69,8 +69,7 @@ void token_print(FILE* stream, token_p token, uint32_t flags) {
 			case T_COMMA:   fprintf(stream, "\",\"");  break;
 			case T_ASSIGN:  fprintf(stream, "\"=\"");  break;
 			
-			case T_FUNC:    fprintf(stream, "func");   break;
-			case T_RET:     fprintf(stream, "return"); break;
+			case T_SYSCALL: fprintf(stream, "syscall"); break;
 			
 			case T_ERROR:   fprintf(stream, "error(%.*s)", token->str_len, token->str_val);  break;
 			case T_EOF:     fprintf(stream, "EOF");                                          break;
@@ -91,25 +90,6 @@ void token_print_line(FILE* stream, token_p token, int first_line_indent) {
 		token->src_len, token->src_str,
 		(int)(line_end - (token->src_str + token->src_len)), token->src_str + token->src_len
 	);
-	
-	/*
-	char* line_start = token->src_str;
-	while (line_start > token->list->src_str && *(line_start-1) != '\n')
-		line_start--;
-	char* line_end = token->src_str;
-	while (*line_end != '\n' && line_end < token->list->src_str + token->list->src_len)
-		line_end++;
-	fprintf(stream, "%.*s\n", (int)(line_end - line_start), line_start);
-	
-	fprintf(stream, "%*s", first_line_indent, "");
-	for(char* c = line_start; c < token->src_str; c++) {
-		if ( isspace(*c) )
-			printf("%c", *c);
-		else
-			printf(" ");
-	}
-	printf("^\n");
-	*/
 }
 
 int token_line(token_p token) {
@@ -257,8 +237,7 @@ void lex_free(token_list_p list) {
 //
 
 static struct { const char* keyword; token_type_t type; } keywords[] = {
-	{ "function", T_FUNC },
-	{ "return", T_RET }
+	{ "syscall", T_SYSCALL }
 };
 
 static token_t next_token(lexer_p lexer) {
@@ -281,13 +260,13 @@ static token_t next_token(lexer_p lexer) {
 	}
 	
 	if ( isspace(c) ) {
-		token_t t = new_token(lexer, (c == '\n') ? T_WS_EOS : T_WS, 1);
+		token_t t = new_token(lexer, (c == '\n') ? T_WSNL : T_WS, 1);
 		
 		while ( isspace(c = peek1(lexer)) ) {
 			putc_into_token(lexer, &t, c);
 			// If a white space token contains a new line it becomes a possible end of statement
 			if (c == '\n')
-				t.type = T_WS_EOS;
+				t.type = T_WSNL;
 		}
 		
 		return t;

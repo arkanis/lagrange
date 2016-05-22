@@ -8,7 +8,6 @@
 
 void* sgl_fload(const char* filename, size_t* size);
 node_p expand_uops(node_p node, uint32_t level, uint32_t flags);
-node_p demo_pass(node_p node, uint32_t level, uint32_t flags);
 void compile(node_p node, const char* filename);
 
 
@@ -41,7 +40,7 @@ int main(int argc, char** argv) {
 		token_p t = &list->tokens_ptr[i];
 		if (t->type == T_COMMENT || t->type == T_WS) {
 			token_print(stdout, t, TP_SOURCE);
-		} else if (t->type == T_WS_EOS || t->type == T_EOF) {
+		} else if (t->type == T_WSNL || t->type == T_EOF) {
 			printf(" ");
 			token_print(stdout, t, TP_DUMP);
 			printf(" ");
@@ -54,11 +53,10 @@ int main(int argc, char** argv) {
 	printf("\n");
 	node_p tree = parse(list, parse_stmt);
 	printf("\n");
-	node_print(tree, stdout, 0);
+	node_print(tree, stdout);
 	
-	node_iterate(tree, 0, demo_pass);
-	node_iterate(tree, 0, expand_uops);
-	node_print(tree, stdout, 0);
+	node_iterate(tree, expand_uops);
+	node_print(tree, stdout);
 	
 	compile(tree, "main.elf");
 	
@@ -76,42 +74,32 @@ int main(int argc, char** argv) {
 // trees (op_t) nodes.
 //
 
-node_p demo_pass(node_p node, uint32_t level, uint32_t flags) {
-	if (flags & NI_PRE)
-		printf("%*sPRE  %p\n", (int)level*2, "", node);
-	else if (flags & NI_POST)
-		printf("%*sPOST %p\n", (int)level*2, "", node);
-	else if (flags & NI_LEAF)
-		printf("%*sLEAF %p\n", (int)level*2, "", node);
-	return node;
-}
-
 node_p expand_uops(node_p node, uint32_t level, uint32_t flags) {
 	// We only want uops nodes with children in them (there should be no uops
 	// nodes without children).
-	if ( !( (flags & NI_PRE) && node->spec == uops_spec ) )
+	if ( !( (flags & NI_PRE) && node->type == NT_UOPS ) )
 		return node;
 	
-	uops_p uops = (uops_p)node;
+	node_list_p list = &node->uops.list;
 	
 	// Find weakest operator
 	int weakest_op_idx = -1;
 	int weakest_op_weight = 10000;
 	char weakest_op = '\0';
-	for(int op_idx = 1; op_idx < (int)uops->list.len; op_idx += 2) {
+	for(int op_idx = 1; op_idx < (int)list->len; op_idx += 2) {
 		
 		int weight = 0;
 		char op = '\0';
 		
-		if (uops->list.ptr[op_idx]->spec == sym_spec) {
-			sym_p sym = (sym_p)uops->list.ptr[op_idx];
-			switch(sym->name[0]) {
+		if (list->ptr[op_idx]->type == NT_ID) {
+			node_p id = list->ptr[op_idx];
+			switch(id->id.name.ptr[0]) {
 				case '+': weight = 10; op = '+'; break;
 				case '-': weight = 10; op = '-'; break;
 				case '*': weight = 20; op = '*'; break;
 				case '/': weight = 20; op = '/'; break;
 			}
-			printf("got op %.*s, weight: %d\n", (int)sym->size, sym->name, weight);
+			printf("got op %.*s, weight: %d\n", (int)id->id.name.len, id->id.name.ptr, weight);
 			
 			if (weight < weakest_op_weight) {
 				weakest_op_weight = weight;
@@ -119,7 +107,7 @@ node_p expand_uops(node_p node, uint32_t level, uint32_t flags) {
 				weakest_op = op;
 			}
 		} else {
-			fprintf(stderr, "expand_uops(): got non symbol in uops op slot!");
+			fprintf(stderr, "expand_uops(): got non NT_ID in uops op slot!");
 			abort();
 		}
 	}
@@ -132,28 +120,33 @@ node_p expand_uops(node_p node, uint32_t level, uint32_t flags) {
 	printf("got weakest op at %d, weight: %d\n", weakest_op_idx, weakest_op_weight);
 	
 	// Split uops node into an op node with two uops children
-	op_p op_node = node_alloc(op, uops->node.parent);
-	op_node->op = weakest_op;
+	node_p op_node = node_alloc(NT_OP);
+	op_node->parent = node->parent;
+	op_node->op.op = weakest_op;
 	
 	if (weakest_op_idx == 1) {
-		op_node->a = uops->list.ptr[0];
+		op_node->op.a = list->ptr[0];
 	} else {
-		uops_p first = node_alloc(uops, op_node);
+		node_p first = node_alloc(NT_UOPS);
+		first->parent = op_node;
+		op_node->op.a = first;
+		
 		for(int i = 0; i < weakest_op_idx; i++)
-			buf_append(first->list, uops->list.ptr[i]);
-		op_node->a = (node_p)first;
+			buf_append(&first->uops.list, list->ptr[i]);
 	}
 	
-	if (weakest_op_idx == (int)uops->list.len - 2) {
-		op_node->b = uops->list.ptr[uops->list.len - 1];
+	if (weakest_op_idx == (int)list->len - 2) {
+		op_node->op.b = list->ptr[list->len - 1];
 	} else {
-		uops_p rest = node_alloc(uops, op_node);
-		for(int i = weakest_op_idx + 1; i < (int)uops->list.len; i++)
-			buf_append(rest->list, uops->list.ptr[i]);
-		op_node->b = (node_p)rest;
+		node_p rest = node_alloc(NT_UOPS);
+		rest->parent = op_node;
+		op_node->op.b = rest;
+		
+		for(int i = weakest_op_idx + 1; i < (int)list->len; i++)
+			buf_append(&rest->uops.list, list->ptr[i]);
 	}
 	
-	return (node_p)op_node;
+	return op_node;
 }
 
 
@@ -162,9 +155,9 @@ node_p expand_uops(node_p node, uint32_t level, uint32_t flags) {
 //
 
 raa_t compile_node(node_p node, asm_p assembler, ra_p register_allocator, int8_t requested_result_register);
-raa_t compile_ret_stmt(ret_stmt_p node, asm_p as, ra_p ra);
-raa_t compile_op(op_p node, asm_p as, ra_p ra, int8_t req_reg);
-raa_t compile_int(int_p node, asm_p as, ra_p ra, int8_t req_reg);
+raa_t compile_syscall(node_p node, asm_p as, ra_p ra);
+raa_t compile_op(node_p node, asm_p as, ra_p ra, int8_t req_reg);
+raa_t compile_intl(node_p node, asm_p as, ra_p ra, int8_t req_reg);
 
 void compile(node_p node, const char* filename) {
 	asm_p as = &(asm_t){ 0 };
@@ -181,30 +174,28 @@ void compile(node_p node, const char* filename) {
 }
 
 raa_t compile_node(node_p node, asm_p assembler, ra_p register_allocator, int8_t requested_result_register) {
-	if(node->spec == ret_stmt_spec) {
-		return compile_ret_stmt((ret_stmt_p)node, assembler, register_allocator);
-	} else if(node->spec == sym_spec) {
-		fprintf(stderr, "compile_node(): TODO\n");
-		abort();
-	} else if(node->spec == int_spec) {
-		return compile_int((int_p)node, assembler, register_allocator, requested_result_register);
-	} else if(node->spec == str_spec) {
-		fprintf(stderr, "compile_node(): TODO\n");
-		abort();
-	} else if(node->spec == op_spec) {
-		return compile_op((op_p)node, assembler, register_allocator, requested_result_register);
-	} else if(node->spec == uops_spec) {
-		fprintf(stderr, "compile_node(): uops nodes have to be reordered to op nodes before compilation!\n");
-		abort();
-	} else {
-		fprintf(stderr, "compile_node(): unknown node spec (node type)!\n");
-		abort();
+	switch(node->type) {
+		case NT_SYSCALL:
+			return compile_syscall(node, assembler, register_allocator);
+		case NT_INTL:
+			return compile_intl(node, assembler, register_allocator, requested_result_register);
+		case NT_OP:
+			return compile_op(node, assembler, register_allocator, requested_result_register);
+		
+		case NT_UOPS:
+			fprintf(stderr, "compile_node(): uops nodes have to be reordered to op nodes before compilation!\n");
+			abort();
+			
+		case NT_ID:
+		case NT_STRL:
+			fprintf(stderr, "compile_node(): TODO\n");
+			abort();
 	}
 	
 	return (raa_t){ -1, -1 };
 }
 
-raa_t compile_ret_stmt(ret_stmt_p node, asm_p as, ra_p ra) {
+raa_t compile_syscall(node_p node, asm_p as, ra_p ra) {
 	/*
 	Input:
 		RAX ← syscall_no
@@ -225,13 +216,7 @@ raa_t compile_ret_stmt(ret_stmt_p node, asm_p as, ra_p ra) {
 	as_mov(as, RAX, imm(60));
 	
 	// RDI ← status code
-	raa_t a2;
-	if (node->expr->spec == op_spec) {
-		a2 = compile_op((op_p)node->expr, as, ra, RDI.reg);
-	} else {
-		fprintf(stderr, "compile_ret_stmt(): unsupported expr node!\n");
-		abort();
-	}
+	raa_t a2 = compile_node(node->syscall.expr, as, ra, RDI.reg);
 	
 	as_syscall(as);
 	
@@ -241,25 +226,28 @@ raa_t compile_ret_stmt(ret_stmt_p node, asm_p as, ra_p ra) {
 	return (raa_t){ -1, -1 };
 }
 
-raa_t compile_op(op_p node, asm_p as, ra_p ra, int8_t req_reg) {
-	if (node->op == '+' || node->op == '-') {
-		raa_t a1 = compile_node(node->a, as, ra, req_reg);
-		raa_t a2 = compile_node(node->b, as, ra, -1);
+raa_t compile_op(node_p node, asm_p as, ra_p ra, int8_t req_reg) {
+	char op = node->op.op;
+	node_p a = node->op.a, b = node->op.b;
+	
+	if (op == '+' || op == '-') {
+		raa_t a1 = compile_node(a, as, ra, req_reg);
+		raa_t a2 = compile_node(b, as, ra, -1);
 		
-		switch(node->op) {
+		switch(op) {
 			case '+':  as_add(as, reg(a1.reg_index), reg(a2.reg_index));  break;
 			case '-':  as_sub(as, reg(a1.reg_index), reg(a2.reg_index));  break;
 		}
 		
 		ra_free_reg(ra, as, a2);
 		return a1;
-	} else if (node->op == '*' || node->op == '/') {
+	} else if (op == '*' || op == '/') {
 		// reserve RDX since MUL and DIV overwrite it
 		raa_t a1 = ra_alloc_reg(ra, as, RDX.reg);
-		raa_t a2 = compile_node(node->a, as, ra, RAX.reg);
-		raa_t a3 = compile_node(node->b, as, ra, -1);
+		raa_t a2 = compile_node(a, as, ra, RAX.reg);
+		raa_t a3 = compile_node(b, as, ra, -1);
 		
-		switch(node->op) {
+		switch(op) {
 			case '*':  as_mul(as, reg(a3.reg_index));  break;
 			case '/':  as_div(as, reg(a3.reg_index));  break;
 		}
@@ -277,14 +265,14 @@ raa_t compile_op(op_p node, asm_p as, ra_p ra, int8_t req_reg) {
 		}
 	}
 	
-	fprintf(stderr, "compile_op(): unknown operation: %c!\n", node->op);
+	fprintf(stderr, "compile_op(): unknown operation: %c!\n", op);
 	abort();
 	return (raa_t){ -1, -1 };
 }
 
-raa_t compile_int(int_p node, asm_p as, ra_p ra, int8_t req_reg) {
+raa_t compile_intl(node_p node, asm_p as, ra_p ra, int8_t req_reg) {
 	raa_t a = ra_alloc_reg(ra, as, req_reg);
-	as_mov(as, reg(a.reg_index), imm(node->value));
+	as_mov(as, reg(a.reg_index), imm(node->intl.value));
 	return a;
 }
 

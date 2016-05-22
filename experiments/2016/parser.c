@@ -19,7 +19,7 @@ int next_filtered_token_at(parser_p parser, size_t pos, bool ignore_ws_eos) {
 	while (pos + offset < (size_t)parser->list->tokens_len) {
 		token_type_t type = parser->list->tokens_ptr[pos + offset].type;
 		// Return the offset if we found a filtered token there
-		if ( !( type == T_WS || type == T_COMMENT || (ignore_ws_eos && type == T_WS_EOS) ) )
+		if ( !( type == T_WS || type == T_COMMENT || (ignore_ws_eos && type == T_WSNL) ) )
 			return offset;
 		offset++;
 	}
@@ -72,7 +72,7 @@ token_type_t peek_type_impl(parser_p parser, bool ignore_ws_eos, const char* cal
 
 #define consume_type(parser, type) consume_type_impl((parser), (type), __FUNCTION__, __LINE__)
 token_p consume_type_impl(parser_p parser, token_type_t type, const char* caller, int line) {
-	token_p t = consume_impl(parser, (type != T_WS_EOS), caller, line);
+	token_p t = consume_impl(parser, (type != T_WSNL), caller, line);
 	if (t->type == type)
 		return t;
 	
@@ -88,99 +88,42 @@ token_p consume_type_impl(parser_p parser, token_type_t type, const char* caller
 
 
 //
-// Definitions
+// Parser rules
 //
 
-/*
-tree_p parse_module(tokenized_file_p file) {
-	parser_t parser_storage = { file, 0 };
-	parser_p parser = &parser_storage;
-	
-	token_p t;
-	do {
-		t = consume(parser);
-	} while (t->type != T_EOF);
-	
-	return NULL;
-}
-*/
+static bool is_stmt_start(token_type_t type);
+static bool is_expr_start(token_type_t type);
+node_p parse_expr_ex(parser_p parser, bool collect_uops);
 
+
+//
+// Definitions
+//
 
 node_p parse(token_list_p list, parser_rule_func_t rule) {
 	parser_t parser = { list, 0 };
 	return rule(&parser);
 }
 
-node_p parse_expr_ex(parser_p parser, bool collect_uops);
-
-/*
-tree_p parse_func_def(parser_p parser);
-tree_p parse_var_def(parser_p parser);
-bool is_stmt_start(token_type_t type);
-tree_p parse_stmt(parser_p parser);
-bool is_expr_start(token_type_t type);
-tree_p parse_expr(parser_p parser);
-
-
-tree_p parse_module(tokenized_file_p file) {
-	parser_t parser_storage = { file, 0 };
-	parser_p parser = &parser_storage;
-	
-	printf("module:\n");
-	while (true) {
-		token_type_t type = peek_type(parser);
-		if ( type == T_FUNC ) {
-			parse_func_def(parser);
-		} else if ( is_expr_start(type) ) {
-			parse_var_def(parser);
-		} else {
-			break;
-		}
-	}
-	consume_type(parser, T_EOF);
-	
-	return NULL;
-}
-
-tree_p parse_func_def(parser_p parser) {
-	printf("  func");
-	consume_type(parser, T_FUNC);
-	token_p id = consume_type(parser, T_ID);
-	printf(" id %.*s:\n", id->size, id->source);
-	consume_type(parser, T_CBO);
-	
-	while ( is_stmt_start(peek_type(parser)) )
-		parse_stmt(parser);
-	
-	consume_type(parser, T_CBC);
-	
-	return NULL;
-}
-
-tree_p parse_var_def(parser_p parser) {
-	parser = parser;
-	abort();
-}
 
 
 //
 // Statements
 //
 
-bool is_stmt_start(token_type_t type) {
+static bool is_stmt_start(token_type_t type) {
 	switch(type) {
-		case T_RET:
+		case T_SYSCALL:
 			return true;
 		default:
 			return is_expr_start(type);
 	}
 }
-*/
 
 void parse_eos(parser_p parser) {
 	token_p t = consume_with_eos(parser);
-	if ( !(t->type == T_WS_EOS || t->type == T_EOF) ) {
-		printf("%s:%d:%d: expectet EOS or EOF, got:\n", parser->list->filename, token_line(t), token_col(t));
+	if ( !(t->type == T_WSNL || t->type == T_EOF) ) {
+		printf("%s:%d:%d: expectet WSNL or EOF, got:\n", parser->list->filename, token_line(t), token_col(t));
 		token_print_line(stderr, t, 0);
 		abort();
 	}
@@ -188,16 +131,17 @@ void parse_eos(parser_p parser) {
 
 node_p parse_stmt(parser_p parser) {
 	token_p t = consume(parser);
-	if (t->type == T_RET) {
-		ret_stmt_p stmt = node_alloc(ret_stmt, NULL);
+	if (t->type == T_SYSCALL) {
 		node_p expr = parse_expr(parser);
-		stmt->expr = expr;
-		expr->parent = (node_p)stmt;
 		parse_eos(parser);
-		return (node_p)stmt;
+		
+		node_p stmt = node_alloc(NT_SYSCALL);
+		stmt->syscall.expr = expr;
+		expr->parent = stmt;
+		return stmt;
 	}
 	
-	printf("%s:%d:%d: expectet 'return', got:\n", parser->list->filename, token_line(t), token_col(t));
+	printf("%s:%d:%d: expectet 'syscall', got:\n", parser->list->filename, token_line(t), token_col(t));
 	token_print_line(stderr, t, 0);
 	abort();
 	
@@ -209,7 +153,7 @@ node_p parse_stmt(parser_p parser) {
 // Expressions
 //
 
-bool is_expr_start(token_type_t type) {
+static bool is_expr_start(token_type_t type) {
 	switch(type) {
 		case T_ID:
 		case T_INT:
@@ -225,31 +169,32 @@ node_p parse_expr(parser_p parser) {
 	return parse_expr_ex(parser, true);
 }
 
+/**
+
+Idea: make a parse_expr_without_trailing_ops() function and one parse_epxr()
+function that uses the first but only does the uops collection stuff.
+
+**/
+
 node_p parse_expr_ex(parser_p parser, bool collect_uops) {
 	node_p node = NULL;
 	
 	token_p t = consume(parser);
 	switch(t->type) {
-		case T_ID: {
-			sym_p sym_node = node_alloc(sym, NULL);
-			sym_node->name = t->src_str;
-			sym_node->size = t->src_len;
-			node = (node_p)sym_node;
+		case T_ID:
+			node = node_alloc(NT_ID);
+			node->id.name.ptr = t->src_str;
+			node->id.name.len = t->src_len;
 			break;
-			}
-		case T_INT: {
-			int_p int_node = node_alloc(int, NULL);
-			int_node->value = t->int_val;
-			node = (node_p)int_node;
+		case T_INT:
+			node = node_alloc(NT_INTL);
+			node->intl.value = t->int_val;
 			break;
-			}
-		case T_STR: {
-			str_p str_node = node_alloc(str, NULL);
-			str_node->value = t->str_val;
-			str_node->size = t->str_len;
-			node = (node_p)str_node;
+		case T_STR:
+			node = node_alloc(NT_STRL);
+			node->strl.value.ptr = t->str_val;
+			node->strl.value.len = t->str_len;
 			break;
-			}
 		case T_RBO:
 			// TODO: remember somehow that this node was surrounded by brackets!
 			// Otherwise exact syntax reconstruction will be impossible.
@@ -257,28 +202,32 @@ node_p parse_expr_ex(parser_p parser, bool collect_uops) {
 			consume_type(parser, T_RBC);
 			break;
 		default:
+			printf("%s:%d:%d: expectet ID, INT or STR, got:\n", parser->list->filename, token_line(t), token_col(t));
+			token_print_line(stderr, t, 0);
 			abort();
 			return NULL;
 	}
 	
 	if (collect_uops && peek_type(parser) == T_ID) {
-		// Got an operator
-		uops_p uops_node = node_alloc(uops, NULL);
-		node->parent = (node_p)uops_node;
-		buf_append(uops_node->list, node);
+		// Got an operator, wrap everything into an uops node and collect the
+		// remaining operators and expressions.
+		node_p uops = node_alloc(NT_UOPS);
+		node->parent = uops;
+		buf_append(&uops->uops.list, node);
 		
 		while (peek_type(parser) == T_ID) {
 			token_p id = consume_type(parser, T_ID);
-			sym_p op_node = node_alloc(sym, uops_node);
-			op_node->name = id->src_str;
-			op_node->size = id->src_len;
-			buf_append(uops_node->list, (node_p)op_node);
 			
-			node_p next_expr = parse_expr_ex(parser, false);
-			buf_append(uops_node->list, next_expr);
+			node_p op_node = node_alloc_append(NT_ID, uops, &uops->uops.list);
+			op_node->id.name.ptr = id->src_str;
+			op_node->id.name.len = id->src_len;
+			
+			node_p expr = parse_expr_ex(parser, false);
+			expr->parent = uops;
+			buf_append(&uops->uops.list, expr);
 		}
 		
-		return (node_p)uops_node;
+		return uops;
 	}
 	
 	return node;

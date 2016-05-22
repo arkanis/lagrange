@@ -9,7 +9,7 @@
 typedef enum {
 	T_COMMENT,
 	T_WS,
-	T_WS_EOS,
+	T_WSNL,
 	
 	T_STR,
 	T_INT,
@@ -22,8 +22,7 @@ typedef enum {
 	T_COMMA,  // ,
 	T_ASSIGN, // =
 	
-	T_FUNC,
-	T_RET,
+	T_SYSCALL,
 	
 	T_ERROR,
 	T_EOF
@@ -70,36 +69,3 @@ void token_print(FILE* stream, token_p token, uint32_t flags);
 void token_print_line(FILE* stream, token_p token, int first_line_indent);
 int  token_line(token_p token);
 int  token_col(token_p token);
-
-
-
-/*
-typedef struct tokenized_file_s tokenized_file_t, *tokenized_file_p;
-
-typedef struct {
-	token_type_t type;
-	int line;
-	char* source;
-	int size;
-	tokenized_file_p file;
-	union {
-		struct { char* str_val; int str_size; };
-		int int_val;
-	};
-} token_t, *token_p;
-
-struct tokenized_file_s {
-	const char* name;
-	char* source;
-	size_t source_size;
-	token_p tokens;
-	size_t token_count;
-};
-
-
-tokenized_file_p tokenize_str(char* source, size_t size, const char* name, FILE* errors);
-void             tokenized_file_free(tokenized_file_p file);
-
-int  token_dump(token_p token, char* buffer, size_t buffer_size);
-void token_print_line(token_p token);
-*/
