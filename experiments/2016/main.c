@@ -220,17 +220,33 @@ raa_t compile_syscall(node_p node, asm_p as, ra_p ra) {
 		R11
 	*/
 	
-	// RAX ← syscall number
-	raa_t a1 = ra_alloc_reg(ra, as, RAX.reg);
-	as_mov(as, RAX, imm(60));
+	int8_t arg_regs[7] = { RAX.reg, RDI.reg, RSI.reg, RDX.reg, RCX.reg, R8.reg, R9.reg };
+	raa_t arg_allocs[7];
 	
-	// RDI ← status code
-	raa_t a2 = compile_node(node->syscall.expr, as, ra, RDI.reg);
+	// Need at least one argument (the syscall number)
+	if (node->syscall.args.len < 1) {
+		fprintf(stderr, "compile_syscall(): need at least 1 arg, got %zu\n", node->syscall.args.len);
+		abort();
+	}
+	
+	// Compile args
+	for(size_t i = 0; i < node->syscall.args.len; i++)
+		arg_allocs[i] = compile_node(node->syscall.args.ptr[i], as, ra, arg_regs[i]);
+	
+	// Allocate scratch registers
+	// TODO: Also allocate unused args as scratch regs
+	raa_t a1 = ra_alloc_reg(ra, as, R10.reg);
+	raa_t a2 = ra_alloc_reg(ra, as, R11.reg);
 	
 	as_syscall(as);
 	
+	// Free scratch registers
 	ra_free_reg(ra, as, a2);
 	ra_free_reg(ra, as, a1);
+	
+	// Free argument registers
+	for(size_t i = 0; i < node->syscall.args.len; i++)
+		ra_free_reg(ra, as, arg_allocs[i]);
 	
 	return (raa_t){ -1, -1 };
 }

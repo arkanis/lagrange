@@ -1,4 +1,5 @@
 // something
 //syscall (foo + bar + 8) * x / batz
-syscall 1*2 + 3*4
-syscall 70
+syscall 3, 0  // close stdin
+syscall 3, 1  // close stdout
+syscall 60, 1*2 + 3*5

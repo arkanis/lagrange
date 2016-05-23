@@ -272,7 +272,9 @@ static token_t next_token(lexer_p lexer) {
 		return t;
 	}
 	
-	if ( c != '0' && isdigit(c) ) {
+	// TODO: Handle numbers starting with a "0" prefix (e.g. 0b... 0o... 0x...)
+	// But also "0" itself.
+	if ( isdigit(c) ) {
 		token_t t = new_token(lexer, T_INT, 1);
 		
 		int value = c - '0';

@@ -75,7 +75,7 @@ struct node_s {
 		} module;
 		
 		struct {
-			node_p expr;
+			node_list_t args;
 		} syscall;
 		
 		struct {
@@ -116,7 +116,7 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 	
 	[ NT_SYSCALL ] = &(node_spec_t){
 		"syscall", (member_spec_t[]){
-			{ MT_NODE, offsetof(node_t, syscall.expr), "expr" },
+			{ MT_NODE_LIST, offsetof(node_t, syscall.args), "args" },
 			{ 0 }
 		}
 	},

@@ -144,6 +144,11 @@ static bool is_stmt_start(token_type_t type) {
 	}
 }
 
+bool peek_eos(parser_p parser) {
+	token_type_t type = peek_type_with_eos(parser);
+	return (type == T_WSNL || type == T_EOF);
+}
+
 void parse_eos(parser_p parser) {
 	token_p t = consume_with_eos(parser);
 	if ( !(t->type == T_WSNL || t->type == T_EOF) ) {
@@ -156,12 +161,24 @@ void parse_eos(parser_p parser) {
 node_p parse_stmt(parser_p parser) {
 	token_p t = consume(parser);
 	if (t->type == T_SYSCALL) {
-		node_p expr = parse_expr(parser);
-		parse_eos(parser);
-		
+		// syscall eos
+		// syscall expr ["," expr] eos
 		node_p stmt = node_alloc(NT_SYSCALL);
-		stmt->syscall.expr = expr;
-		expr->parent = stmt;
+		
+		if ( is_expr_start(peek_type_with_eos(parser)) ) {
+			node_p expr = parse_expr(parser);
+			expr->parent = stmt;
+			buf_append(&stmt->syscall.args, expr);
+			
+			while ( peek_type_with_eos(parser) == T_COMMA ) {
+				consume_type(parser, T_COMMA);
+				expr = parse_expr(parser);
+				expr->parent = stmt;
+				buf_append(&stmt->syscall.args, expr);
+			}
+		}
+		
+		parse_eos(parser);
 		return stmt;
 	}
 	
