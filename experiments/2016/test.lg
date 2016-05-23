@@ -1,3 +1,4 @@
 // something
 //syscall (foo + bar + 8) * x / batz
 syscall 1*2 + 3*4
+syscall 70

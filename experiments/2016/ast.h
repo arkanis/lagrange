@@ -48,6 +48,8 @@ typedef struct {
 
 
 typedef enum {
+	NT_MODULE,
+	
 	NT_SYSCALL,
 	
 	NT_ID,
@@ -68,6 +70,10 @@ struct node_s {
 	node_p parent;
 	
 	union {
+		struct {
+			node_list_t stmts;
+		} module;
+		
 		struct {
 			node_p expr;
 		} syscall;
@@ -101,6 +107,13 @@ struct node_s {
 //
 
 __attribute__ ((weak)) node_spec_p node_specs[] = {
+	[ NT_MODULE ] = &(node_spec_t){
+		"module", (member_spec_t[]){
+			{ MT_NODE_LIST, offsetof(node_t, module.stmts), "stmts" },
+			{ 0 }
+		}
+	},
+	
 	[ NT_SYSCALL ] = &(node_spec_t){
 		"syscall", (member_spec_t[]){
 			{ MT_NODE, offsetof(node_t, syscall.expr), "expr" },

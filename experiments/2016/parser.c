@@ -32,13 +32,21 @@ int next_filtered_token_at(parser_p parser, size_t pos, bool ignore_ws_eos) {
 #define consume_with_eos(parser) consume_impl((parser), false, __FUNCTION__, __LINE__)
 token_p consume_impl(parser_p parser, bool ignore_ws_eos, const char* caller, int line) {
 	int offset = next_filtered_token_at(parser, parser->pos, ignore_ws_eos);
+	/* For now return T_EOF (the last token in the list) so we can consume as
+	   many EOFs as we want.
 	// Return NULL if there are no more filtered tokens
 	if (offset == -1)
 		return NULL;
+	*/
 	
-	parser->pos += offset;
-	token_p current_token = &parser->list->tokens_ptr[parser->pos];
-	parser->pos++;
+	token_p current_token;
+	if (offset == -1) {
+		current_token = &parser->list->tokens_ptr[parser->list->tokens_len - 1];
+	} else {
+		parser->pos += offset;
+		current_token = &parser->list->tokens_ptr[parser->pos];
+		parser->pos++;
+	}
 	
 	printf("%s:%d consume ", caller, line);
 	token_print(stdout, current_token, TP_INLINE_DUMP);
@@ -51,11 +59,18 @@ token_p consume_impl(parser_p parser, bool ignore_ws_eos, const char* caller, in
 #define peek_with_eos(parser) peek_impl((parser), false, __FUNCTION__, __LINE__)
 token_p peek_impl(parser_p parser, bool ignore_ws_eos, const char* caller, int line) {
 	int offset = next_filtered_token_at(parser, parser->pos, ignore_ws_eos);
+	/* For now return T_EOF (the last token in the list) so we can consume as
+	   many EOFs as we want.
 	// Return NULL if there are no more filtered tokens
 	if (offset == -1)
 		return NULL;
+	*/
 	
-	token_p current_token = &parser->list->tokens_ptr[parser->pos + offset];
+	token_p current_token;
+	if (offset == -1)
+		current_token = &parser->list->tokens_ptr[parser->list->tokens_len - 1];
+	else
+		current_token = &parser->list->tokens_ptr[parser->pos + offset];
 	
 	printf("%s:%d peek ", caller, line);
 	token_print(stdout, current_token, TP_INLINE_DUMP);
@@ -93,18 +108,27 @@ token_p consume_type_impl(parser_p parser, token_type_t type, const char* caller
 
 static bool is_stmt_start(token_type_t type);
 static bool is_expr_start(token_type_t type);
-node_p parse_expr_ex(parser_p parser, bool collect_uops);
-
-
-//
-// Definitions
-//
 
 node_p parse(token_list_p list, parser_rule_func_t rule) {
 	parser_t parser = { list, 0 };
 	return rule(&parser);
 }
 
+
+//
+// Definitions
+//
+
+node_p parse_module(parser_p parser) {
+	node_p node = node_alloc(NT_MODULE);
+	while ( is_stmt_start(peek_type(parser)) ) {
+		node_p stmt = parse_stmt(parser);
+		buf_append(&node->module.stmts, stmt);
+	}
+	
+	consume_type(parser, T_EOF);
+	return node;
+}
 
 
 //

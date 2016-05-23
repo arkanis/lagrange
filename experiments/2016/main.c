@@ -51,7 +51,7 @@ int main(int argc, char** argv) {
 	printf("\n");
 	
 	printf("\n");
-	node_p tree = parse(list, parse_stmt);
+	node_p tree = parse(list, parse_module);
 	printf("\n");
 	node_print(tree, stdout);
 	
@@ -155,6 +155,7 @@ node_p expand_uops(node_p node, uint32_t level, uint32_t flags) {
 //
 
 raa_t compile_node(node_p node, asm_p assembler, ra_p register_allocator, int8_t requested_result_register);
+raa_t compile_module(node_p node, asm_p as, ra_p ra);
 raa_t compile_syscall(node_p node, asm_p as, ra_p ra);
 raa_t compile_op(node_p node, asm_p as, ra_p ra, int8_t req_reg);
 raa_t compile_intl(node_p node, asm_p as, ra_p ra, int8_t req_reg);
@@ -175,6 +176,8 @@ void compile(node_p node, const char* filename) {
 
 raa_t compile_node(node_p node, asm_p assembler, ra_p register_allocator, int8_t requested_result_register) {
 	switch(node->type) {
+		case NT_MODULE:
+			return compile_module(node, assembler, register_allocator);
 		case NT_SYSCALL:
 			return compile_syscall(node, assembler, register_allocator);
 		case NT_INTL:
@@ -192,6 +195,12 @@ raa_t compile_node(node_p node, asm_p assembler, ra_p register_allocator, int8_t
 			abort();
 	}
 	
+	return (raa_t){ -1, -1 };
+}
+
+raa_t compile_module(node_p node, asm_p as, ra_p ra) {
+	for(size_t i = 0; i < node->module.stmts.len; i++)
+		compile_node(node->module.stmts.ptr[i], as, ra, -1);
 	return (raa_t){ -1, -1 };
 }
 
