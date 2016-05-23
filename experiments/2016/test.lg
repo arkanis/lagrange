@@ -1,5 +1,6 @@
 // something
 //syscall (foo + bar + 8) * x / batz
+syscall 1, 1, "Hello World!\n", 13  // write text
 syscall 3, 0  // close stdin
 syscall 3, 1  // close stdout
 syscall 60, 1*2 + 3*5

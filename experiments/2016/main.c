@@ -159,6 +159,7 @@ raa_t compile_module(node_p node, asm_p as, ra_p ra);
 raa_t compile_syscall(node_p node, asm_p as, ra_p ra);
 raa_t compile_op(node_p node, asm_p as, ra_p ra, int8_t req_reg);
 raa_t compile_intl(node_p node, asm_p as, ra_p ra, int8_t req_reg);
+raa_t compile_strl(node_p node, asm_p as, ra_p ra, int8_t req_reg);
 
 void compile(node_p node, const char* filename) {
 	asm_p as = &(asm_t){ 0 };
@@ -182,6 +183,8 @@ raa_t compile_node(node_p node, asm_p assembler, ra_p register_allocator, int8_t
 			return compile_syscall(node, assembler, register_allocator);
 		case NT_INTL:
 			return compile_intl(node, assembler, register_allocator, requested_result_register);
+		case NT_STRL:
+			return compile_strl(node, assembler, register_allocator, requested_result_register);
 		case NT_OP:
 			return compile_op(node, assembler, register_allocator, requested_result_register);
 		
@@ -190,7 +193,6 @@ raa_t compile_node(node_p node, asm_p assembler, ra_p register_allocator, int8_t
 			abort();
 			
 		case NT_ID:
-		case NT_STRL:
 			fprintf(stderr, "compile_node(): TODO\n");
 			abort();
 	}
@@ -300,6 +302,14 @@ raa_t compile_intl(node_p node, asm_p as, ra_p ra, int8_t req_reg) {
 	as_mov(as, reg(a.reg_index), imm(node->intl.value));
 	return a;
 }
+
+raa_t compile_strl(node_p node, asm_p as, ra_p ra, int8_t req_reg) {
+	size_t str_vaddr = as_data(as, node->strl.value.ptr, node->strl.value.len);
+	raa_t a = ra_alloc_reg(ra, as, req_reg);
+	as_mov(as, reg(a.reg_index), imm(str_vaddr));
+	return a;
+}
+
 
 
 //
