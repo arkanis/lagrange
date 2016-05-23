@@ -23,6 +23,7 @@ typedef enum {
 	T_ASSIGN, // =
 	
 	T_SYSCALL,
+	T_VAR,
 	
 	T_ERROR,
 	T_EOF

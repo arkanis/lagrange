@@ -69,7 +69,8 @@ void token_print(FILE* stream, token_p token, uint32_t flags) {
 			case T_COMMA:   fprintf(stream, "\",\"");  break;
 			case T_ASSIGN:  fprintf(stream, "\"=\"");  break;
 			
-			case T_SYSCALL: fprintf(stream, "syscall"); break;
+			case T_SYSCALL: fprintf(stream, "syscall");  break;
+			case T_VAR:     fprintf(stream, "var");      break;
 			
 			case T_ERROR:   fprintf(stream, "error(%.*s)", token->str_len, token->str_val);  break;
 			case T_EOF:     fprintf(stream, "EOF");                                          break;
@@ -237,7 +238,8 @@ void lex_free(token_list_p list) {
 //
 
 static struct { const char* keyword; token_type_t type; } keywords[] = {
-	{ "syscall", T_SYSCALL }
+	{ "syscall", T_SYSCALL },
+	{ "var", T_VAR }
 };
 
 static token_t next_token(lexer_p lexer) {

@@ -1,6 +1,13 @@
+// For strdup
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <string.h>
+
+#define SLIM_HASH_IMPLEMENTATION
+#include "slim_hash.h"
+
 #include "lexer.h"
 #include "parser.h"
 #include "reg_alloc.h"
@@ -65,6 +72,7 @@ int main(int argc, char** argv) {
 	
 	return 0;
 }
+
 
 
 //
@@ -150,63 +158,138 @@ node_p expand_uops(node_p node, uint32_t level, uint32_t flags) {
 }
 
 
+
+//
+// Scope (support stuff for compilation of variables)
+//
+
+typedef struct {
+	size_t stack_offset;
+} scope_binding_t, *scope_binding_p;
+
+SH_GEN_DECL(scope_dict, const char*, scope_binding_t);
+
+typedef struct scope_s scope_t, *scope_p;
+struct scope_s {
+	scope_p parent;
+	size_t allocated_stack_space;
+	scope_dict_t bindings;
+};
+
+SH_GEN_DICT_DEF(scope_dict, const char*, scope_binding_t);
+
+void scope_new(scope_p scope, scope_p parent) {
+	scope->parent = parent;
+	scope->allocated_stack_space = 0;
+	scope_dict_new(&scope->bindings);
+}
+
+void scope_destroy(scope_p scope) {
+	scope_dict_destroy(&scope->bindings);
+}
+
+size_t scope_put(scope_p scope, const char* name, size_t size) {
+	scope_binding_p binding = scope_dict_put_ptr(&scope->bindings, name);
+	
+	binding->stack_offset = scope->allocated_stack_space;
+	scope->allocated_stack_space += size;
+	
+	return binding->stack_offset;
+}
+
+size_t scope_get(scope_p scope, const char* name) {
+	scope_binding_p binding = scope_dict_get_ptr(&scope->bindings, name);
+	if (binding == NULL)
+		return -1;
+	return binding->stack_offset;
+}
+
+
+
 //
 // Compiler stuff (tree to asm)
 //
 
-raa_t compile_node(node_p node, asm_p assembler, ra_p register_allocator, int8_t requested_result_register);
-raa_t compile_module(node_p node, asm_p as, ra_p ra);
-raa_t compile_syscall(node_p node, asm_p as, ra_p ra);
-raa_t compile_op(node_p node, asm_p as, ra_p ra, int8_t req_reg);
-raa_t compile_intl(node_p node, asm_p as, ra_p ra, int8_t req_reg);
-raa_t compile_strl(node_p node, asm_p as, ra_p ra, int8_t req_reg);
+typedef struct {
+	asm_p as;
+	ra_p ra;
+	scope_p scope;
+} compiler_ctx_t, *compiler_ctx_p;
+
+raa_t compile_node(node_p node, compiler_ctx_p ctx, int8_t requested_result_register);
+raa_t compile_module(node_p node, compiler_ctx_p ctx);
+raa_t compile_syscall(node_p node, compiler_ctx_p ctx);
+raa_t compile_var(node_p node, compiler_ctx_p ctx);
+raa_t compile_op(node_p node, compiler_ctx_p ctx, int8_t req_reg);
+raa_t compile_intl(node_p node, compiler_ctx_p ctx, int8_t req_reg);
+raa_t compile_strl(node_p node, compiler_ctx_p ctx, int8_t req_reg);
+raa_t compile_id(node_p node, compiler_ctx_p ctx, int8_t req_reg);
+
+
 
 void compile(node_p node, const char* filename) {
-	asm_p as = &(asm_t){ 0 };
-	ra_p ra = &(ra_t){ 0 };
-	as_new(as);
-	ra_new(ra);
+	compiler_ctx_t ctx = (compiler_ctx_t){
+		.as = &(asm_t){ 0 },
+		.ra = &(ra_t){ 0 },
+		.scope = NULL
+	};
+	as_new(ctx.as);
+	ra_new(ctx.ra);
 	
-	raa_t alloc = compile_node(node, as, ra, -1);
-	ra_free_reg(ra, as, alloc);
-	as_save_elf(as, filename);
+	raa_t a = compile_node(node, &ctx, -1);
+	ra_free_reg(ctx.ra, ctx.as, a);
+	as_save_elf(ctx.as, filename);
 	
-	ra_destroy(ra);
-	as_destroy(as);
+	ra_destroy(ctx.ra);
+	as_destroy(ctx.as);
 }
 
-raa_t compile_node(node_p node, asm_p assembler, ra_p register_allocator, int8_t requested_result_register) {
+raa_t compile_node(node_p node, compiler_ctx_p ctx, int8_t requested_result_register) {
 	switch(node->type) {
 		case NT_MODULE:
-			return compile_module(node, assembler, register_allocator);
+			return compile_module(node, ctx);
 		case NT_SYSCALL:
-			return compile_syscall(node, assembler, register_allocator);
+			return compile_syscall(node, ctx);
+		case NT_VAR:
+			return compile_var(node, ctx);
 		case NT_INTL:
-			return compile_intl(node, assembler, register_allocator, requested_result_register);
+			return compile_intl(node, ctx, requested_result_register);
 		case NT_STRL:
-			return compile_strl(node, assembler, register_allocator, requested_result_register);
+			return compile_strl(node, ctx, requested_result_register);
 		case NT_OP:
-			return compile_op(node, assembler, register_allocator, requested_result_register);
+			return compile_op(node, ctx, requested_result_register);
+		case NT_ID:
+			return compile_id(node, ctx, requested_result_register);
 		
 		case NT_UOPS:
 			fprintf(stderr, "compile_node(): uops nodes have to be reordered to op nodes before compilation!\n");
 			abort();
 			
+		/*
 		case NT_ID:
 			fprintf(stderr, "compile_node(): TODO\n");
 			abort();
+		*/
 	}
 	
 	return (raa_t){ -1, -1 };
 }
 
-raa_t compile_module(node_p node, asm_p as, ra_p ra) {
+raa_t compile_module(node_p node, compiler_ctx_p ctx) {
+	scope_t scope;
+	scope_new(&scope, ctx->scope);
+	ctx->scope = &scope;
+	
 	for(size_t i = 0; i < node->module.stmts.len; i++)
-		compile_node(node->module.stmts.ptr[i], as, ra, -1);
+		compile_node(node->module.stmts.ptr[i], ctx, -1);
+	
+	ctx->scope = scope.parent;
+	scope_destroy(&scope);
+	
 	return (raa_t){ -1, -1 };
 }
 
-raa_t compile_syscall(node_p node, asm_p as, ra_p ra) {
+raa_t compile_syscall(node_p node, compiler_ctx_p ctx) {
 	/*
 	Input:
 		RAX ← syscall_no
@@ -233,59 +316,74 @@ raa_t compile_syscall(node_p node, asm_p as, ra_p ra) {
 	
 	// Compile args
 	for(size_t i = 0; i < node->syscall.args.len; i++)
-		arg_allocs[i] = compile_node(node->syscall.args.ptr[i], as, ra, arg_regs[i]);
+		arg_allocs[i] = compile_node(node->syscall.args.ptr[i], ctx, arg_regs[i]);
 	
 	// Allocate scratch registers
 	// TODO: Also allocate unused args as scratch regs
-	raa_t a1 = ra_alloc_reg(ra, as, R10.reg);
-	raa_t a2 = ra_alloc_reg(ra, as, R11.reg);
+	raa_t a1 = ra_alloc_reg(ctx->ra, ctx->as, R10.reg);
+	raa_t a2 = ra_alloc_reg(ctx->ra, ctx->as, R11.reg);
 	
-	as_syscall(as);
+	as_syscall(ctx->as);
 	
 	// Free scratch registers
-	ra_free_reg(ra, as, a2);
-	ra_free_reg(ra, as, a1);
+	ra_free_reg(ctx->ra, ctx->as, a2);
+	ra_free_reg(ctx->ra, ctx->as, a1);
 	
 	// Free argument registers
 	for(size_t i = 0; i < node->syscall.args.len; i++)
-		ra_free_reg(ra, as, arg_allocs[i]);
+		ra_free_reg(ctx->ra, ctx->as, arg_allocs[i]);
 	
 	return (raa_t){ -1, -1 };
 }
 
-raa_t compile_op(node_p node, asm_p as, ra_p ra, int8_t req_reg) {
+raa_t compile_var(node_p node, compiler_ctx_p ctx) {
+	char* terminated_name = strndup(node->var.name.ptr, node->var.name.len);
+	
+	size_t stack_offset = scope_put(ctx->scope, terminated_name, 8);
+	if (node->var.value != NULL) {
+		raa_t a = compile_node(node->var.value, ctx, -1);
+		as_mov(ctx->as, memrd(RSP, stack_offset), reg(a.reg_index));
+		ra_free_reg(ctx->ra, ctx->as, a);
+	}
+	
+	free(terminated_name);
+	return (raa_t){ -1, -1 };
+}
+
+
+raa_t compile_op(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 	char op = node->op.op;
 	node_p a = node->op.a, b = node->op.b;
 	
 	if (op == '+' || op == '-') {
-		raa_t a1 = compile_node(a, as, ra, req_reg);
-		raa_t a2 = compile_node(b, as, ra, -1);
+		raa_t a1 = compile_node(a, ctx, req_reg);
+		raa_t a2 = compile_node(b, ctx, -1);
 		
 		switch(op) {
-			case '+':  as_add(as, reg(a1.reg_index), reg(a2.reg_index));  break;
-			case '-':  as_sub(as, reg(a1.reg_index), reg(a2.reg_index));  break;
+			case '+':  as_add(ctx->as, reg(a1.reg_index), reg(a2.reg_index));  break;
+			case '-':  as_sub(ctx->as, reg(a1.reg_index), reg(a2.reg_index));  break;
 		}
 		
-		ra_free_reg(ra, as, a2);
+		ra_free_reg(ctx->ra, ctx->as, a2);
 		return a1;
 	} else if (op == '*' || op == '/') {
 		// reserve RDX since MUL and DIV overwrite it
-		raa_t a1 = ra_alloc_reg(ra, as, RDX.reg);
-		raa_t a2 = compile_node(a, as, ra, RAX.reg);
-		raa_t a3 = compile_node(b, as, ra, -1);
+		raa_t a1 = ra_alloc_reg(ctx->ra, ctx->as, RDX.reg);
+		raa_t a2 = compile_node(a, ctx, RAX.reg);
+		raa_t a3 = compile_node(b, ctx, -1);
 		
 		switch(op) {
-			case '*':  as_mul(as, reg(a3.reg_index));  break;
-			case '/':  as_div(as, reg(a3.reg_index));  break;
+			case '*':  as_mul(ctx->as, reg(a3.reg_index));  break;
+			case '/':  as_div(ctx->as, reg(a3.reg_index));  break;
 		}
 		
-		ra_free_reg(ra, as, a1);
-		ra_free_reg(ra, as, a3);
+		ra_free_reg(ctx->ra, ctx->as, a1);
+		ra_free_reg(ctx->ra, ctx->as, a3);
 		
 		if (req_reg != RAX.reg && req_reg != -1) {
-			raa_t a4 = ra_alloc_reg(ra, as, req_reg);
-			as_mov(as, reg(req_reg), RAX);
-			ra_free_reg(ra, as, a2);
+			raa_t a4 = ra_alloc_reg(ctx->ra, ctx->as, req_reg);
+			as_mov(ctx->as, reg(req_reg), RAX);
+			ra_free_reg(ctx->ra, ctx->as, a2);
 			return a4;
 		} else {
 			return a2;
@@ -297,16 +395,27 @@ raa_t compile_op(node_p node, asm_p as, ra_p ra, int8_t req_reg) {
 	return (raa_t){ -1, -1 };
 }
 
-raa_t compile_intl(node_p node, asm_p as, ra_p ra, int8_t req_reg) {
-	raa_t a = ra_alloc_reg(ra, as, req_reg);
-	as_mov(as, reg(a.reg_index), imm(node->intl.value));
+raa_t compile_intl(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
+	raa_t a = ra_alloc_reg(ctx->ra, ctx->as, req_reg);
+	as_mov(ctx->as, reg(a.reg_index), imm(node->intl.value));
 	return a;
 }
 
-raa_t compile_strl(node_p node, asm_p as, ra_p ra, int8_t req_reg) {
-	size_t str_vaddr = as_data(as, node->strl.value.ptr, node->strl.value.len);
-	raa_t a = ra_alloc_reg(ra, as, req_reg);
-	as_mov(as, reg(a.reg_index), imm(str_vaddr));
+raa_t compile_strl(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
+	size_t str_vaddr = as_data(ctx->as, node->strl.value.ptr, node->strl.value.len);
+	raa_t a = ra_alloc_reg(ctx->ra, ctx->as, req_reg);
+	as_mov(ctx->as, reg(a.reg_index), imm(str_vaddr));
+	return a;
+}
+
+raa_t compile_id(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
+	char* terminated_name = strndup(node->var.name.ptr, node->var.name.len);
+	int32_t stack_offset = scope_get(ctx->scope, terminated_name);
+	free(terminated_name);
+	
+	raa_t a = ra_alloc_reg(ctx->ra, ctx->as, req_reg);
+	as_mov(ctx->as, reg(a.reg_index), memrd(RSP, stack_offset));
+	
 	return a;
 }
 

@@ -138,6 +138,7 @@ node_p parse_module(parser_p parser) {
 static bool is_stmt_start(token_type_t type) {
 	switch(type) {
 		case T_SYSCALL:
+		case T_VAR:
 			return true;
 		default:
 			return is_expr_start(type);
@@ -159,32 +160,50 @@ void parse_eos(parser_p parser) {
 }
 
 node_p parse_stmt(parser_p parser) {
+	node_p stmt = NULL;
 	token_p t = consume(parser);
-	if (t->type == T_SYSCALL) {
-		// syscall eos
-		// syscall expr ["," expr] eos
-		node_p stmt = node_alloc(NT_SYSCALL);
-		
-		if ( is_expr_start(peek_type_with_eos(parser)) ) {
-			node_p expr = parse_expr(parser);
-			expr->parent = stmt;
-			buf_append(&stmt->syscall.args, expr);
+	switch (t->type) {
+		case T_SYSCALL:
+			// syscall eos
+			// syscall expr ["," expr] eos
+			stmt = node_alloc(NT_SYSCALL);
 			
-			while ( peek_type_with_eos(parser) == T_COMMA ) {
-				consume_type(parser, T_COMMA);
-				expr = parse_expr(parser);
+			if ( is_expr_start(peek_type_with_eos(parser)) ) {
+				node_p expr = parse_expr(parser);
 				expr->parent = stmt;
 				buf_append(&stmt->syscall.args, expr);
+				
+				while ( peek_type_with_eos(parser) == T_COMMA ) {
+					consume_type(parser, T_COMMA);
+					expr = parse_expr(parser);
+					expr->parent = stmt;
+					buf_append(&stmt->syscall.args, expr);
+				}
 			}
-		}
-		
-		parse_eos(parser);
-		return stmt;
+			
+			parse_eos(parser);
+			return stmt;
+		case T_VAR:
+			// var ID eos
+			// var ID = expr eos
+			stmt = node_alloc(NT_VAR);
+			token_p id = consume_type(parser, T_ID);
+			stmt->var.name.ptr = id->src_str;
+			stmt->var.name.len = id->src_len;
+			
+			if ( peek_type_with_eos(parser) == T_ASSIGN ) {
+				consume_type(parser, T_ASSIGN);
+				node_p expr = parse_expr(parser);
+				expr->parent = stmt;
+				stmt->var.value = expr;
+			}
+			
+			return stmt;
+		default:
+			printf("%s:%d:%d: expectet 'syscall', got:\n", parser->list->filename, token_line(t), token_col(t));
+			token_print_line(stderr, t, 0);
+			abort();
 	}
-	
-	printf("%s:%d:%d: expectet 'syscall', got:\n", parser->list->filename, token_line(t), token_col(t));
-	token_print_line(stderr, t, 0);
-	abort();
 	
 	return NULL;
 }

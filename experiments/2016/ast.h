@@ -20,6 +20,7 @@ typedef struct node_s node_t, *node_p;
 } while(0)
 
 typedef buf_t(node_p) node_list_t, *node_list_p;
+typedef buf_t(char) str_t, *str_p;
 
 
 //
@@ -51,6 +52,7 @@ typedef enum {
 	NT_MODULE,
 	
 	NT_SYSCALL,
+	NT_VAR,
 	
 	NT_ID,
 	NT_INTL,
@@ -79,7 +81,12 @@ struct node_s {
 		} syscall;
 		
 		struct {
-			buf_t(char) name;
+			str_t name;
+			node_p value;  // Can be NULL in case of declaration only
+		} var;
+		
+		struct {
+			str_t name;
 		} id;
 		
 		struct {
@@ -87,7 +94,7 @@ struct node_s {
 		} intl;
 		
 		struct {
-			buf_t(char) value;
+			str_t value;
 		} strl;
 		
 		struct {
@@ -117,6 +124,14 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 	[ NT_SYSCALL ] = &(node_spec_t){
 		"syscall", (member_spec_t[]){
 			{ MT_NODE_LIST, offsetof(node_t, syscall.args), "args" },
+			{ 0 }
+		}
+	},
+	
+	[ NT_VAR ] = &(node_spec_t){
+		"var", (member_spec_t[]){
+			{ MT_CHAR_LIST, offsetof(node_t, var.name), "name" },
+			{ MT_NODE, offsetof(node_t, var.value), "value" },
 			{ 0 }
 		}
 	},
