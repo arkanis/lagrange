@@ -160,6 +160,9 @@ void parse_eos(parser_p parser) {
 }
 
 node_p parse_stmt(parser_p parser) {
+	if ( is_expr_start(peek_type(parser)) )
+		return parse_expr(parser);
+	
 	node_p stmt = NULL;
 	token_p t = consume(parser);
 	switch (t->type) {
@@ -200,7 +203,7 @@ node_p parse_stmt(parser_p parser) {
 			
 			return stmt;
 		default:
-			printf("%s:%d:%d: expectet 'syscall', got:\n", parser->list->filename, token_line(t), token_col(t));
+			printf("%s:%d:%d: expectet SYSCALL, VAR or expr, got:\n", parser->list->filename, token_line(t), token_col(t));
 			token_print_line(stderr, t, 0);
 			abort();
 	}
@@ -263,15 +266,16 @@ node_p parse_expr_without_trailing_ops(parser_p parser) {
 node_p parse_expr(parser_p parser) {
 	node_p node = parse_expr_without_trailing_ops(parser);
 	
-	if (peek_type(parser) == T_ID) {
+	token_type_t type = peek_type_with_eos(parser);
+	if (type == T_ID || type == T_ASSIGN) {
 		// Got an operator, wrap everything into an uops node and collect the
 		// remaining operators and expressions.
 		node_p uops = node_alloc(NT_UOPS);
 		node->parent = uops;
 		buf_append(&uops->uops.list, node);
 		
-		while (peek_type(parser) == T_ID) {
-			token_p id = consume_type(parser, T_ID);
+		while ( type = peek_type_with_eos(parser), (type == T_ID || type == T_ASSIGN) ) {
+			token_p id = consume_type(parser, type);
 			
 			node_p op_node = node_alloc_append(NT_ID, uops, &uops->uops.list);
 			op_node->id.name.ptr = id->src_str;

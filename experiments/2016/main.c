@@ -106,6 +106,7 @@ node_p expand_uops(node_p node, uint32_t level, uint32_t flags) {
 				case '-': weight = 10; op = '-'; break;
 				case '*': weight = 20; op = '*'; break;
 				case '/': weight = 20; op = '/'; break;
+				case '=': weight = 0;  op = '='; break;
 			}
 			printf("got op %.*s, weight: %d\n", (int)id->id.name.len, id->id.name.ptr, weight);
 			
@@ -388,6 +389,22 @@ raa_t compile_op(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 		} else {
 			return a2;
 		}
+	} else if (op == '=') {
+		if (a->type != NT_ID) {
+			fprintf(stderr, "compile_op(): right side of assigment has to be an ID for now!\n");
+			abort();
+		}
+		
+		char* terminated_name = strndup(a->id.name.ptr, a->id.name.len);
+		
+		size_t stack_offset = scope_get(ctx->scope, terminated_name);
+		raa_t alloc = compile_node(node->var.value, ctx, -1);
+		as_mov(ctx->as, memrd(RSP, stack_offset), reg(alloc.reg_index));
+		// keep value as result value of this operation
+		//ra_free_reg(ctx->ra, ctx->as, alloc);
+		
+		free(terminated_name);
+		return alloc;
 	}
 	
 	fprintf(stderr, "compile_op(): unknown operation: %c!\n", op);
