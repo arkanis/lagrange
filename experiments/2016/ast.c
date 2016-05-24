@@ -3,6 +3,13 @@
 #include "ast.h"
 
 
+void node_list_append(node_list_p list, node_p node) {
+	list->len++;
+	list->ptr = realloc(list->ptr, list->len * sizeof(list->ptr[0]));
+	list->ptr[list->len - 1] = node;
+}
+
+
 //
 // Allocation functions
 //
@@ -34,6 +41,33 @@ node_p node_alloc_append(node_type_t type, node_p parent, node_list_p list) {
 	
 	return node;
 }
+
+
+
+//
+// Manipulation functions
+//
+
+void node_set(node_p parent, node_p* member, node_p child) {
+	if ( (size_t)((uint8_t*)member - (uint8_t*)parent) > sizeof(node_t) ) {
+		fprintf(stderr, "node_set(): member isn't part of the parent node!\n");
+		abort();
+	}
+	
+	child->parent = parent;
+	*member = child;
+}
+
+void node_append(node_p parent, node_list_p list, node_p child) {
+	if ( (size_t)((uint8_t*)list - (uint8_t*)parent) > sizeof(node_t) ) {
+		fprintf(stderr, "node_append(): list isn't part of the parent node!\n");
+		abort();
+	}
+	
+	child->parent = parent;
+	node_list_append(list, child);
+}
+
 
 
 //
@@ -122,7 +156,7 @@ static void node_print_recursive(node_p node, FILE* output, int level) {
 				char* value = member_ptr;
 				fprintf(output, "%c", *value);
 				} break;
-			case MT_CHAR_LIST: {
+			case MT_STR: {
 				buf_t(char)* value = member_ptr;
 				fprintf(output, "\"%.*s\"", (int)value->len, value->ptr);
 				} break;
@@ -156,7 +190,7 @@ void node_print_inline(node_p node, FILE* output) {
 				char* value = member_ptr;
 				fprintf(output, "%c", *value);
 				} break;
-			case MT_CHAR_LIST: {
+			case MT_STR: {
 				buf_t(char)* value = member_ptr;
 				fprintf(output, "\"%.*s\"", (int)value->len, value->ptr);
 				} break;

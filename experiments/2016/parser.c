@@ -123,7 +123,7 @@ node_p parse_module(parser_p parser) {
 	node_p node = node_alloc(NT_MODULE);
 	while ( is_stmt_start(peek_type(parser)) ) {
 		node_p stmt = parse_stmt(parser);
-		buf_append(&node->module.stmts, stmt);
+		node_append(node, &node->module.stmts, stmt);
 	}
 	
 	consume_type(parser, T_EOF);
@@ -173,14 +173,12 @@ node_p parse_stmt(parser_p parser) {
 			
 			if ( is_expr_start(peek_type_with_eos(parser)) ) {
 				node_p expr = parse_expr(parser);
-				expr->parent = stmt;
-				buf_append(&stmt->syscall.args, expr);
+				node_append(stmt, &stmt->syscall.args, expr);
 				
 				while ( peek_type_with_eos(parser) == T_COMMA ) {
 					consume_type(parser, T_COMMA);
 					expr = parse_expr(parser);
-					expr->parent = stmt;
-					buf_append(&stmt->syscall.args, expr);
+					node_append(stmt, &stmt->syscall.args, expr);
 				}
 			}
 			
@@ -197,8 +195,7 @@ node_p parse_stmt(parser_p parser) {
 			if ( peek_type_with_eos(parser) == T_ASSIGN ) {
 				consume_type(parser, T_ASSIGN);
 				node_p expr = parse_expr(parser);
-				expr->parent = stmt;
-				stmt->var.value = expr;
+				node_set(stmt, &stmt->var.value, expr);
 			}
 			
 			return stmt;
@@ -271,8 +268,7 @@ node_p parse_expr(parser_p parser) {
 		// Got an operator, wrap everything into an uops node and collect the
 		// remaining operators and expressions.
 		node_p uops = node_alloc(NT_UOPS);
-		node->parent = uops;
-		buf_append(&uops->uops.list, node);
+		node_append(uops, &uops->uops.list, node);
 		
 		while ( type = peek_type_with_eos(parser), (type == T_ID || type == T_ASSIGN) ) {
 			token_p id = consume_type(parser, type);
@@ -282,8 +278,7 @@ node_p parse_expr(parser_p parser) {
 			op_node->id.name.len = id->src_len;
 			
 			node_p expr = parse_expr_without_trailing_ops(parser);
-			expr->parent = uops;
-			buf_append(&uops->uops.list, expr);
+			node_append(uops, &uops->uops.list, expr);
 		}
 		
 		return uops;

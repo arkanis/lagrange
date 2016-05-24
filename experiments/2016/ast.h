@@ -3,24 +3,22 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
+#include "utils.h"
 
 
 typedef struct node_s node_t, *node_p;
 
 
 //
-// Simple variable length buffer
+// Node list
 //
 
-#define buf_t(content_type_t) struct { size_t len; content_type_t* ptr; }
-#define buf_append(buf, value) do {                                    \
-	(buf)->len++;                                                       \
-	(buf)->ptr = realloc((buf)->ptr, (buf)->len * sizeof((buf)->ptr[0]));  \
-	(buf)->ptr[(buf)->len - 1] = (value);                                \
-} while(0)
+typedef struct {
+	size_t len;
+	node_p* ptr;
+} node_list_t, *node_list_p;
 
-typedef buf_t(node_p) node_list_t, *node_list_p;
-typedef buf_t(char) str_t, *str_p;
+void node_list_append(node_list_p list, node_p node);
 
 
 //
@@ -33,7 +31,7 @@ typedef enum {
 	
 	MT_INT,
 	MT_CHAR,
-	MT_CHAR_LIST
+	MT_STR
 } member_type_t;
 
 typedef struct {
@@ -130,7 +128,7 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 	
 	[ NT_VAR ] = &(node_spec_t){
 		"var", (member_spec_t[]){
-			{ MT_CHAR_LIST, offsetof(node_t, var.name), "name" },
+			{ MT_STR, offsetof(node_t, var.name), "name" },
 			{ MT_NODE, offsetof(node_t, var.value), "value" },
 			{ 0 }
 		}
@@ -138,7 +136,7 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 	
 	[ NT_ID ] = &(node_spec_t){
 		"id", (member_spec_t[]){
-			{ MT_CHAR_LIST, offsetof(node_t, id.name), "name" },
+			{ MT_STR, offsetof(node_t, id.name), "name" },
 			{ 0 }
 		}
 	},
@@ -152,7 +150,7 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 	
 	[ NT_STRL ] = &(node_spec_t){
 		"strl", (member_spec_t[]){
-			{ MT_CHAR_LIST, offsetof(node_t, strl.value), "value" },
+			{ MT_STR, offsetof(node_t, strl.value), "value" },
 			{ 0 }
 		}
 	},
@@ -183,8 +181,8 @@ node_p node_alloc(node_type_t type);
 node_p node_alloc_set(node_type_t type, node_p parent, node_p* member);
 node_p node_alloc_append(node_type_t type, node_p parent, node_list_p list);
 
-// node_set(parent, member, child)
-// node_append(parent, list, child)
+void node_set(node_p parent, node_p* member, node_p child);
+void node_append(node_p parent, node_list_p list, node_p child);
 
 #define NI_PRE  (1 << 0)
 #define NI_POST (1 << 1)

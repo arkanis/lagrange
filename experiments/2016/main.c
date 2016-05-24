@@ -8,12 +8,12 @@
 #define SLIM_HASH_IMPLEMENTATION
 #include "slim_hash.h"
 
+#include "utils.h"
 #include "lexer.h"
 #include "parser.h"
 #include "reg_alloc.h"
 
 
-void* sgl_fload(const char* filename, size_t* size);
 node_p expand_uops(node_p node, uint32_t level, uint32_t flags);
 void compile(node_p node, const char* filename);
 
@@ -24,9 +24,8 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 	
-	size_t src_len = 0;
-	char* src_str = sgl_fload(argv[1], &src_len);
-	token_list_p list = lex_str(src_str, src_len, argv[1], stderr);
+	str_t src = str_fload(argv[1]);
+	token_list_p list = lex_str(src.ptr, src.len, argv[1], stderr);
 	
 	if (list->error_count > 0) {
 		// Just output errors and exit
@@ -39,7 +38,7 @@ int main(int argc, char** argv) {
 		}
 		
 		lex_free(list);
-		free(src_str);
+		str_free(&src);
 		return 1;
 	}
 	
@@ -68,7 +67,7 @@ int main(int argc, char** argv) {
 	compile(tree, "main.elf");
 	
 	lex_free(list);
-	free(src_str);
+	str_free(&src);
 	
 	return 0;
 }
@@ -438,45 +437,4 @@ raa_t compile_id(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 	as_mov(ctx->as, reg(a.reg_index), memrd(RSP, stack_offset));
 	
 	return a;
-}
-
-
-
-//
-// Utility stuff
-//
-
-void* sgl_fload(const char* filename, size_t* size) {
-	long filesize = 0;
-	char* data = NULL;
-	int error = -1;
-	
-	FILE* f = fopen(filename, "rb");
-	if (f == NULL)
-		return NULL;
-	
-	if ( fseek(f, 0, SEEK_END)              == -1       ) goto fail;
-	if ( (filesize = ftell(f))              == -1       ) goto fail;
-	if ( fseek(f, 0, SEEK_SET)              == -1       ) goto fail;
-	if ( (data = malloc(filesize + 1))      == NULL     ) goto fail;
-	// TODO: proper error detection for fread and get proper error code with ferror
-	if ( (long)fread(data, 1, filesize, f)  != filesize ) goto free_and_fail;
-	fclose(f);
-	
-	data[filesize] = '\0';
-	if (size)
-		*size = filesize;
-	return (void*)data;
-	
-	free_and_fail:
-		error = errno;
-		free(data);
-	
-	fail:
-		if (error == -1)
-			error = errno;
-		fclose(f);
-	
-	errno = error;
-	return NULL;
 }
