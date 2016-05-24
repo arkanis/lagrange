@@ -281,8 +281,12 @@ raa_t compile_module(node_p node, compiler_ctx_p ctx) {
 	scope_new(&scope, ctx->scope);
 	ctx->scope = &scope;
 	
-	for(size_t i = 0; i < node->module.stmts.len; i++)
-		compile_node(node->module.stmts.ptr[i], ctx, -1);
+	for(size_t i = 0; i < node->module.stmts.len; i++) {
+		raa_t allocation = compile_node(node->module.stmts.ptr[i], ctx, -1);
+		// Free allocations in case the statement is an expr (syscall and var
+		// don't return an allocated register)
+		ra_free_reg(ctx->ra, ctx->as, allocation);
+	}
 	
 	ctx->scope = scope.parent;
 	scope_destroy(&scope);
