@@ -19,6 +19,7 @@ typedef struct {
 } node_list_t, *node_list_p;
 
 void node_list_append(node_list_p list, node_p node);
+void node_list_replace_n1(node_list_p list, size_t start_idx, size_t hole_len, node_p replacement_node);
 
 
 //
@@ -100,7 +101,7 @@ struct node_s {
 		} uops;
 		
 		struct {
-			char op;
+			int64_t idx;
 			node_p a, b;
 		} op;
 	};
@@ -164,7 +165,7 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 	
 	[ NT_OP ] = &(node_spec_t){
 		"op", (member_spec_t[]){
-			{ MT_CHAR, offsetof(node_t, op.op), "op" },
+			{ MT_INT,  offsetof(node_t, op.idx), "idx" },
 			{ MT_NODE, offsetof(node_t, op.a), "a" },
 			{ MT_NODE, offsetof(node_t, op.b), "b" },
 			{ 0 }

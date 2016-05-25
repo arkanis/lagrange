@@ -77,10 +77,35 @@ int main(int argc, char** argv) {
 //
 // Normal transformation passes
 // 
-// For now only transform unordered operations (uops_t) into binary operator
-// trees (op_t) nodes.
+// For now only transform unordered operations (uops) into binary operator
+// trees (op nodes).
 //
 
+// Based on http://en.cppreference.com/w/c/language/operator_precedence
+// Worth a look because of bitwise and comparison ops: http://wiki.dlang.org/Operator_precedence
+typedef enum { LEFT_TO_RIGHT, RIGHT_TO_LEFT } op_assoc_t;
+typedef enum {
+	OP_MUL, OP_DIV,
+	OP_ADD, OP_SUB,
+	OP_ASSIGN
+} op_idx_t;
+// CAUTION: Operators with the same precedence need the same associativity!
+// Otherwise it probably gets complicates... not sure.
+struct { char* name; int precedence; op_assoc_t assoc; } operators[] = {
+	[OP_MUL]    = { "*",  80, LEFT_TO_RIGHT },
+	[OP_DIV]    = { "/",  80, LEFT_TO_RIGHT },
+	
+	[OP_ADD]    = { "+",  70, LEFT_TO_RIGHT },
+	[OP_SUB]    = { "-",  70, LEFT_TO_RIGHT },
+	
+	[OP_ASSIGN] = { "=",   0, RIGHT_TO_LEFT },
+};
+
+/**
+ * For each uops node: We find the strongest binding operator and replace it and
+ * the nodes it binds to with an op node. This is repeated until no operators
+ * are left to replace. The uops node should just have one op child at the end.
+ */
 node_p expand_uops(node_p node, uint32_t level, uint32_t flags) {
 	// We only want uops nodes with children in them (there should be no uops
 	// nodes without children).
@@ -89,72 +114,77 @@ node_p expand_uops(node_p node, uint32_t level, uint32_t flags) {
 	
 	node_list_p list = &node->uops.list;
 	
-	// Find weakest operator
-	int weakest_op_idx = -1;
-	int weakest_op_weight = 10000;
-	char weakest_op = '\0';
-	for(int op_idx = 1; op_idx < (int)list->len; op_idx += 2) {
-		
-		int weight = 0;
-		char op = '\0';
-		
-		if (list->ptr[op_idx]->type == NT_ID) {
-			node_p id = list->ptr[op_idx];
-			switch(id->id.name.ptr[0]) {
-				case '+': weight = 10; op = '+'; break;
-				case '-': weight = 10; op = '-'; break;
-				case '*': weight = 20; op = '*'; break;
-				case '/': weight = 20; op = '/'; break;
-				case '=': weight = 0;  op = '='; break;
+	while (list->len > 1) {
+		// Find strongest operator (operator with highest precedence)
+		int strongest_op_idx = -1;
+		int strongest_op_prec = 0;
+		int strongest_op_node_idx = -1;
+		for(int node_idx = 1; node_idx < (int)list->len; node_idx += 2) {
+			node_p op_slot = list->ptr[node_idx];
+			if (op_slot->type != NT_ID) {
+				fprintf(stderr, "expand_uops(): got non NT_ID in uops op slot!\n");
+				abort();
 			}
-			printf("got op %.*s, weight: %d\n", (int)id->id.name.len, id->id.name.ptr, weight);
 			
-			if (weight < weakest_op_weight) {
-				weakest_op_weight = weight;
-				weakest_op_idx = op_idx;
-				weakest_op = op;
+			// Find operator of the current op_slot node based on the IDs name
+			ssize_t op_idx = -1;
+			for(size_t i = 0; i < sizeof(operators) / sizeof(operators[0]); i++) {
+				if ( strncmp(operators[i].name, op_slot->id.name.ptr, op_slot->id.name.len) == 0 ) {
+					op_idx = i;
+					break;
+				}
 			}
-		} else {
-			fprintf(stderr, "expand_uops(): got non NT_ID in uops op slot!");
+			
+			if (op_idx == -1) {
+				fprintf(stderr, "expand_uops(): unknown operator: %.*s!",
+					op_slot->id.name.len, op_slot->id.name.ptr);
+				abort();
+			}
+			
+			printf("expand_uops(): got op %.*s (idx %zd) at node idx %d\n",
+				op_slot->id.name.len, op_slot->id.name.ptr, op_idx, node_idx
+			);
+			
+			// When several ops have the highest (same) precedence:
+			// For LEFT_TO_RIGHT operators we pick the first op
+			// For RIGHT_TO_LEFT operators we pick the last op
+			if (
+				(operators[op_idx].assoc == LEFT_TO_RIGHT && operators[op_idx].precedence >  strongest_op_prec) ||
+				(operators[op_idx].assoc == RIGHT_TO_LEFT && operators[op_idx].precedence >= strongest_op_prec)
+			) {
+				strongest_op_prec = operators[op_idx].precedence;
+				strongest_op_idx = op_idx;
+				strongest_op_node_idx = node_idx;
+			}
+		}
+		
+		if (strongest_op_idx == -1) {
+			fprintf(stderr, "expand_uops(): found no op in uops node!");
 			abort();
 		}
-	}
-	
-	if (weakest_op_idx == -1) {
-		fprintf(stderr, "expand_uops(): found no op in uops!");
-		abort();
-	}
-	
-	printf("got weakest op at %d, weight: %d\n", weakest_op_idx, weakest_op_weight);
-	
-	// Split uops node into an op node with two uops children
-	node_p op_node = node_alloc(NT_OP);
-	op_node->parent = node->parent;
-	op_node->op.op = weakest_op;
-	
-	if (weakest_op_idx == 1) {
-		op_node->op.a = list->ptr[0];
-	} else {
-		node_p first = node_alloc(NT_UOPS);
-		first->parent = op_node;
-		op_node->op.a = first;
 		
-		for(int i = 0; i < weakest_op_idx; i++)
-			buf_append(&first->uops.list, list->ptr[i]);
-	}
-	
-	if (weakest_op_idx == (int)list->len - 2) {
-		op_node->op.b = list->ptr[list->len - 1];
-	} else {
-		node_p rest = node_alloc(NT_UOPS);
-		rest->parent = op_node;
-		op_node->op.b = rest;
+		printf("expand_uops(): op %s got highest precedence: %d\n",
+			operators[strongest_op_idx].name, strongest_op_prec
+		);
 		
-		for(int i = weakest_op_idx + 1; i < (int)list->len; i++)
-			buf_append(&rest->uops.list, list->ptr[i]);
+		
+		// Take the nodes left and right from the op_slot node and create a new op
+		// node out of them. Then replace these nodes in the list with the new op
+		// node.
+		node_p op_node = node_alloc(NT_OP);
+		op_node->parent = node;
+		op_node->op.idx = strongest_op_idx;
+		node_set(op_node, &op_node->op.a, list->ptr[strongest_op_node_idx - 1]);
+		node_set(op_node, &op_node->op.b, list->ptr[strongest_op_node_idx + 1]);
+		
+		node_list_replace_n1(list, strongest_op_node_idx - 1, 3, op_node);
+		
+		node_print(node, stderr);
 	}
 	
-	return op_node;
+	// By now the uops node only contains one op node child. Return that so the
+	// iteration function replaces this uops node with the returned op node.
+	return node->uops.list.ptr[0];
 }
 
 
@@ -356,29 +386,29 @@ raa_t compile_var(node_p node, compiler_ctx_p ctx) {
 
 
 raa_t compile_op(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
-	char op = node->op.op;
+	size_t op = node->op.idx;
 	node_p a = node->op.a, b = node->op.b;
 	
-	if (op == '+' || op == '-') {
+	if (op == OP_ADD || op == OP_SUB) {
 		raa_t a1 = compile_node(a, ctx, req_reg);
 		raa_t a2 = compile_node(b, ctx, -1);
 		
 		switch(op) {
-			case '+':  as_add(ctx->as, reg(a1.reg_index), reg(a2.reg_index));  break;
-			case '-':  as_sub(ctx->as, reg(a1.reg_index), reg(a2.reg_index));  break;
+			case OP_ADD:  as_add(ctx->as, reg(a1.reg_index), reg(a2.reg_index));  break;
+			case OP_SUB:  as_sub(ctx->as, reg(a1.reg_index), reg(a2.reg_index));  break;
 		}
 		
 		ra_free_reg(ctx->ra, ctx->as, a2);
 		return a1;
-	} else if (op == '*' || op == '/') {
+	} else if (op == OP_MUL || op == OP_DIV) {
 		// reserve RDX since MUL and DIV overwrite it
 		raa_t a1 = ra_alloc_reg(ctx->ra, ctx->as, RDX.reg);
 		raa_t a2 = compile_node(a, ctx, RAX.reg);
 		raa_t a3 = compile_node(b, ctx, -1);
 		
 		switch(op) {
-			case '*':  as_mul(ctx->as, reg(a3.reg_index));  break;
-			case '/':  as_div(ctx->as, reg(a3.reg_index));  break;
+			case OP_MUL:  as_mul(ctx->as, reg(a3.reg_index));  break;
+			case OP_DIV:  as_div(ctx->as, reg(a3.reg_index));  break;
 		}
 		
 		ra_free_reg(ctx->ra, ctx->as, a1);
@@ -392,7 +422,7 @@ raa_t compile_op(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 		} else {
 			return a2;
 		}
-	} else if (op == '=') {
+	} else if (op == OP_ASSIGN) {
 		if (a->type != NT_ID) {
 			fprintf(stderr, "compile_op(): right side of assigment has to be an ID for now!\n");
 			abort();
@@ -410,7 +440,7 @@ raa_t compile_op(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 		return alloc;
 	}
 	
-	fprintf(stderr, "compile_op(): unknown operation: %c!\n", op);
+	fprintf(stderr, "compile_op(): unknown op idx: %zu!\n", op);
 	abort();
 	return (raa_t){ -1, -1 };
 }

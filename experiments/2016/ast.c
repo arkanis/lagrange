@@ -9,6 +9,23 @@ void node_list_append(node_list_p list, node_p node) {
 	list->ptr[list->len - 1] = node;
 }
 
+void node_list_replace_n1(node_list_p list, size_t start_idx, size_t hole_len, node_p replacement_node) {
+	size_t new_len = list->len - hole_len + 1;
+	
+	// Nodes from 0..start_idx remain unchanged
+	// Node at start_idx is replaced by replacement_node
+	// Overwrite nodes begining at start_idx+1 with nodes at (start_idx + hole_len)..new_len
+	list->ptr[start_idx] = replacement_node;
+	for(size_t i = start_idx + 1; i < new_len; i++)
+		list->ptr[i] = list->ptr[i + hole_len - 1];
+	// Null out free space
+	for(size_t i = new_len; i < list->len; i++)
+		list->ptr[i] = NULL;
+	
+	list->len = new_len;
+	list->ptr = realloc(list->ptr, list->len * sizeof(list->ptr[0]));
+}
+
 
 //
 // Allocation functions

@@ -20,8 +20,8 @@
 //
 
 typedef struct {
-	size_t len;
-	char*  ptr;
+	int   len;
+	char* ptr;
 } str_t, *str_p;
 
 void str_free(str_p str);
