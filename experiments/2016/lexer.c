@@ -67,8 +67,43 @@ void token_print(FILE* stream, token_p token, uint32_t flags) {
 			case T_RBO:     fprintf(stream, "\"(\"");  break;
 			case T_RBC:     fprintf(stream, "\")\"");  break;
 			case T_COMMA:   fprintf(stream, "\",\"");  break;
-			case T_ASSIGN:  fprintf(stream, "\"=\"");  break;
 			
+			case T_ADD:        fprintf(stream, "\"+\"");   break;
+			case T_ADD_ASSIGN: fprintf(stream, "\"+=\"");  break;
+			case T_SUB:        fprintf(stream, "\"-\"");   break;
+			case T_SUB_ASSIGN: fprintf(stream, "\"-=\"");  break;
+			case T_MUL:        fprintf(stream, "\"*\"");   break;
+			case T_MUL_ASSIGN: fprintf(stream, "\"*=\"");  break;
+			case T_DIV:        fprintf(stream, "\"/\"");   break;
+			case T_DIV_ASSIGN: fprintf(stream, "\"/=\"");  break;
+			case T_MOD:        fprintf(stream, "\"%%\"");  break;
+			case T_MOD_ASSIGN: fprintf(stream, "\"%%=\""); break;
+			
+			case T_LT:        fprintf(stream, "\"<\"");   break;
+			case T_LE:        fprintf(stream, "\"<=\"");  break;
+			case T_SL:        fprintf(stream, "\"<<\"");  break;
+			case T_SL_ASSIGN: fprintf(stream, "\"<<=\""); break;
+			case T_GT:        fprintf(stream, "\">\"");   break;
+			case T_GE:        fprintf(stream, "\">=\"");  break;
+			case T_SR:        fprintf(stream, "\">>\"");  break;
+			case T_SR_ASSIGN: fprintf(stream, "\">>=\""); break;
+			
+			case T_BIN_AND:        fprintf(stream, "\"&\"");  break;
+			case T_BIN_AND_ASSIGN: fprintf(stream, "\"&=\""); break;
+			case T_BIN_XOR:        fprintf(stream, "\"^\"");  break;
+			case T_BIN_XOR_ASSIGN: fprintf(stream, "\"^=\""); break;
+			case T_BIN_OR:         fprintf(stream, "\"|\"");  break;
+			case T_BIN_OR_ASSIGN:  fprintf(stream, "\"|=\""); break;
+			
+			case T_ASSIGN: fprintf(stream, "\"=\"");  break;
+			case T_EQ:     fprintf(stream, "\"==\""); break;
+			case T_NEQ:    fprintf(stream, "\"!=\""); break;
+			case T_PERIOD: fprintf(stream, "\".\"");  break;
+			case T_COMPL:  fprintf(stream, "\"~\"");  break;
+			
+			case T_NOT:     fprintf(stream, "not");      break;
+			case T_AND:     fprintf(stream, "and");      break;
+			case T_OR:      fprintf(stream, "or");       break;
 			case T_SYSCALL: fprintf(stream, "syscall");  break;
 			case T_VAR:     fprintf(stream, "var");      break;
 			
@@ -131,6 +166,10 @@ static int peek1(lexer_p lexer) {
 }
 
 static int peek2(lexer_p lexer) {
+	return peek_at_offset(lexer, 1);
+}
+
+static int peek3(lexer_p lexer) {
 	return peek_at_offset(lexer, 1);
 }
 
@@ -237,28 +276,197 @@ void lex_free(token_list_p list) {
 // The lexer itself
 //
 
+// Function is called when "//" was peeked. So it's safe to consume 2 chars
+// right away.
+static token_t lex_one_line_comment(lexer_p lexer) {
+	token_t t = new_token(lexer, T_COMMENT, 2);
+	
+	int c;
+	while ( c = peek1(lexer), !(c == '\n' || c == EOF) ) {
+		putc_into_token(lexer, &t, c);
+	}
+	
+	return t;
+}
+
+// Function is called when "/*" was peeked. So it's safe to consume 2 chars
+// right away.
+static token_t lex_nested_multiline_comment(lexer_p lexer) {
+	token_t t = new_token(lexer, T_COMMENT, 2);
+	
+	int nesting_level = 1;
+	while ( nesting_level > 0 ) {
+		if ( peek1(lexer) == '*' && peek2(lexer) == '/' ) {
+			nesting_level--;
+			putc_into_token(lexer, &t, '*');
+			putc_into_token(lexer, &t, '/');
+		} else if ( peek1(lexer) == '/' && peek2(lexer) == '*' ) {
+			nesting_level++;
+			putc_into_token(lexer, &t, '/');
+			putc_into_token(lexer, &t, '*');
+		} else if ( peek1(lexer) == EOF ) {
+			make_into_error_token(&t, "unterminated multiline comment");
+			break;
+		} else {
+			int c = peek1(lexer);
+			putc_into_token(lexer, &t, c);
+		}
+	}
+	
+	return t;
+}
+
+// Function is called when '"' was peeked. So it's safe to consume one char
+// right away.
+static token_t lex_string(lexer_p lexer) {
+	token_t t = new_token(lexer, T_STR, 1);
+	
+	while (true) {
+		int c = peek1(lexer);
+		putc_into_token(lexer, &t, c);
+		
+		switch(c) {
+			case '"':
+				return t;
+			default:
+				append_token_str(&t, c);
+				break;
+				
+			case EOF:
+				make_into_error_token(&t, "unterminated string");
+				return t;
+			case '\\':
+				c = peek1(lexer);
+				putc_into_token(lexer, &t, c);
+				switch(c) {
+					case EOF:
+						make_into_error_token(&t, "unterminated escape code in string");
+						return t;
+					case '\\':
+						append_token_str(&t, '\\');
+						break;
+					case '"':
+						append_token_str(&t, '"');
+						break;
+					case 'n':
+						append_token_str(&t, '\n');
+						break;
+					case 't':
+						append_token_str(&t, '\t');
+						break;
+					default:
+						// TODO: Figure out how to create a error token that reprsents
+						// a region inside another token (the string)...
+						//make_into_error_token(&t, "unknown escape code in string");
+						fprintf(lexer->errors, "unknown escape code in string (\\%c), ignoring FOR NOW\n", c);
+						break;
+				}
+				break;
+		}
+	}}
+
+
 static struct { const char* keyword; token_type_t type; } keywords[] = {
+	{ "or", T_OR },
+	{ "and", T_AND },
+	{ "not", T_NOT },
+	
 	{ "syscall", T_SYSCALL },
-	{ "var", T_VAR }
+	{ "var", T_VAR },
 };
 
 static token_t next_token(lexer_p lexer) {
 	int c = peek1(lexer);
+	int c2 = peek2(lexer);
+	int c3 = peek3(lexer);
 	switch(c) {
-		case EOF:
-			return new_token(lexer, T_EOF, 0);
-		case '{':
-			return new_token(lexer, T_CBO, 1);
-		case '}':
-			return new_token(lexer, T_CBC, 1);
-		case '(':
-			return new_token(lexer, T_RBO, 1);
-		case ')':
-			return new_token(lexer, T_RBC, 1);
-		case ',':
-			return new_token(lexer, T_COMMA, 1);
+		case EOF:  return new_token(lexer, T_EOF, 0);
+		case '{':  return new_token(lexer, T_CBO, 1);
+		case '}':  return new_token(lexer, T_CBC, 1);
+		case '(':  return new_token(lexer, T_RBO, 1);
+		case ')':  return new_token(lexer, T_RBC, 1);
+		case ',':  return new_token(lexer, T_COMMA, 1);
+		case '.':  return new_token(lexer, T_PERIOD, 1);
+		case '~':  return new_token(lexer, T_COMPL, 1);
+		case '"':  return lex_string(lexer);
+		
+		case '+':
+			switch(c2) {
+				case '=':  return new_token(lexer, T_ADD_ASSIGN, 2);
+				default:   return new_token(lexer, T_ADD, 1);
+			}
+		case '-':
+			switch(c2) {
+				case '=':  return new_token(lexer, T_SUB_ASSIGN, 2);
+				default:   return new_token(lexer, T_SUB, 1);
+			}
+		case '*':
+			switch(c2) {
+				case '=':  return new_token(lexer, T_MUL_ASSIGN, 2);
+				default:   return new_token(lexer, T_MUL, 1);
+			}
+		case '/':
+			switch(c2) {
+				case '/':  return lex_one_line_comment(lexer);
+				case '*':  return lex_nested_multiline_comment(lexer);
+				case '=':  return new_token(lexer, T_DIV_ASSIGN, 2);
+				default:   return new_token(lexer, T_DIV, 1);
+			}
+		case '%':
+			switch(c2) {
+				case '=':  return new_token(lexer, T_MOD_ASSIGN, 2);
+				default:   return new_token(lexer, T_MOD, 1);
+			}
+		
+		case '<':
+			switch(c2) {
+				case '<':
+					switch(c3) {
+						case '=':  return new_token(lexer, T_SL_ASSIGN, 3);
+						default:   return new_token(lexer, T_SL, 2);
+					}
+				case '=':  return new_token(lexer, T_LE, 2);
+				default:   return new_token(lexer, T_LT, 1);
+			}
+		case '>':
+			switch(c2) {
+				case '>':
+					switch(c3) {
+						case '=':  return new_token(lexer, T_SR_ASSIGN, 3);
+						default:   return new_token(lexer, T_SR, 2);
+					}
+				case '=':  return new_token(lexer, T_GE, 2);
+				default:   return new_token(lexer, T_GT, 1);
+			}
+		
+		case '&':
+			switch(c2) {
+				case '&':  return new_token(lexer, T_AND, 2);
+				case '=':  return new_token(lexer, T_BIN_AND_ASSIGN, 2);
+				default:   return new_token(lexer, T_BIN_AND, 1);
+			}
+		case '|':
+			switch(c2) {
+				case '|':  return new_token(lexer, T_OR, 2);
+				case '=':  return new_token(lexer, T_BIN_OR_ASSIGN, 2);
+				default:   return new_token(lexer, T_BIN_OR, 1);
+			}
+		case '^':
+			switch(c2) {
+				case '=':  return new_token(lexer, T_BIN_XOR_ASSIGN, 2);
+				default:   return new_token(lexer, T_BIN_XOR, 1);
+			}
+		
 		case '=':
-			return new_token(lexer, T_ASSIGN, 1);
+			switch(c2) {
+				case '=':  return new_token(lexer, T_EQ, 2);
+				default:   return new_token(lexer, T_ASSIGN, 1);
+			}
+		case '!':
+			switch(c2) {
+				case '=':  return new_token(lexer, T_NEQ, 2);
+				default:   return new_token(lexer, T_NOT, 1);
+			}
 	}
 	
 	if ( isspace(c) ) {
@@ -287,100 +495,6 @@ static token_t next_token(lexer_p lexer) {
 		
 		t.int_val = value;
 		return t;
-	}
-	
-	if ( c == '/' ) {
-		if ( peek2(lexer) == '/' ) {
-			token_t t = new_token(lexer, T_COMMENT, 2);
-			
-			while ( c = peek1(lexer), !(c == '\n' || c == EOF) ) {
-				putc_into_token(lexer, &t, c);
-			}
-			
-			return t;
-		} else if ( peek2(lexer) == '*' ) {
-			token_t t = new_token(lexer, T_COMMENT, 2);
-			
-			int nesting_level = 1;
-			while ( nesting_level > 0 ) {
-				if ( peek1(lexer) == '*' && peek2(lexer) == '/' ) {
-					nesting_level--;
-					putc_into_token(lexer, &t, '*');
-					putc_into_token(lexer, &t, '/');
-				} else if ( peek1(lexer) == '/' && peek2(lexer) == '*' ) {
-					nesting_level++;
-					putc_into_token(lexer, &t, '/');
-					putc_into_token(lexer, &t, '*');
-				} else if ( peek1(lexer) == EOF ) {
-					make_into_error_token(&t, "unterminated multiline comment");
-					break;
-				} else {
-					c = peek1(lexer);
-					putc_into_token(lexer, &t, c);
-				}
-			}
-			
-			return t;
-		}
-	}
-	
-	if (c == '"') {
-		token_t t = new_token(lexer, T_STR, 1);
-		
-		while (true) {
-			c = peek1(lexer);
-			putc_into_token(lexer, &t, c);
-			
-			switch(c) {
-				case '"':
-					return t;
-				default:
-					append_token_str(&t, c);
-					break;
-					
-				case EOF:
-					make_into_error_token(&t, "unterminated string");
-					return t;
-				case '\\':
-					c = peek1(lexer);
-					putc_into_token(lexer, &t, c);
-					switch(c) {
-						case EOF:
-							make_into_error_token(&t, "unterminated escape code in string");
-							return t;
-						case '\\':
-							append_token_str(&t, '\\');
-							break;
-						case '"':
-							append_token_str(&t, '"');
-							break;
-						case 'n':
-							append_token_str(&t, '\n');
-							break;
-						case 't':
-							append_token_str(&t, '\t');
-							break;
-						default:
-							// TODO: Figure out how to create a error token that reprsents
-							// a region inside another token (the string)...
-							//make_into_error_token(&t, "unknown escape code in string");
-							fprintf(lexer->errors, "unknown escape code in string (\\%c), ignoring FOR NOW\n", c);
-							break;
-					}
-					break;
-			}
-		}
-	}
-	
-	// Can't put / operator at the top since it would have a higher priority
-	// than comments ("//"). Resulting in two division operators instead of
-	// an comment.
-	switch(c) {
-		case '+':
-		case '-':
-		case '*':
-		case '/':
-			return new_token(lexer, T_ID, 1);
 	}
 	
 	if ( isalpha(c) || c == '_' ) {

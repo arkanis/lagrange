@@ -295,11 +295,9 @@ raa_t compile_node(node_p node, compiler_ctx_p ctx, int8_t requested_result_regi
 			fprintf(stderr, "compile_node(): uops nodes have to be reordered to op nodes before compilation!\n");
 			abort();
 			
-		/*
-		case NT_ID:
+		case NT_UNARY_OP:
 			fprintf(stderr, "compile_node(): TODO\n");
 			abort();
-		*/
 	}
 	
 	return (raa_t){ -1, -1 };

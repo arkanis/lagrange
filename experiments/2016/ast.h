@@ -56,6 +56,7 @@ typedef enum {
 	NT_ID,
 	NT_INTL,
 	NT_STRL,
+	NT_UNARY_OP,
 	NT_UOPS,
 	NT_OP
 } node_type_t;
@@ -95,6 +96,11 @@ struct node_s {
 		struct {
 			str_t value;
 		} strl;
+		
+		struct {
+			int64_t type;
+			node_p arg;
+		} unary_op;
 		
 		struct {
 			node_list_t list;
@@ -152,6 +158,14 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 	[ NT_STRL ] = &(node_spec_t){
 		"strl", (member_spec_t[]){
 			{ MT_STR, offsetof(node_t, strl.value), "value" },
+			{ 0 }
+		}
+	},
+	
+	[ NT_UNARY_OP ] = &(node_spec_t){
+		"unary_op", (member_spec_t[]){
+			{ MT_INT,  offsetof(node_t, unary_op.type), "type" },
+			{ MT_NODE, offsetof(node_t, unary_op.arg),  "arg" },
 			{ 0 }
 		}
 	},

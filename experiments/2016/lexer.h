@@ -7,7 +7,7 @@
 
 
 typedef enum {
-	T_COMMENT,
+	T_COMMENT,  // /* //
 	T_WS,
 	T_WSNL,
 	
@@ -20,8 +20,27 @@ typedef enum {
 	T_RBO,    // (
 	T_RBC,    // )
 	T_COMMA,  // ,
-	T_ASSIGN, // =
 	
+	// Tokens for unary and binary operators
+	T_ADD, T_ADD_ASSIGN,  // + +=
+	T_SUB, T_SUB_ASSIGN,  // - -=
+	T_MUL, T_MUL_ASSIGN,  // * *=
+	T_DIV, T_DIV_ASSIGN,  // / /=   // and /* become T_COMMENT
+	T_MOD, T_MOD_ASSIGN,  // % %=
+	
+	T_LT, T_LE, T_SL, T_SL_ASSIGN,   // < <= << <<=
+	T_GT, T_GE, T_SR, T_SR_ASSIGN,   // > >= >> >>=
+	
+	T_BIN_AND, T_BIN_AND_ASSIGN,  // & &=    && becomes T_AND
+	T_BIN_OR,  T_BIN_OR_ASSIGN,   // | |=    || becomes T_OR
+	T_BIN_XOR, T_BIN_XOR_ASSIGN,  // ^ ^=
+	
+	T_ASSIGN, T_EQ,     // = ==
+	T_NEQ,              // !=    ! becomes T_NOT
+	T_PERIOD, T_COMPL,  // . ~
+	
+	// Keywords
+	T_NOT, T_AND, T_OR,
 	T_SYSCALL,
 	T_VAR,
 	

@@ -220,6 +220,12 @@ static bool is_expr_start(token_type_t type) {
 		case T_STR:
 		case T_RBO:
 			return true;
+		// unary operators
+		case T_ADD:
+		case T_SUB:
+		case T_NOT:
+		case T_COMPL:
+			return true;
 		default:
 			return false;
 	}
@@ -250,6 +256,16 @@ node_p parse_expr_without_trailing_ops(parser_p parser) {
 			node = parse_expr(parser);
 			consume_type(parser, T_RBC);
 			break;
+		
+		case T_ADD:
+		case T_SUB:
+		case T_NOT:
+		case T_COMPL:
+			node = node_alloc(NT_UNARY_OP);
+			node->unary_op.type = t->type;
+			node_set(node, &node->unary_op.arg, parse_expr_without_trailing_ops(parser) );
+			break;
+		
 		default:
 			printf("%s:%d:%d: expectet ID, INT or STR, got:\n", parser->list->filename, token_line(t), token_col(t));
 			token_print_line(stderr, t, 0);
@@ -260,17 +276,49 @@ node_p parse_expr_without_trailing_ops(parser_p parser) {
 	return node;
 }
 
+static bool is_binary_op(token_type_t type) {
+	switch(type) {
+		// use defined operator
+		case T_ID:
+			return true;
+		
+		// builtin binary operators
+		case T_ADD: case T_ADD_ASSIGN:  // + +=
+		case T_SUB: case T_SUB_ASSIGN:  // - -=
+		case T_MUL: case T_MUL_ASSIGN:  // * *=
+		case T_DIV: case T_DIV_ASSIGN:  // / /=
+		case T_MOD: case T_MOD_ASSIGN:  // % %=
+		
+		case T_LT: case T_LE: case T_SL: case T_SL_ASSIGN:  // < <= << <<=
+		case T_GT: case T_GE: case T_SR: case T_SR_ASSIGN:  // > >= >> >>=
+		
+		case T_BIN_AND: case T_BIN_AND_ASSIGN:  // & &=
+		case T_BIN_XOR: case T_BIN_XOR_ASSIGN:  // ^ ^=
+		case T_BIN_OR:  case T_BIN_OR_ASSIGN:   // | |=
+		
+		case T_ASSIGN: case T_EQ:   // = ==
+		case T_NEQ: case T_PERIOD:  // != .
+		
+		case T_NOT: case T_AND: case T_OR:
+			return true;
+		
+		default:
+			return false;
+	}
+}
+
+
 node_p parse_expr(parser_p parser) {
 	node_p node = parse_expr_without_trailing_ops(parser);
 	
 	token_type_t type = peek_type_with_eos(parser);
-	if (type == T_ID || type == T_ASSIGN) {
+	if ( is_binary_op(type) ) {
 		// Got an operator, wrap everything into an uops node and collect the
 		// remaining operators and expressions.
 		node_p uops = node_alloc(NT_UOPS);
 		node_append(uops, &uops->uops.list, node);
 		
-		while ( type = peek_type_with_eos(parser), (type == T_ID || type == T_ASSIGN) ) {
+		while ( is_binary_op(type = peek_type_with_eos(parser)) ) {
 			token_p id = consume_type(parser, type);
 			
 			node_p op_node = node_alloc_append(NT_ID, uops, &uops->uops.list);

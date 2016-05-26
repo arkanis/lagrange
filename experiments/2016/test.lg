@@ -29,6 +29,8 @@ syscall 60, (foo + bar + 8) * x / batz
 syscall 60, bar
 */
 
+/*
+// variable assignment test
 var str_ptr = "Hello World!\n"
 var str_len = 13
 
@@ -36,5 +38,12 @@ str_ptr = "Hello Assigment!\n"
 str_len = 17 * 1 + 0
 
 syscall 1, 1, str_ptr, str_len
+
+syscall 60, 0
+*/
+
+var x = not (4 << 2 == 8 != 7 || y && z and foo or bar)
+var y = -7
+var z = +17
 
 syscall 60, 0
