@@ -42,8 +42,22 @@ syscall 1, 1, str_ptr, str_len
 syscall 60, 0
 */
 
+/*
+// test for all C operators in lexer and parser
 var x = not (4 << 2 == 8 != 7 || y && z and foo or bar)
 var y = -7
 var z = +17
 
 syscall 60, 0
+*/
+
+// scopes
+var x = 1
+{
+	var foo = 2
+	var bar = 3
+	{
+		var y = x
+		syscall 60, y
+	}
+}

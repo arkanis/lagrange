@@ -139,6 +139,7 @@ static bool is_stmt_start(token_type_t type) {
 	switch(type) {
 		case T_SYSCALL:
 		case T_VAR:
+		case T_CBO:
 			return true;
 		default:
 			return is_expr_start(type);
@@ -198,6 +199,16 @@ node_p parse_stmt(parser_p parser) {
 			}
 			
 			return stmt;
+		case T_CBO:
+			// "{" [ stmts ] "}"
+			stmt = node_alloc(NT_SCOPE);
+			
+			while ( is_stmt_start(peek_type(parser)) )
+				node_append(stmt, &stmt->scope.stmts, parse_stmt(parser) );
+			consume_type(parser, T_CBC);
+			
+			return stmt;
+		
 		default:
 			printf("%s:%d:%d: expectet SYSCALL, VAR or expr, got:\n", parser->list->filename, token_line(t), token_col(t));
 			token_print_line(stderr, t, 0);

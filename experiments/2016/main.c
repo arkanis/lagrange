@@ -210,7 +210,7 @@ SH_GEN_DICT_DEF(scope_dict, const char*, scope_binding_t);
 
 void scope_new(scope_p scope, scope_p parent) {
 	scope->parent = parent;
-	scope->allocated_stack_space = 0;
+	scope->allocated_stack_space = (parent != NULL) ? parent->allocated_stack_space : 0;
 	scope_dict_new(&scope->bindings);
 }
 
@@ -228,10 +228,12 @@ size_t scope_put(scope_p scope, const char* name, size_t size) {
 }
 
 size_t scope_get(scope_p scope, const char* name) {
-	scope_binding_p binding = scope_dict_get_ptr(&scope->bindings, name);
-	if (binding == NULL)
-		return -1;
-	return binding->stack_offset;
+	for(scope_p current_scope = scope; current_scope != NULL; current_scope = current_scope->parent) {
+		scope_binding_p binding = scope_dict_get_ptr(&current_scope->bindings, name);
+		if (binding != NULL)
+			return binding->stack_offset;
+	}
+	return -1;
 }
 
 
@@ -248,6 +250,7 @@ typedef struct {
 
 raa_t compile_node(node_p node, compiler_ctx_p ctx, int8_t requested_result_register);
 raa_t compile_module(node_p node, compiler_ctx_p ctx);
+raa_t compile_scope(node_p node, compiler_ctx_p ctx);
 raa_t compile_syscall(node_p node, compiler_ctx_p ctx);
 raa_t compile_var(node_p node, compiler_ctx_p ctx);
 raa_t compile_op(node_p node, compiler_ctx_p ctx, int8_t req_reg);
@@ -278,6 +281,8 @@ raa_t compile_node(node_p node, compiler_ctx_p ctx, int8_t requested_result_regi
 	switch(node->type) {
 		case NT_MODULE:
 			return compile_module(node, ctx);
+		case NT_SCOPE:
+			return compile_scope(node, ctx);
 		case NT_SYSCALL:
 			return compile_syscall(node, ctx);
 		case NT_VAR:
@@ -319,6 +324,11 @@ raa_t compile_module(node_p node, compiler_ctx_p ctx) {
 	scope_destroy(&scope);
 	
 	return (raa_t){ -1, -1 };
+}
+
+raa_t compile_scope(node_p node, compiler_ctx_p ctx) {
+	// compile_module() does the exact same for now...
+	return compile_module(node, ctx);
 }
 
 raa_t compile_syscall(node_p node, compiler_ctx_p ctx) {

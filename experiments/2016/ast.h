@@ -49,6 +49,7 @@ typedef struct {
 
 typedef enum {
 	NT_MODULE,
+	NT_SCOPE,
 	
 	NT_SYSCALL,
 	NT_VAR,
@@ -75,6 +76,10 @@ struct node_s {
 		struct {
 			node_list_t stmts;
 		} module;
+		
+		struct {
+			node_list_t stmts;
+		} scope;
 		
 		struct {
 			node_list_t args;
@@ -122,6 +127,13 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 	[ NT_MODULE ] = &(node_spec_t){
 		"module", (member_spec_t[]){
 			{ MT_NODE_LIST, offsetof(node_t, module.stmts), "stmts" },
+			{ 0 }
+		}
+	},
+	
+	[ NT_SCOPE ] = &(node_spec_t){
+		"scope", (member_spec_t[]){
+			{ MT_NODE_LIST, offsetof(node_t, scope.stmts), "stmts" },
 			{ 0 }
 		}
 	},
