@@ -16,8 +16,8 @@ struct parser_s {
 
 int next_filtered_token_at(parser_p parser, size_t pos, bool ignore_ws_eos) {
 	size_t offset = 0;
-	while (pos + offset < (size_t)parser->list->tokens_len) {
-		token_type_t type = parser->list->tokens_ptr[pos + offset].type;
+	while (pos + offset < (size_t)parser->list->tokens.len) {
+		token_type_t type = parser->list->tokens.ptr[pos + offset].type;
 		// Return the offset if we found a filtered token there
 		if ( !( type == T_WS || type == T_COMMENT || (ignore_ws_eos && type == T_WSNL) ) )
 			return offset;
@@ -41,10 +41,10 @@ token_p consume_impl(parser_p parser, bool ignore_ws_eos, const char* caller, in
 	
 	token_p current_token;
 	if (offset == -1) {
-		current_token = &parser->list->tokens_ptr[parser->list->tokens_len - 1];
+		current_token = &parser->list->tokens.ptr[parser->list->tokens.len - 1];
 	} else {
 		parser->pos += offset;
-		current_token = &parser->list->tokens_ptr[parser->pos];
+		current_token = &parser->list->tokens.ptr[parser->pos];
 		parser->pos++;
 	}
 	
@@ -68,9 +68,9 @@ token_p peek_impl(parser_p parser, bool ignore_ws_eos, const char* caller, int l
 	
 	token_p current_token;
 	if (offset == -1)
-		current_token = &parser->list->tokens_ptr[parser->list->tokens_len - 1];
+		current_token = &parser->list->tokens.ptr[parser->list->tokens.len - 1];
 	else
-		current_token = &parser->list->tokens_ptr[parser->pos + offset];
+		current_token = &parser->list->tokens.ptr[parser->pos + offset];
 	
 	printf("%s:%d peek ", caller, line);
 	token_print(stdout, current_token, TP_INLINE_DUMP);
@@ -91,7 +91,7 @@ token_p consume_type_impl(parser_p parser, token_type_t type, const char* caller
 	if (t->type == type)
 		return t;
 	
-	token_p current_token = &parser->list->tokens_ptr[parser->pos-1];
+	token_p current_token = &parser->list->tokens.ptr[parser->pos-1];
 	
 	printf("%s:%d consume_type, expected %d, got ", caller, line, type);
 	token_print(stdout, current_token, TP_INLINE_DUMP);
@@ -189,8 +189,7 @@ node_p parse_stmt(parser_p parser) {
 			// var ID = expr eos
 			stmt = node_alloc(NT_VAR);
 			token_p id = consume_type(parser, T_ID);
-			stmt->var.name.ptr = id->src_str;
-			stmt->var.name.len = id->src_len;
+			stmt->var.name = id->src;
 			
 			if ( peek_type_with_eos(parser) == T_ASSIGN ) {
 				consume_type(parser, T_ASSIGN);
@@ -238,8 +237,7 @@ node_p parse_expr_without_trailing_ops(parser_p parser) {
 	switch(t->type) {
 		case T_ID:
 			node = node_alloc(NT_ID);
-			node->id.name.ptr = t->src_str;
-			node->id.name.len = t->src_len;
+			node->id.name = t->src;
 			break;
 		case T_INT:
 			node = node_alloc(NT_INTL);
@@ -247,8 +245,7 @@ node_p parse_expr_without_trailing_ops(parser_p parser) {
 			break;
 		case T_STR:
 			node = node_alloc(NT_STRL);
-			node->strl.value.ptr = t->str_val;
-			node->strl.value.len = t->str_len;
+			node->strl.value = t->str_val;
 			break;
 		case T_RBO:
 			// TODO: remember somehow that this node was surrounded by brackets!
@@ -322,8 +319,7 @@ node_p parse_expr(parser_p parser) {
 			token_p id = consume_type(parser, type);
 			
 			node_p op_node = node_alloc_append(NT_ID, uops, &uops->uops.list);
-			op_node->id.name.ptr = id->src_str;
-			op_node->id.name.len = id->src_len;
+			op_node->id.name = id->src;
 			
 			node_p expr = parse_expr_without_trailing_ops(parser);
 			node_append(uops, &uops->uops.list, expr);

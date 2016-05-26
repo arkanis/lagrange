@@ -25,14 +25,14 @@ int main(int argc, char** argv) {
 	}
 	
 	str_t src = str_fload(argv[1]);
-	token_list_p list = lex_str(src.ptr, src.len, argv[1], stderr);
+	token_list_p list = lex_str(src, argv[1], stderr);
 	
 	if (list->error_count > 0) {
 		// Just output errors and exit
-		for(size_t i = 0; i < list->tokens_len; i++) {
-			token_p t = &list->tokens_ptr[i];
+		for(size_t i = 0; i < list->tokens.len; i++) {
+			token_p t = &list->tokens.ptr[i];
 			if (t->type == T_ERROR) {
-				fprintf(stderr, "%s:%d:%d: %s\n", argv[1], token_line(t), token_col(t), t->str_val);
+				fprintf(stderr, "%s:%d:%d: %s\n", argv[1], token_line(t), token_col(t), t->str_val.ptr);
 				token_print_line(stderr, t, 0);
 			}
 		}
@@ -42,8 +42,8 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 	
-	for(size_t i = 0; i < list->tokens_len; i++) {
-		token_p t = &list->tokens_ptr[i];
+	for(size_t i = 0; i < list->tokens.len; i++) {
+		token_p t = &list->tokens.ptr[i];
 		if (t->type == T_COMMENT || t->type == T_WS) {
 			token_print(stdout, t, TP_SOURCE);
 		} else if (t->type == T_WSNL || t->type == T_EOF) {

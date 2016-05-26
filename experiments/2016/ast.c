@@ -54,7 +54,7 @@ node_p node_alloc_append(node_type_t type, node_p parent, node_list_p list) {
 	node_p node = node_alloc(type);
 	
 	node->parent = parent;
-	buf_append(list, node);
+	list_append(list, node);
 	
 	return node;
 }
@@ -174,8 +174,8 @@ static void node_print_recursive(node_p node, FILE* output, int level) {
 				fprintf(output, "%c", *value);
 				} break;
 			case MT_STR: {
-				buf_t(char)* value = member_ptr;
-				fprintf(output, "\"%.*s\"", (int)value->len, value->ptr);
+				str_p value = member_ptr;
+				fprintf(output, "\"%.*s\"", value->len, value->ptr);
 				} break;
 		}
 	}
@@ -208,8 +208,8 @@ void node_print_inline(node_p node, FILE* output) {
 				fprintf(output, "%c", *value);
 				} break;
 			case MT_STR: {
-				buf_t(char)* value = member_ptr;
-				fprintf(output, "\"%.*s\"", (int)value->len, value->ptr);
+				str_p value = member_ptr;
+				fprintf(output, "\"%.*s\"", value->len, value->ptr);
 				} break;
 		}
 	}

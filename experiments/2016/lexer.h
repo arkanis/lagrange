@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <stdio.h>
 
-
+#include "utils.h"
 
 
 typedef enum {
@@ -55,30 +55,24 @@ struct token_s {
 	token_list_p list;
 	
 	token_type_t type;
-	char* src_str;
-	int   src_len;
+	str_t src;
 	
 	union {
-		struct {
-			char* str_val;
-			int   str_len;
-		};
+		str_t   str_val;
 		int64_t int_val;
 	};
 };
 
 struct token_list_s {
-	char* src_str;
-	int   src_len;
+	str_t src;
 	const char* filename;
 	
-	token_p tokens_ptr;
-	size_t  tokens_len;
+	list_t(token_t) tokens;
 	size_t  error_count;
 };
 
 
-token_list_p lex_str(char* code_str, int code_len, const char* filename, FILE* errors);
+token_list_p lex_str(str_t code, const char* filename, FILE* errors);
 void         lex_free(token_list_p token_list);
 
 #define TP_SOURCE      (1 << 0)  // print only source

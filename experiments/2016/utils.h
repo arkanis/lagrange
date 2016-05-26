@@ -7,11 +7,11 @@
 // Simple variable length buffer
 //
 
-#define buf_t(content_type_t) struct { size_t len; content_type_t* ptr; }
-#define buf_append(buf, value) do {                                    \
-	(buf)->len++;                                                       \
-	(buf)->ptr = realloc((buf)->ptr, (buf)->len * sizeof((buf)->ptr[0]));  \
-	(buf)->ptr[(buf)->len - 1] = (value);                                \
+#define list_t(content_type_t)   struct { size_t len; content_type_t* ptr; }
+#define list_append(list, value)  do {                                         \
+	(list)->len++;                                                             \
+	(list)->ptr = realloc((list)->ptr, (list)->len * sizeof((list)->ptr[0]));  \
+	(list)->ptr[(list)->len - 1] = (value);                                    \
 } while(0)
 
 
