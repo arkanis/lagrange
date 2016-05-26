@@ -618,23 +618,9 @@ bool as_write_modrm(asm_p as, const char* format, asm_arg_t dest, asm_arg_t src)
 
 void as_syscall(asm_p as) {
 	// Volume 2C - Instruction Set Reference, p107 (B.2.1 General Purpose Instruction Formats and Encodings for 64-Bit Mode)
-	/*
-	Input:
-		RAX ← syscall_no
-		RDI
-		RSI
-		RDX
-		RCX
-		R8
-		R9
-	Scratch
-		All input regs
-		R10
-		R11
-	Source: http://wiki.osdev.org/Calling_Conventions
-	*/
 	as_write(as, "0000 1111 : 0000 0101");
 }
+
 
 void as_add(asm_p as, asm_arg_t dest, asm_arg_t src) {
 	// Volume 2C - Instruction Set Reference, p90 (B.2.1 General Purpose Instruction Formats and Encodings for 64-Bit Mode)
@@ -685,4 +671,40 @@ void as_mov(asm_p as, asm_arg_t dest, asm_arg_t src) {
 	
 	fprintf(stderr, "as_mov(): unsupported arg combination!\n");
 	abort();
+}
+
+
+void as_cmp(asm_p as, asm_arg_t arg1, asm_arg_t arg2) {
+	// Volume 2C - Instruction Set Reference, p93 (B.2.1 General Purpose Instruction Formats and Encodings for 64-Bit Mode)
+	if ( as_write_modrm(as, "0011 10dw", arg1, arg2) ) {
+		// memory to reg 0100 0RXB : 1000 101w : mod reg r/m
+		// reg to memory 0100 0RXB : 1000 100w : mod reg r/m
+		return;
+	} else if (arg1.type == ASM_T_REG && arg2.type == ASM_T_IMM) {
+		as_write(as, "0100 100B : 1000 0001 : 11 111 bbb : %32d", arg1.reg >> 3, arg1.reg, arg2.imm);
+		return;
+	}
+	
+	fprintf(stderr, "as_cmp(): unsupported arg combination!\n");
+	abort();
+}
+
+void as_jmp(asm_p as, asm_arg_t target) {
+	if (target.type == ASM_T_MEM_REL_DISP) {
+		as_write(as, "1110 1001 : %32d", target.mem_disp);
+		return;
+	/*
+	} else if ( as_write_modrm(as, "1111 1111", reg(0b0100), target) ) {
+		// register indirect  0100 W00B : 1111 1111 : 11  100 reg
+		// memory indirect    0100 W0XB : 1111 1111 : mod 100 r/m
+		return;
+	*/
+	}
+	
+	fprintf(stderr, "as_jmp(): unsupported arg type!\n");
+	abort();
+}
+
+void as_jmp_cc(asm_p as, uint8_t condition_code, int32_t displacement) {
+	as_write(as, "0000 1111 : 1000 tttt : %32d", condition_code, displacement);
 }

@@ -91,10 +91,33 @@ static inline asm_arg_t memrd(asm_arg_t reg, int32_t disp) {
 #define RSI R6
 #define RDI R7
 
+// Volume 2C - Instruction Set Reference, p77 (B.1.4.7 Condition Test (tttn) Field)
+#define CC_OVERFLOW          0b0000
+#define CC_NO_OVERFLOW       0b0001
+#define CC_BELOW             0b0010
+#define CC_ABOVE_OR_EQUAL    0b0011
+#define CC_EQUAL             0b0100
+#define CC_NOT_EQUAL         0b0101
+#define CC_BELOW_OR_EQUAL    0b0110
+#define CC_ABOVE             0b0111
+#define CC_SIGN              0b1000
+#define CC_NO_SIGN           0b1001
+#define CC_PARITY_EVEN       0b1010
+#define CC_PARITY_ODD        0b1011
+#define CC_LESS              0b1100
+#define CC_GREATER_OR_EQUAL  0b1101
+#define CC_LESS_OR_EQUAL     0b1110
+#define CC_GREATER           0b1111
+
 
 void as_syscall(asm_p as);
+
 void as_add(asm_p as, asm_arg_t arg1, asm_arg_t arg2);
 void as_sub(asm_p as, asm_arg_t arg1, asm_arg_t arg2);
 void as_mul(asm_p as, asm_arg_t arg);
 void as_div(asm_p as, asm_arg_t arg);
-void as_mov(asm_p as, asm_arg_t arg1, asm_arg_t arg2);
+void as_mov(asm_p as, asm_arg_t dest, asm_arg_t src);
+
+void as_cmp(asm_p as, asm_arg_t arg1, asm_arg_t arg2);
+void as_jmp(asm_p as, asm_arg_t target);
+void as_jmp_cc(asm_p as, uint8_t condition_code, int32_t displacement);
