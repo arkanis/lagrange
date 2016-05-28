@@ -35,6 +35,7 @@ void as_write_with_vars(asm_p as, const char* format, asm_var_t vars[]);
 typedef enum {
 	ASM_T_REG,
 	ASM_T_IMM,
+	ASM_T_OP,
 	ASM_T_MEM_DISP,
 	ASM_T_MEM_REL_DISP,
 	ASM_T_MEM_REG_DISP,
@@ -45,6 +46,7 @@ typedef struct {
 	union {
 		uint8_t reg;
 		uint64_t imm;
+		uint8_t op_code;
 		struct {
 			// [reg + disp]
 			uint8_t mem_reg;
@@ -55,6 +57,7 @@ typedef struct {
 
 static inline asm_arg_t reg(uint8_t index)  { return (asm_arg_t){ ASM_T_REG, .reg = index }; }
 static inline asm_arg_t imm(uint64_t value) { return (asm_arg_t){ ASM_T_IMM, .imm = value }; }
+static inline asm_arg_t op(uint8_t op_code) { return (asm_arg_t){ ASM_T_OP, .op_code = op_code }; }
 static inline asm_arg_t memd(int32_t disp)  { return (asm_arg_t){ ASM_T_MEM_DISP, .mem_disp = disp }; }
 static inline asm_arg_t reld(int32_t disp)  { return (asm_arg_t){ ASM_T_MEM_REL_DISP, .mem_disp = disp }; }
 static inline asm_arg_t memrd(asm_arg_t reg, int32_t disp) {
@@ -112,10 +115,10 @@ static inline asm_arg_t memrd(asm_arg_t reg, int32_t disp) {
 
 void as_syscall(asm_p as);
 
-void as_add(asm_p as, asm_arg_t arg1, asm_arg_t arg2);
-void as_sub(asm_p as, asm_arg_t arg1, asm_arg_t arg2);
-void as_mul(asm_p as, asm_arg_t arg);
-void as_div(asm_p as, asm_arg_t arg);
+void as_add(asm_p as, asm_arg_t dest, asm_arg_t src);
+void as_sub(asm_p as, asm_arg_t dest, asm_arg_t src);
+void as_mul(asm_p as, asm_arg_t src);
+void as_div(asm_p as, asm_arg_t src);
 void as_mov(asm_p as, asm_arg_t dest, asm_arg_t src);
 
 void as_cmp(asm_p as, asm_arg_t arg1, asm_arg_t arg2);

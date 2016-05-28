@@ -389,7 +389,22 @@ void as_write_with_vars(asm_p as, const char* format, asm_var_t vars[]) {
 
 # Argument combinations
 
-- reg       BSWAP RAX
+Usually encoded on instruction basis:
+- reg      BSWAP RAX
+- reg imm  MOV   RAX, 17
+
+Encoded by ModR/M stuff:
+- (reg|op) reg               ADD R0, R1
+                             DIV RDX → op(110), RDX
+                             JMP RDX → op(100), RDX
+- (reg|op) memd(addr)        ADD R0, [0xaabbccdd]
+                             JMP [0xaabbccdd] → op(100) memd(addr)
+- (reg|op) reld(addr)        ADD R0, [RIP + 0xaabbccdd]
+                             JMP [RIP + 0xaabbccdd] → op(100) reld(addr)
+- (reg|op) memrd(reg, addr)  ADD R0, [R1 + 0xaabbccdd]
+
+
+- reg       
 - reg imm   MOV   RAX, 17
 - reg reg   ADD   R0, R1
 - reg mem(addr)  [0x...]
@@ -487,128 +502,176 @@ as_call(as, addr_mem(0x11223344));
 	[:reg, :mem (:reg, :reg, :imm) ]   # register indirect (base) + register indirect (index) + displacement
 	  
 **/
-bool as_write_modrm(asm_p as, const char* format, asm_arg_t dest, asm_arg_t src) {
-	asm_arg_type_t dt = dest.type, st = src.type;
+
+#define WMRM_OP_SIZE_FIXED_TO_64 (1 << 0)
+
+bool as_write_modrm(asm_p as, uint32_t flags, const char* format, asm_arg_t dest, asm_arg_t src) {
+	// Variables for parts of the opcode format:
+	// 66H : REX : opcode : mod reg r/m : SIB : disp : imm
+	// We use -1 for invalid values
+	bool prefix_66h, sib;
+	int8_t rex_W, rex_R, rex_X, rex_B;
+	int8_t op_d, op_w;
+	uint8_t mod, reg, r_m;
+	int16_t scale, index, base;
+	int32_t* displacement_ptr = NULL;
+	
+	// operand size   w bit           REX.W bit          66H prefix
+	// 8 bit          0 (byte size)   ignored            ignored
+	// 16 bit         1 (full size)   0 (default size)   yes (16 bit size)
+	// 32 bit         1 (full size)   0 (default size)   no (default size)
+	// 64 bit         1 (full size)   1 (64 bit size)    ignored
 	
 	// Just use 64 bit operand size for everything for now (write no 66H prefix)
-	uint8_t op_w = 1;
-	uint8_t rex_W = 1;
+	prefix_66h = false;
+	op_w = 1;
+	// If the operand size is fixed to 64 bit for this instruct (e.g. JMP) we
+	// don't need to set the REX.W bit.
+	rex_W = (flags & WMRM_OP_SIZE_FIXED_TO_64) ? 0 : 1;
 	
-	if (dt == ASM_T_REG && st == ASM_T_REG) {
-		// REX
-		as_write(as, "0100 WR0B", rex_W, dest.reg >> 3, src.reg >> 3);
-		as_write_with_vars(as, format, (asm_var_t[]){
-			{ "d",  1 },
-			{ "w",  op_w },
-			{ NULL, 0 }
-		});
-		// ModRM
-		as_write(as, "11 rrr bbb", dest.reg, src.reg);
-		return true;
-	}
-	
-	uint8_t direction_bit;
-	asm_arg_t reg_arg, mem_arg;
-	if (dt == ASM_T_REG) {
-		// memory to register
-		direction_bit = 1;
+	asm_arg_t reg_arg, r_m_arg;
+	asm_arg_type_t dt = dest.type, st = src.type;
+	if (dt == ASM_T_OP) {
+		op_d = -1;
 		reg_arg = dest;
-		mem_arg = src;
-	} else {
-		// register to memory
-		direction_bit = 0;
+		r_m_arg = src;
+	} else if (dt == ASM_T_REG) {
+		// r/m to register, Table B-11. Encoding of Operation Direction (d) Bit, p78, Volume 2C
+		op_d = 1;
+		reg_arg = dest;
+		r_m_arg = src;
+	} else if (st == ASM_T_REG) {
+		// register to r/m, Table B-11. Encoding of Operation Direction (d) Bit, p78, Volume 2C
+		op_d = 0;
 		reg_arg = src;
-		mem_arg = dest;
-	}
-	
-	// Not a ModR/M combination
-	if ( ! (reg_arg.type == ASM_T_REG && (mem_arg.type == ASM_T_MEM_DISP || mem_arg.type == ASM_T_MEM_REG_DISP || mem_arg.type == ASM_T_MEM_REL_DISP)) )
+		r_m_arg = dest;
+	} else {
+		// Not a ModR/M combination
 		return false;
-	
-	if (mem_arg.type == ASM_T_MEM_REL_DISP) {
-		// Volume 2A, p39, 2.2.1.6 RIP-Relative Addressing
-		// mod = 00 and R/M = 101 is a special case that signals RIP + disp32
-		uint8_t mod = 0b00;
-		uint8_t r_m = 0b101;
-		uint8_t reg = reg_arg.reg & 0b111;
-		uint8_t rex_R = reg_arg.reg >> 3;
-		
-		// REX
-		as_write(as, "0100 WR00", rex_W, rex_R);
-		as_write_with_vars(as, format, (asm_var_t[]){
-			{ "d",  direction_bit },
-			{ "w",  op_w },
-			{ NULL, 0 }
-		});
-		// ModRM
-		as_write(as, "mm rrr bbb", mod, reg, r_m);
-		as_write(as, "%32d", mem_arg.mem_disp);
-		return true;
-	} else if (mem_arg.type == ASM_T_MEM_DISP) {
-		// mod = 00 and R/M = 100 is a special case that signals just a following
-		// SIB byte (p33). Within the SIB byte base = 101 is a special case that
-		// when used with mod = 00 signals [scaled index] + disp32. We leave the
-		// scaled index empty (index = 100) so we just get the disp32 (p34).
-		uint8_t mod = 0b00;
-		uint8_t r_m = 0b100;
-		uint8_t reg = reg_arg.reg & 0b111;
-		uint8_t rex_R = reg_arg.reg >> 3;
-		
-		// REX
-		as_write(as, "0100 WR00", rex_W, rex_R);
-		as_write_with_vars(as, format, (asm_var_t[]){
-			{ "d",  direction_bit },
-			{ "w",  op_w },
-			{ NULL, 0 }
-		});
-		// ModRM
-		as_write(as, "mm rrr bbb", mod, reg, r_m);
-		// SIB
-		as_write(as, "ss xxx bbb", 0b00, 0b100 /* no index */, 0b101 /* no base, [scaled index] + disp32 instead */);
-		as_write(as, "%32d", mem_arg.mem_disp);
-		
-		return true;
-	} else if (mem_arg.type == ASM_T_MEM_REG_DISP) {
-		uint8_t mod = 0b10; // [reg] + disp32 addressing mode, Volume 2C, p33
-		uint8_t r_m = mem_arg.mem_reg & 0b111;
-		uint8_t rex_B = mem_arg.mem_reg >> 3;
-		uint8_t reg = reg_arg.reg & 0b111;
-		uint8_t rex_R = reg_arg.reg >> 3;
-		
-		bool write_sib = false;
-		uint8_t sib_ss;
-		uint8_t sib_index;
-		uint8_t sib_base;
-		
-		if (r_m == 0b100) {
-			// Would usually mean [RSP] + disp32 but is a special case that signals
-			// a following SIB byte. Encode with an SIB byte with no index (special
-			// case SS = 00, Index = 100) and RSP as base. In this case REX.B is
-			// used to extend SIB.base, so we can just keep the bit in there.
-			write_sib = true;
-			sib_ss = 0b00;
-			sib_index = 0b100;
-			sib_base = mem_arg.mem_reg;
-		}
-		
-		// REX
-		as_write(as, "0100 WR0B", rex_W, rex_R, rex_B);
-		as_write_with_vars(as, format, (asm_var_t[]){
-			{ "d",   direction_bit },
-			{ "w",   op_w },
-			{ NULL, 0 }
-		});
-		// ModRM
-		as_write(as, "mm rrr bbb", mod, reg, r_m);
-		// SIB
-		if (write_sib)
-			as_write(as, "ss xxx bbb", sib_ss, sib_index, sib_base);
-		as_write(as, "%32d", mem_arg.mem_disp);
-		
-		return true;
 	}
 	
-	return false;
+	// Handle register argument
+	if (reg_arg.type == ASM_T_REG) {
+		// ModR/M reg field contains register operand, REX.R bit extends it
+		reg = reg_arg.reg;
+		rex_R = reg_arg.reg >> 3;
+	} else if (reg_arg.type == ASM_T_OP) {
+		// ModR/M reg field used as opcode extention, REX.R bit unused, see:
+		// 
+		// 2.2.1.2 More on REX Prefix Fields, p35: REX.R modifies the ModR/M reg
+		// field when that field encodes a GPR, SSE, control or debug register.
+		// REX.R is ignored when ModR/M specifies other registers or defines an
+		// extended opcode.
+		// 
+		// Examples:
+		//                               |-- USE OF REX.R PROBABLY A DOC MISTAKE!
+		// CALL register indirect  0100 WR00 w 1111 1111 : 11  010 reg
+		// CALL memory indirect    0100 W0XB w 1111 1111 : mod 010 r/m
+		// DIV  Divide RDX:RAX by qwordregister  0100 100B 1111 0111 : 11  110 reg
+		// DIV  Divide RDX:RAX by memory64       0100 10XB 1111 0111 : mod 110 r/m
+		reg = reg_arg.op_code;
+		rex_R = 0;
+	} else {
+		// Should never happen
+		abort();
+	}
+	
+	// Even if the reg operand is an op code extention for the addressing mode
+	// it is treated as a register. So we can operate as if the reg argument
+	// always is a register.
+	switch(r_m_arg.type) {
+		case ASM_T_REG:
+			// register to register
+			mod = 0b11;
+			r_m = r_m_arg.reg;
+			rex_B = r_m_arg.reg >> 3;
+			
+			// no SIB byte used
+			sib = false;
+			rex_X = 0;
+			break;
+		case ASM_T_MEM_DISP:
+			// mod = 00 and R/M = 100 is a special case that signals just a following
+			// SIB byte (Volume 2A, p33). Within the SIB byte base = 101 is a special
+			// case that when used with mod = 00 signals [scaled index] + disp32. We
+			// leave the scaled index empty (index = 100) so we just get the disp32 (p34).
+			mod = 0b00;
+			r_m = 0b100;
+			rex_B = 0;    // r_m field not extended, so REX.B is unused
+			
+			sib = true;
+			base = 0b101;   // no base, [scaled index] + disp32 instead
+			index = 0b100;  // no index
+			rex_X = 0;      // index doesn't represent a register, so REX.X is not used
+			scale = 0b00;   // unused in this case (bits don't matter)
+			
+			displacement_ptr = &r_m_arg.mem_disp;
+			break;
+		case ASM_T_MEM_REL_DISP:
+			// Volume 2A, p39, 2.2.1.6 RIP-Relative Addressing
+			// mod = 00 and R/M = 101 is a special case that signals RIP + disp32
+			mod = 0b00;
+			r_m = 0b101;
+			rex_B = 0;    // r_m field not extended, so REX.B is unused
+			
+			// no SIB byte used
+			sib = false;
+			rex_X = 0;
+			
+			displacement_ptr = &r_m_arg.mem_disp;
+			break;
+		case ASM_T_MEM_REG_DISP:
+			// mod == 10 signals [reg] + disp32 addressing mode, Volume 2A, p33
+			mod = 0b10; 
+			r_m = r_m_arg.mem_reg & 0b111;
+			rex_B = r_m_arg.mem_reg >> 3;
+			
+			// normally no SIB byte used
+			sib = false;
+			rex_X = 0;
+			
+			if (r_m == 0b100) {
+				// Would usually mean [RSP] + disp32 but is a special case that signals
+				// a following SIB byte. Encode with an SIB byte with no index (special
+				// case SS = 00, Index = 100) and RSP as base. In this case REX.B is
+				// used to extend SIB.base, so we can just keep the bit in there.
+				sib = true;
+				scale = 0b00;
+				index = 0b100;
+				base = r_m_arg.mem_reg;
+			}
+			
+			displacement_ptr = &r_m_arg.mem_disp;
+			break;
+		default:
+			fprintf(stderr, "as_write_modrm(): unsupported memory operand!\n");
+			abort();
+	}
+	
+	// Write encoded instruction
+	
+	// 66H prefix
+	if (prefix_66h)
+		as_write(as, "0110 0110");
+	// REX byte (if necessary)
+	if ( rex_W == 1 || rex_R == 1 || rex_X == 1 || rex_B == 1 )
+		as_write(as, "0100 WRXB", rex_W, rex_R, rex_X, rex_B);
+	// Opcode byte(s)
+	as_write_with_vars(as, format, (asm_var_t[]){
+		{ "d", op_d },
+		{ "w", op_w },
+		{ NULL, 0 }
+	});
+	// ModR/M byte
+	as_write(as, "mm rrr bbb", mod, reg, r_m);
+	// SIB byte (if used)
+	if (sib)
+		as_write(as, "ss xxx bbb", scale, index, base);
+	// Displacement (if used)
+	if (displacement_ptr != NULL)
+		as_write(as, "%32d", *displacement_ptr);
+	
+	return true;
 }
 
 
@@ -624,7 +687,7 @@ void as_syscall(asm_p as) {
 
 void as_add(asm_p as, asm_arg_t dest, asm_arg_t src) {
 	// Volume 2C - Instruction Set Reference, p90 (B.2.1 General Purpose Instruction Formats and Encodings for 64-Bit Mode)
-	if ( as_write_modrm(as, "0000 00dw", dest, src) )
+	if ( as_write_modrm(as, 0, "0000 00dw", dest, src) )
 		return;
 	
 	fprintf(stderr, "as_add(): unsupported arg combination!\n");
@@ -633,7 +696,7 @@ void as_add(asm_p as, asm_arg_t dest, asm_arg_t src) {
 
 void as_sub(asm_p as, asm_arg_t dest, asm_arg_t src) {
 	// Volume 2C - Instruction Set Reference, p106 (B.2.1 General Purpose Instruction Formats and Encodings for 64-Bit Mode)
-	if ( as_write_modrm(as, "0010 10dw", dest, src) )
+	if ( as_write_modrm(as, 0, "0010 10dw", dest, src) )
 		return;
 	
 	fprintf(stderr, "as_sub(): unsupported arg combination!\n");
@@ -641,31 +704,35 @@ void as_sub(asm_p as, asm_arg_t dest, asm_arg_t src) {
 }
 
 void as_mul(asm_p as, asm_arg_t src) {
-	if (src.type != ASM_T_REG) {
-		fprintf(stderr, "as_mul(): src has to be an register for now!\n");
-		abort();
+	// Volume 2C - Instruction Set Reference, p99
+	if ( as_write_modrm(as, 0, "1111 011w", op(0b100), src) ) {
+		return;
 	}
-	// Volume 2C - Instruction Set Reference, p99 (B.2.1 General Purpose Instruction Formats and Encodings for 64-Bit Mode)
-	as_write(as, "0100 W00B : 1111 011w : 11 100 bbb", 1, src.reg >> 3, 1, src.reg);
+	
+	fprintf(stderr, "as_mul(): unsupported arg combination!\n");
+	abort();
 }
 
 void as_div(asm_p as, asm_arg_t src) {
-	if (src.type != ASM_T_REG) {
-		fprintf(stderr, "as_div(): src has to be an register for now!\n");
-		abort();
+	// Volume 2C - Instruction Set Reference, p94
+	if ( as_write_modrm(as, 0, "1111 011w", op(0b110), src) ) {
+		// Divide RDX:RAX by qwordregister  0100 100B : 1111 0111 : 11  110 qwordreg
+		// Divide RDX:RAX by memory64       0100 10XB : 1111 0111 : mod 110 r/m
+		return;
 	}
-	// Volume 2C - Instruction Set Reference, p94 (B.2.1 General Purpose Instruction Formats and Encodings for 64-Bit Mode)
-	as_write(as, "0100 W00B : 1111 011w : 11 110 bbb", 1, src.reg >> 3, 1, src.reg);
+	
+	fprintf(stderr, "as_div(): unsupported arg combination!\n");
+	abort();
 }
 
 void as_mov(asm_p as, asm_arg_t dest, asm_arg_t src) {
-	if ( as_write_modrm(as, "1000 10dw", dest, src) ) {
-		// memory to reg 0100 0RXB : 1000 101w : mod reg r/m
-		// reg to memory 0100 0RXB : 1000 100w : mod reg r/m
-		return;
-	} else if (dest.type == ASM_T_REG && src.type == ASM_T_IMM) {
+	if (dest.type == ASM_T_REG && src.type == ASM_T_IMM) {
 		// Volume 2C - Instruction Set Reference, p97 (B.2.1 General Purpose Instruction Formats and Encodings for 64-Bit Mode)
 		as_write(as, "0100 100B : 1011 1bbb : %64d", dest.reg >> 3, dest.reg, src.imm);
+		return;
+	} else if ( as_write_modrm(as, 0, "1000 10dw", dest, src) ) {
+		// memory to reg 0100 0RXB : 1000 101w : mod reg r/m
+		// reg to memory 0100 0RXB : 1000 100w : mod reg r/m
 		return;
 	}
 	
@@ -676,14 +743,15 @@ void as_mov(asm_p as, asm_arg_t dest, asm_arg_t src) {
 
 void as_cmp(asm_p as, asm_arg_t arg1, asm_arg_t arg2) {
 	// Volume 2C - Instruction Set Reference, p93 (B.2.1 General Purpose Instruction Formats and Encodings for 64-Bit Mode)
-	if ( as_write_modrm(as, "0011 10dw", arg1, arg2) ) {
-		// memory to reg 0100 0RXB : 1000 101w : mod reg r/m
-		// reg to memory 0100 0RXB : 1000 100w : mod reg r/m
-		return;
-	} else if (arg1.type == ASM_T_REG && arg2.type == ASM_T_IMM) {
+	if (arg1.type == ASM_T_REG && arg2.type == ASM_T_IMM) {
 		as_write(as, "0100 100B : 1000 0001 : 11 111 bbb : %32d", arg1.reg >> 3, arg1.reg, arg2.imm);
 		return;
-	}
+	} else if ( as_write_modrm(as, 0, "0011 10dw", arg1, arg2) ) {
+		// memory64 with qwordregister  0100 1RXB : 0011 1001  : mod qwordreg r/m
+		// qwordregister with memory64  0100 1RXB : 0011 101w1 : mod qwordreg r/m
+		//                                                   |-- PROBABLY ERROR IN DOCS
+		return;
+	} else 
 	
 	fprintf(stderr, "as_cmp(): unsupported arg combination!\n");
 	abort();
@@ -693,12 +761,15 @@ void as_jmp(asm_p as, asm_arg_t target) {
 	if (target.type == ASM_T_MEM_REL_DISP) {
 		as_write(as, "1110 1001 : %32d", target.mem_disp);
 		return;
-	/*
-	} else if ( as_write_modrm(as, "1111 1111", reg(0b0100), target) ) {
+	} else if ( as_write_modrm(as, WMRM_OP_SIZE_FIXED_TO_64, "1111 1111", op(0b100), target) ) {
+		// Combined Volumes 1, 2ABC, 3ABC, p856:
+		// In 64-Bit Mode — The instruction’s operation size is fixed at 64 bits. If a selector points to a gate, then RIP equals
+		// the 64-bit displacement taken from gate; else RIP equals the zero-extended offset from the far pointer referenced
+		// in the instruction.
+		// 
 		// register indirect  0100 W00B : 1111 1111 : 11  100 reg
 		// memory indirect    0100 W0XB : 1111 1111 : mod 100 r/m
 		return;
-	*/
 	}
 	
 	fprintf(stderr, "as_jmp(): unsupported arg type!\n");

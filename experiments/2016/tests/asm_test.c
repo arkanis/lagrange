@@ -97,10 +97,16 @@ void test_modrm_instructions() {
 		as_add(as, reg(i), reg(i));
 	for(size_t i = 0; i < 16; i++)
 		as_sub(as, reg(i), reg(i));
+	
 	for(size_t i = 0; i < 16; i++)
 		as_mul(as, reg(i));
 	for(size_t i = 0; i < 16; i++)
+		as_mul(as, memrd(reg(i), 0xbeba));
+	
+	for(size_t i = 0; i < 16; i++)
 		as_div(as, reg(i));
+	for(size_t i = 0; i < 16; i++)
+		as_div(as, memrd(reg(i), 0xbeba));
 	
 	for(size_t i = 0; i < 16; i++)
 		as_mov(as, reg(i), reg(i));
@@ -122,12 +128,11 @@ void test_modrm_instructions() {
 		as_cmp(as, reg(i), imm(0x11223344));
 	
 	as_jmp(as, reld(0x11223344));
-	/*
 	for(size_t i = 0; i < 16; i++)
 		as_jmp(as, reg(i));
 	for(size_t i = 0; i < 16; i++)
 		as_jmp(as, memrd(reg(i), 0xbeba));
-	*/
+	
 	as_jmp_cc(as, CC_OVERFLOW,         0x11223344);
 	as_jmp_cc(as, CC_NO_OVERFLOW,      0x11223344);
 	as_jmp_cc(as, CC_BELOW,            0x11223344);
