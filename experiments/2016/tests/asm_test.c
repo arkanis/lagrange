@@ -176,11 +176,36 @@ void test_write_elf() {
 	as_destroy(as);
 }
 
+void test_instructions_for_if() {
+	asm_p as = &(asm_t){ 0 };
+	as_new(as);
+	
+	as_mov(as, RAX, imm(0));
+	as_cmp(as, RAX, imm(0));
+	asm_jump_slot_t to_false_case = as_jmp_cc(as, CC_NOT_EQUAL, 0);
+		as_mov(as, RAX, imm(60));
+		as_mov(as, RDI, imm(1));
+		as_syscall(as);
+		asm_jump_slot_t to_end = as_jmp(as, reld(0));
+	as_mark_jmp_slot_target(as, to_false_case);
+		as_mov(as, RAX, imm(60));
+		as_mov(as, RDI, imm(0));
+		as_syscall(as);
+	as_mark_jmp_slot_target(as, to_end);
+	as_mov(as, RAX, imm(60));
+	as_mov(as, RDI, imm(17));
+	as_syscall(as);
+	
+	as_save_elf(as, "if.elf");
+	as_destroy(as);
+}
+
 
 int main() {
 	st_run(test_write);
 	st_run(test_write_with_vars);
 	st_run(test_modrm_instructions);
 	st_run(test_write_elf);
+	st_run(test_instructions_for_if);
 	return st_show_report();
 }

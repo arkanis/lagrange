@@ -113,6 +113,11 @@ static inline asm_arg_t memrd(asm_arg_t reg, int32_t disp) {
 #define CC_GREATER           0b1111
 
 
+typedef struct {
+	size_t base;
+	size_t disp_offset;
+} asm_jump_slot_t, *asm_jump_slot_p;
+
 void as_syscall(asm_p as);
 
 void as_add(asm_p as, asm_arg_t dest, asm_arg_t src);
@@ -122,5 +127,6 @@ void as_div(asm_p as, asm_arg_t src);
 void as_mov(asm_p as, asm_arg_t dest, asm_arg_t src);
 
 void as_cmp(asm_p as, asm_arg_t arg1, asm_arg_t arg2);
-void as_jmp(asm_p as, asm_arg_t target);
-void as_jmp_cc(asm_p as, uint8_t condition_code, int32_t displacement);
+asm_jump_slot_t as_jmp(asm_p as, asm_arg_t target);
+asm_jump_slot_t as_jmp_cc(asm_p as, uint8_t condition_code, int32_t displacement);
+void as_mark_jmp_slot_target(asm_p as, asm_jump_slot_t jump_slot);

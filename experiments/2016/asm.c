@@ -705,9 +705,8 @@ void as_sub(asm_p as, asm_arg_t dest, asm_arg_t src) {
 
 void as_mul(asm_p as, asm_arg_t src) {
 	// Volume 2C - Instruction Set Reference, p99
-	if ( as_write_modrm(as, 0, "1111 011w", op(0b100), src) ) {
+	if ( as_write_modrm(as, 0, "1111 011w", op(0b100), src) )
 		return;
-	}
 	
 	fprintf(stderr, "as_mul(): unsupported arg combination!\n");
 	abort();
@@ -715,11 +714,10 @@ void as_mul(asm_p as, asm_arg_t src) {
 
 void as_div(asm_p as, asm_arg_t src) {
 	// Volume 2C - Instruction Set Reference, p94
-	if ( as_write_modrm(as, 0, "1111 011w", op(0b110), src) ) {
-		// Divide RDX:RAX by qwordregister  0100 100B : 1111 0111 : 11  110 qwordreg
-		// Divide RDX:RAX by memory64       0100 10XB : 1111 0111 : mod 110 r/m
+	// Divide RDX:RAX by qwordregister  0100 100B : 1111 0111 : 11  110 qwordreg
+	// Divide RDX:RAX by memory64       0100 10XB : 1111 0111 : mod 110 r/m
+	if ( as_write_modrm(as, 0, "1111 011w", op(0b110), src) )
 		return;
-	}
 	
 	fprintf(stderr, "as_div(): unsupported arg combination!\n");
 	abort();
@@ -757,10 +755,10 @@ void as_cmp(asm_p as, asm_arg_t arg1, asm_arg_t arg2) {
 	abort();
 }
 
-void as_jmp(asm_p as, asm_arg_t target) {
+asm_jump_slot_t as_jmp(asm_p as, asm_arg_t target) {
 	if (target.type == ASM_T_MEM_REL_DISP) {
 		as_write(as, "1110 1001 : %32d", target.mem_disp);
-		return;
+		return (asm_jump_slot_t){ .base = as->code_len, .disp_offset = as->code_len - 4 };
 	} else if ( as_write_modrm(as, WMRM_OP_SIZE_FIXED_TO_64, "1111 1111", op(0b100), target) ) {
 		// Combined Volumes 1, 2ABC, 3ABC, p856:
 		// In 64-Bit Mode — The instruction’s operation size is fixed at 64 bits. If a selector points to a gate, then RIP equals
@@ -769,13 +767,20 @@ void as_jmp(asm_p as, asm_arg_t target) {
 		// 
 		// register indirect  0100 W00B : 1111 1111 : 11  100 reg
 		// memory indirect    0100 W0XB : 1111 1111 : mod 100 r/m
-		return;
+		return (asm_jump_slot_t){ .base = as->code_len, .disp_offset = as->code_len - 4 };
 	}
 	
 	fprintf(stderr, "as_jmp(): unsupported arg type!\n");
 	abort();
 }
 
-void as_jmp_cc(asm_p as, uint8_t condition_code, int32_t displacement) {
+asm_jump_slot_t as_jmp_cc(asm_p as, uint8_t condition_code, int32_t displacement) {
 	as_write(as, "0000 1111 : 1000 tttt : %32d", condition_code, displacement);
+	return (asm_jump_slot_t){ .base = as->code_len, .disp_offset = as->code_len - 4 };
+}
+
+void as_mark_jmp_slot_target(asm_p as, asm_jump_slot_t jump_slot) {
+	int32_t displacement = as->code_len - (ssize_t)jump_slot.base;
+	int32_t* instr_disp_ptr = (int32_t*)(as->code_ptr + jump_slot.disp_offset);
+	*instr_disp_ptr = displacement;
 }
