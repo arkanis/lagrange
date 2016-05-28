@@ -503,9 +503,9 @@ as_call(as, addr_mem(0x11223344));
 	  
 **/
 
-#define WMRM_OP_SIZE_FIXED_TO_64 (1 << 0)
+#define WMRM_FIXED_OPERAND_SIZE (1 << 0)
 
-bool as_write_modrm(asm_p as, uint32_t flags, const char* format, asm_arg_t dest, asm_arg_t src) {
+bool as_write_modrm(asm_p as, uint32_t flags, const char* format, asm_arg_t dest, asm_arg_t src, asm_var_t vars[]) {
 	// Variables for parts of the opcode format:
 	// 66H : REX : opcode : mod reg r/m : SIB : disp : imm
 	// We use -1 for invalid values
@@ -525,9 +525,9 @@ bool as_write_modrm(asm_p as, uint32_t flags, const char* format, asm_arg_t dest
 	// Just use 64 bit operand size for everything for now (write no 66H prefix)
 	prefix_66h = false;
 	op_w = 1;
-	// If the operand size is fixed to 64 bit for this instruct (e.g. JMP) we
-	// don't need to set the REX.W bit.
-	rex_W = (flags & WMRM_OP_SIZE_FIXED_TO_64) ? 0 : 1;
+	// If the operand size is fixed for this instruct (e.g. JMP, SETcc) we don't
+	// need to set the REX.W bit.
+	rex_W = (flags & WMRM_FIXED_OPERAND_SIZE) ? 0 : 1;
 	
 	asm_arg_t reg_arg, r_m_arg;
 	asm_arg_type_t dt = dest.type, st = src.type;
@@ -648,6 +648,17 @@ bool as_write_modrm(asm_p as, uint32_t flags, const char* format, asm_arg_t dest
 			abort();
 	}
 	
+	// Add our local opcode variables to the list of user supplied opcode
+	// variables (like condition code, etc.)
+	size_t user_supplied_var_count = 0;
+	for(size_t i = 0; vars != NULL && vars[i].name != NULL; i++)
+		user_supplied_var_count++;
+	asm_var_t all_vars[user_supplied_var_count + 2];
+	memcpy(all_vars, vars, user_supplied_var_count * sizeof(asm_var_t));
+	all_vars[user_supplied_var_count + 0] = (asm_var_t){ "d", op_d };
+	all_vars[user_supplied_var_count + 1] = (asm_var_t){ "w", op_w };
+	all_vars[user_supplied_var_count + 2] = (asm_var_t){ NULL, 0 };
+	
 	// Write encoded instruction
 	
 	// 66H prefix
@@ -657,11 +668,7 @@ bool as_write_modrm(asm_p as, uint32_t flags, const char* format, asm_arg_t dest
 	if ( rex_W == 1 || rex_R == 1 || rex_X == 1 || rex_B == 1 )
 		as_write(as, "0100 WRXB", rex_W, rex_R, rex_X, rex_B);
 	// Opcode byte(s)
-	as_write_with_vars(as, format, (asm_var_t[]){
-		{ "d", op_d },
-		{ "w", op_w },
-		{ NULL, 0 }
-	});
+	as_write_with_vars(as, format, all_vars);
 	// ModR/M byte
 	as_write(as, "mm rrr bbb", mod, reg, r_m);
 	// SIB byte (if used)
@@ -687,7 +694,7 @@ void as_syscall(asm_p as) {
 
 void as_add(asm_p as, asm_arg_t dest, asm_arg_t src) {
 	// Volume 2C - Instruction Set Reference, p90 (B.2.1 General Purpose Instruction Formats and Encodings for 64-Bit Mode)
-	if ( as_write_modrm(as, 0, "0000 00dw", dest, src) )
+	if ( as_write_modrm(as, 0, "0000 00dw", dest, src, NULL) )
 		return;
 	
 	fprintf(stderr, "as_add(): unsupported arg combination!\n");
@@ -696,7 +703,7 @@ void as_add(asm_p as, asm_arg_t dest, asm_arg_t src) {
 
 void as_sub(asm_p as, asm_arg_t dest, asm_arg_t src) {
 	// Volume 2C - Instruction Set Reference, p106 (B.2.1 General Purpose Instruction Formats and Encodings for 64-Bit Mode)
-	if ( as_write_modrm(as, 0, "0010 10dw", dest, src) )
+	if ( as_write_modrm(as, 0, "0010 10dw", dest, src, NULL) )
 		return;
 	
 	fprintf(stderr, "as_sub(): unsupported arg combination!\n");
@@ -705,7 +712,7 @@ void as_sub(asm_p as, asm_arg_t dest, asm_arg_t src) {
 
 void as_mul(asm_p as, asm_arg_t src) {
 	// Volume 2C - Instruction Set Reference, p99
-	if ( as_write_modrm(as, 0, "1111 011w", op(0b100), src) )
+	if ( as_write_modrm(as, 0, "1111 011w", op(0b100), src, NULL) )
 		return;
 	
 	fprintf(stderr, "as_mul(): unsupported arg combination!\n");
@@ -716,7 +723,7 @@ void as_div(asm_p as, asm_arg_t src) {
 	// Volume 2C - Instruction Set Reference, p94
 	// Divide RDX:RAX by qwordregister  0100 100B : 1111 0111 : 11  110 qwordreg
 	// Divide RDX:RAX by memory64       0100 10XB : 1111 0111 : mod 110 r/m
-	if ( as_write_modrm(as, 0, "1111 011w", op(0b110), src) )
+	if ( as_write_modrm(as, 0, "1111 011w", op(0b110), src, NULL) )
 		return;
 	
 	fprintf(stderr, "as_div(): unsupported arg combination!\n");
@@ -728,7 +735,7 @@ void as_mov(asm_p as, asm_arg_t dest, asm_arg_t src) {
 		// Volume 2C - Instruction Set Reference, p97 (B.2.1 General Purpose Instruction Formats and Encodings for 64-Bit Mode)
 		as_write(as, "0100 100B : 1011 1bbb : %64d", dest.reg >> 3, dest.reg, src.imm);
 		return;
-	} else if ( as_write_modrm(as, 0, "1000 10dw", dest, src) ) {
+	} else if ( as_write_modrm(as, 0, "1000 10dw", dest, src, NULL) ) {
 		// memory to reg 0100 0RXB : 1000 101w : mod reg r/m
 		// reg to memory 0100 0RXB : 1000 100w : mod reg r/m
 		return;
@@ -744,7 +751,7 @@ void as_cmp(asm_p as, asm_arg_t arg1, asm_arg_t arg2) {
 	if (arg1.type == ASM_T_REG && arg2.type == ASM_T_IMM) {
 		as_write(as, "0100 100B : 1000 0001 : 11 111 bbb : %32d", arg1.reg >> 3, arg1.reg, arg2.imm);
 		return;
-	} else if ( as_write_modrm(as, 0, "0011 10dw", arg1, arg2) ) {
+	} else if ( as_write_modrm(as, 0, "0011 10dw", arg1, arg2, NULL) ) {
 		// memory64 with qwordregister  0100 1RXB : 0011 1001  : mod qwordreg r/m
 		// qwordregister with memory64  0100 1RXB : 0011 101w1 : mod qwordreg r/m
 		//                                                   |-- PROBABLY ERROR IN DOCS
@@ -755,11 +762,27 @@ void as_cmp(asm_p as, asm_arg_t arg1, asm_arg_t arg2) {
 	abort();
 }
 
+void as_set_cc(asm_p as, uint8_t condition_code, asm_arg_t dest) {
+	// Volume 2C - Instruction Set Reference, p104
+	// Combined Volumes 1, 2ABC, 3ABC, p1308
+	// In IA-64 mode, the operand size is fixed at 8 bits. Use of REX prefix enable uniform addressing to additional byte
+	// registers. Otherwise, this instruction’s operation is the same as in legacy mode and compatibility mode.	as_write_modrm(as, WMRM_FIXED_OPERAND_SIZE, "")
+	bool result = as_write_modrm(as, WMRM_FIXED_OPERAND_SIZE, "0000 1111 : 1001 tttt", op(0b000), dest, (asm_var_t[]){
+		{ "tttt", condition_code },
+		{ NULL, 0 }
+	});
+	if (result)
+		return;
+	
+	fprintf(stderr, "as_set_cc(): unsupported arg combination!\n");
+	abort();
+}
+
 asm_jump_slot_t as_jmp(asm_p as, asm_arg_t target) {
 	if (target.type == ASM_T_MEM_REL_DISP) {
 		as_write(as, "1110 1001 : %32d", target.mem_disp);
 		return (asm_jump_slot_t){ .base = as->code_len, .disp_offset = as->code_len - 4 };
-	} else if ( as_write_modrm(as, WMRM_OP_SIZE_FIXED_TO_64, "1111 1111", op(0b100), target) ) {
+	} else if ( as_write_modrm(as, WMRM_FIXED_OPERAND_SIZE, "1111 1111", op(0b100), target, NULL) ) {
 		// Combined Volumes 1, 2ABC, 3ABC, p856:
 		// In 64-Bit Mode — The instruction’s operation size is fixed at 64 bits. If a selector points to a gate, then RIP equals
 		// the 64-bit displacement taken from gate; else RIP equals the zero-extended offset from the far pointer referenced

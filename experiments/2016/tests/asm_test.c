@@ -127,28 +127,28 @@ void test_modrm_instructions() {
 	for(size_t i = 0; i < 16; i++)
 		as_cmp(as, reg(i), imm(0x11223344));
 	
+	
 	as_jmp(as, reld(0x11223344));
 	for(size_t i = 0; i < 16; i++)
 		as_jmp(as, reg(i));
 	for(size_t i = 0; i < 16; i++)
 		as_jmp(as, memrd(reg(i), 0xbeba));
 	
-	as_jmp_cc(as, CC_OVERFLOW,         0x11223344);
-	as_jmp_cc(as, CC_NO_OVERFLOW,      0x11223344);
-	as_jmp_cc(as, CC_BELOW,            0x11223344);
-	as_jmp_cc(as, CC_ABOVE_OR_EQUAL,   0x11223344);
-	as_jmp_cc(as, CC_EQUAL,            0x11223344);
-	as_jmp_cc(as, CC_NOT_EQUAL,        0x11223344);
-	as_jmp_cc(as, CC_BELOW_OR_EQUAL,   0x11223344);
-	as_jmp_cc(as, CC_ABOVE,            0x11223344);
-	as_jmp_cc(as, CC_SIGN,             0x11223344);
-	as_jmp_cc(as, CC_NO_SIGN,          0x11223344);
-	as_jmp_cc(as, CC_PARITY_EVEN,      0x11223344);
-	as_jmp_cc(as, CC_PARITY_ODD,       0x11223344);
-	as_jmp_cc(as, CC_LESS,             0x11223344);
-	as_jmp_cc(as, CC_GREATER_OR_EQUAL, 0x11223344);
-	as_jmp_cc(as, CC_LESS_OR_EQUAL,    0x11223344);
-	as_jmp_cc(as, CC_GREATER,          0x11223344);
+	int condition_codes[] = {
+		CC_OVERFLOW, CC_NO_OVERFLOW,
+		CC_BELOW, CC_ABOVE_OR_EQUAL,
+		CC_EQUAL, CC_NOT_EQUAL,
+		CC_BELOW_OR_EQUAL, CC_ABOVE,
+		CC_SIGN, CC_NO_SIGN,
+		CC_PARITY_EVEN, CC_PARITY_ODD,
+		CC_LESS, CC_GREATER_OR_EQUAL,
+		CC_LESS_OR_EQUAL, CC_GREATER
+	};
+	
+	for(size_t i = 0; i < sizeof(condition_codes) / sizeof(condition_codes[0]); i++)
+		as_jmp_cc(as, condition_codes[i], 0x11223344);
+	for(size_t i = 0; i < sizeof(condition_codes) / sizeof(condition_codes[0]); i++)
+		as_set_cc(as, condition_codes[i], reg(i));
 	
 	as_save_code(as, "asm_instructions.raw");
 	as_destroy(as);
