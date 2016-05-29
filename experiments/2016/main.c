@@ -87,6 +87,8 @@ typedef enum { LEFT_TO_RIGHT, RIGHT_TO_LEFT } op_assoc_t;
 typedef enum {
 	OP_MUL, OP_DIV,
 	OP_ADD, OP_SUB,
+	OP_LT, OP_LE, OP_GT, OP_GE,
+	OP_EQ, OP_NEQ,
 	OP_ASSIGN
 } op_idx_t;
 // CAUTION: Operators with the same precedence need the same associativity!
@@ -97,6 +99,14 @@ struct { char* name; int precedence; op_assoc_t assoc; } operators[] = {
 	
 	[OP_ADD]    = { "+",  70, LEFT_TO_RIGHT },
 	[OP_SUB]    = { "-",  70, LEFT_TO_RIGHT },
+	
+	[OP_LT]     = { "<",  50, LEFT_TO_RIGHT },
+	[OP_LE]     = { "<=", 50, LEFT_TO_RIGHT },
+	[OP_GT]     = { ">",  50, LEFT_TO_RIGHT },
+	[OP_GE]     = { ">=", 50, LEFT_TO_RIGHT },
+	
+	[OP_EQ]     = { "==", 40, LEFT_TO_RIGHT },
+	[OP_NEQ]    = { "!=", 40, LEFT_TO_RIGHT },
 	
 	[OP_ASSIGN] = { "=",   0, RIGHT_TO_LEFT },
 };
@@ -129,7 +139,7 @@ node_p expand_uops(node_p node, uint32_t level, uint32_t flags) {
 			// Find operator of the current op_slot node based on the IDs name
 			ssize_t op_idx = -1;
 			for(size_t i = 0; i < sizeof(operators) / sizeof(operators[0]); i++) {
-				if ( strncmp(operators[i].name, op_slot->id.name.ptr, op_slot->id.name.len) == 0 ) {
+				if ( strncmp(operators[i].name, op_slot->id.name.ptr, op_slot->id.name.len) == 0 && (int)strlen(operators[i].name) == op_slot->id.name.len ) {
 					op_idx = i;
 					break;
 				}
@@ -253,6 +263,7 @@ raa_t compile_module(node_p node, compiler_ctx_p ctx);
 raa_t compile_scope(node_p node, compiler_ctx_p ctx);
 raa_t compile_syscall(node_p node, compiler_ctx_p ctx);
 raa_t compile_var(node_p node, compiler_ctx_p ctx);
+raa_t compile_if(node_p node, compiler_ctx_p ctx);
 raa_t compile_op(node_p node, compiler_ctx_p ctx, int8_t req_reg);
 raa_t compile_intl(node_p node, compiler_ctx_p ctx, int8_t req_reg);
 raa_t compile_strl(node_p node, compiler_ctx_p ctx, int8_t req_reg);
@@ -287,6 +298,8 @@ raa_t compile_node(node_p node, compiler_ctx_p ctx, int8_t requested_result_regi
 			return compile_syscall(node, ctx);
 		case NT_VAR:
 			return compile_var(node, ctx);
+		case NT_IF:
+			return compile_if(node, ctx);
 		case NT_INTL:
 			return compile_intl(node, ctx, requested_result_register);
 		case NT_STRL:
@@ -392,60 +405,113 @@ raa_t compile_var(node_p node, compiler_ctx_p ctx) {
 	return (raa_t){ -1, -1 };
 }
 
+raa_t compile_if(node_p node, compiler_ctx_p ctx) {
+	raa_t a = compile_node(node->if_stmt.cond, ctx, -1);
+	as_cmp(ctx->as, reg(a.reg_index), imm(0));
+	// freeing might add a MOV here to restore the previous value of a register
+	// but a MOV doesn't effect the Flags. So it's safe to use here.
+	ra_free_reg(ctx->ra, ctx->as, a);
+	// We jump to the false case if the condition is equal to 0 (false)
+	asm_jump_slot_t to_false_case = as_jmp_cc(ctx->as, CC_EQUAL, 0);
+	
+	a = compile_node(node->if_stmt.true_case, ctx, -1);
+	ra_free_reg(ctx->ra, ctx->as, a);
+	asm_jump_slot_t to_end = as_jmp(ctx->as, reld(0));
+	
+	as_mark_jmp_slot_target(ctx->as, to_false_case);
+	a = compile_node(node->if_stmt.false_case, ctx, -1);
+	ra_free_reg(ctx->ra, ctx->as, a);
+	
+	as_mark_jmp_slot_target(ctx->as, to_end);
+	return (raa_t){ -1, -1 };
+}
+
 
 raa_t compile_op(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 	size_t op = node->op.idx;
 	node_p a = node->op.a, b = node->op.b;
 	
-	if (op == OP_ADD || op == OP_SUB) {
-		raa_t a1 = compile_node(a, ctx, req_reg);
-		raa_t a2 = compile_node(b, ctx, -1);
-		
-		switch(op) {
-			case OP_ADD:  as_add(ctx->as, reg(a1.reg_index), reg(a2.reg_index));  break;
-			case OP_SUB:  as_sub(ctx->as, reg(a1.reg_index), reg(a2.reg_index));  break;
-		}
-		
-		ra_free_reg(ctx->ra, ctx->as, a2);
-		return a1;
-	} else if (op == OP_MUL || op == OP_DIV) {
-		// reserve RDX since MUL and DIV overwrite it
-		raa_t a1 = ra_alloc_reg(ctx->ra, ctx->as, RDX.reg);
-		raa_t a2 = compile_node(a, ctx, RAX.reg);
-		raa_t a3 = compile_node(b, ctx, -1);
-		
-		switch(op) {
-			case OP_MUL:  as_mul(ctx->as, reg(a3.reg_index));  break;
-			case OP_DIV:  as_div(ctx->as, reg(a3.reg_index));  break;
-		}
-		
-		ra_free_reg(ctx->ra, ctx->as, a1);
-		ra_free_reg(ctx->ra, ctx->as, a3);
-		
-		if (req_reg != RAX.reg && req_reg != -1) {
-			raa_t a4 = ra_alloc_reg(ctx->ra, ctx->as, req_reg);
-			as_mov(ctx->as, reg(req_reg), RAX);
+	switch(op) {
+		case OP_ADD: case OP_SUB:
+		{
+			raa_t a1 = compile_node(a, ctx, req_reg);
+			raa_t a2 = compile_node(b, ctx, -1);
+			
+			switch(op) {
+				case OP_ADD:  as_add(ctx->as, reg(a1.reg_index), reg(a2.reg_index));  break;
+				case OP_SUB:  as_sub(ctx->as, reg(a1.reg_index), reg(a2.reg_index));  break;
+			}
+			
 			ra_free_reg(ctx->ra, ctx->as, a2);
-			return a4;
-		} else {
-			return a2;
-		}
-	} else if (op == OP_ASSIGN) {
-		if (a->type != NT_ID) {
-			fprintf(stderr, "compile_op(): right side of assigment has to be an ID for now!\n");
-			abort();
+			return a1;
 		}
 		
-		char* terminated_name = strndup(a->id.name.ptr, a->id.name.len);
+		case OP_MUL: case OP_DIV:
+		{
+			// reserve RDX since MUL and DIV overwrite it
+			raa_t a1 = ra_alloc_reg(ctx->ra, ctx->as, RDX.reg);
+			raa_t a2 = compile_node(a, ctx, RAX.reg);
+			raa_t a3 = compile_node(b, ctx, -1);
+			
+			switch(op) {
+				case OP_MUL:  as_mul(ctx->as, reg(a3.reg_index));  break;
+				case OP_DIV:  as_div(ctx->as, reg(a3.reg_index));  break;
+			}
+			
+			ra_free_reg(ctx->ra, ctx->as, a1);
+			ra_free_reg(ctx->ra, ctx->as, a3);
+			
+			if (req_reg != RAX.reg && req_reg != -1) {
+				raa_t a4 = ra_alloc_reg(ctx->ra, ctx->as, req_reg);
+				as_mov(ctx->as, reg(req_reg), RAX);
+				ra_free_reg(ctx->ra, ctx->as, a2);
+				return a4;
+			} else {
+				return a2;
+			}
+		}
 		
-		size_t stack_offset = scope_get(ctx->scope, terminated_name);
-		raa_t alloc = compile_node(node->var.value, ctx, -1);
-		as_mov(ctx->as, memrd(RSP, stack_offset), reg(alloc.reg_index));
-		// keep value as result value of this operation
-		//ra_free_reg(ctx->ra, ctx->as, alloc);
+		case OP_LT: case OP_LE: case OP_GT: case OP_GE:
+		case OP_EQ: case OP_NEQ:
+		{
+			uint8_t condition_code;
+			switch(op) {
+				case OP_LT:  condition_code = CC_LESS;             break;
+				case OP_LE:  condition_code = CC_LESS_OR_EQUAL;    break;
+				case OP_GT:  condition_code = CC_GREATER;          break;
+				case OP_GE:  condition_code = CC_GREATER_OR_EQUAL; break;
+				case OP_EQ:  condition_code = CC_EQUAL;            break;
+				case OP_NEQ: condition_code = CC_NOT_EQUAL;        break;
+				default:     abort();
+			}
+			
+			raa_t a1 = compile_node(a, ctx, req_reg);
+			raa_t a2 = compile_node(b, ctx, -1);
+			as_cmp(ctx->as, reg(a1.reg_index), reg(a2.reg_index));
+			ra_free_reg(ctx->ra, ctx->as, a2);
+			
+			as_set_cc(ctx->as, condition_code, reg(a1.reg_index));
+			return a1;
+		}
 		
-		free(terminated_name);
-		return alloc;
+		case OP_ASSIGN:
+		{
+			if (a->type != NT_ID) {
+				fprintf(stderr, "compile_op(): right side of assigment has to be an ID for now!\n");
+				abort();
+			}
+			
+			char* terminated_name = strndup(a->id.name.ptr, a->id.name.len);
+			
+			size_t stack_offset = scope_get(ctx->scope, terminated_name);
+			raa_t alloc = compile_node(node->var.value, ctx, -1);
+			as_mov(ctx->as, memrd(RSP, stack_offset), reg(alloc.reg_index));
+			// keep value as result value of this operation
+			//ra_free_reg(ctx->ra, ctx->as, alloc);
+			
+			free(terminated_name);
+			return alloc;
+		}
 	}
 	
 	fprintf(stderr, "compile_op(): unknown op idx: %zu!\n", op);

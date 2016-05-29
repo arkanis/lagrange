@@ -140,6 +140,7 @@ static bool is_stmt_start(token_type_t type) {
 		case T_SYSCALL:
 		case T_VAR:
 		case T_CBO:
+		case T_IF:
 			return true;
 		default:
 			return is_expr_start(type);
@@ -206,6 +207,30 @@ node_p parse_stmt(parser_p parser) {
 			while ( is_stmt_start(peek_type(parser)) )
 				node_append(stmt, &stmt->scope.stmts, parse_stmt(parser) );
 			consume_type(parser, T_CBC);
+			
+			return stmt;
+		case T_IF:
+			// "if" expr ( eos | "then" ) stmt ( "else" stmt )?
+			stmt = node_alloc(NT_IF);
+			
+			{
+				node_p cond = parse_expr(parser);
+				node_set(stmt, &stmt->if_stmt.cond, cond);
+				
+				if ( peek_type_with_eos(parser) == T_THEN )
+					consume_type(parser, T_THEN);
+				else
+					parse_eos(parser);
+				
+				node_p true_case = parse_stmt(parser);
+				node_set(stmt, &stmt->if_stmt.true_case, true_case);
+				
+				if ( peek_type(parser) == T_ELSE ) {
+					consume_type(parser, T_ELSE);
+					node_p false_case = parse_stmt(parser);
+					node_set(stmt, &stmt->if_stmt.false_case, false_case);
+				}
+			}
 			
 			return stmt;
 		

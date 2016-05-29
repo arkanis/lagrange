@@ -53,6 +53,7 @@ typedef enum {
 	
 	NT_SYSCALL,
 	NT_VAR,
+	NT_IF,
 	
 	NT_ID,
 	NT_INTL,
@@ -89,6 +90,11 @@ struct node_s {
 			str_t name;
 			node_p value;  // Can be NULL in case of declaration only
 		} var;
+		
+		struct {
+			node_p cond, true_case, false_case;  // false_case can be NULL if there is no else
+		} if_stmt;
+		
 		
 		struct {
 			str_t name;
@@ -149,6 +155,15 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 		"var", (member_spec_t[]){
 			{ MT_STR, offsetof(node_t, var.name), "name" },
 			{ MT_NODE, offsetof(node_t, var.value), "value" },
+			{ 0 }
+		}
+	},
+	
+	[ NT_IF ] = &(node_spec_t){
+		"if", (member_spec_t[]){
+			{ MT_NODE, offsetof(node_t, if_stmt.cond),       "cond" },
+			{ MT_NODE, offsetof(node_t, if_stmt.true_case),  "true_case" },
+			{ MT_NODE, offsetof(node_t, if_stmt.false_case), "false_case" },
 			{ 0 }
 		}
 	},

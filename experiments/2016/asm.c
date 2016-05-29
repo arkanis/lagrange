@@ -504,6 +504,7 @@ as_call(as, addr_mem(0x11223344));
 **/
 
 #define WMRM_FIXED_OPERAND_SIZE (1 << 0)
+#define WMRM_FORCE_REX          (1 << 1)
 
 bool as_write_modrm(asm_p as, uint32_t flags, const char* format, asm_arg_t dest, asm_arg_t src, asm_var_t vars[]) {
 	// Variables for parts of the opcode format:
@@ -664,8 +665,10 @@ bool as_write_modrm(asm_p as, uint32_t flags, const char* format, asm_arg_t dest
 	// 66H prefix
 	if (prefix_66h)
 		as_write(as, "0110 0110");
-	// REX byte (if necessary)
-	if ( rex_W == 1 || rex_R == 1 || rex_X == 1 || rex_B == 1 )
+	// REX byte (if necessary). If we want to address some byte registers we
+	// need a REX byte even if W, R, X and B bits are set to 0. For now that's
+	// what the WMRM_FORCE_REX flag is for.
+	if ( (rex_W == 1 || rex_R == 1 || rex_X == 1 || rex_B == 1) || (flags & WMRM_FORCE_REX) )
 		as_write(as, "0100 WRXB", rex_W, rex_R, rex_X, rex_B);
 	// Opcode byte(s)
 	as_write_with_vars(as, format, all_vars);
@@ -764,10 +767,15 @@ void as_cmp(asm_p as, asm_arg_t arg1, asm_arg_t arg2) {
 
 void as_set_cc(asm_p as, uint8_t condition_code, asm_arg_t dest) {
 	// Volume 2C - Instruction Set Reference, p104
+	// 
 	// Combined Volumes 1, 2ABC, 3ABC, p1308
 	// In IA-64 mode, the operand size is fixed at 8 bits. Use of REX prefix enable uniform addressing to additional byte
-	// registers. Otherwise, this instruction’s operation is the same as in legacy mode and compatibility mode.	as_write_modrm(as, WMRM_FIXED_OPERAND_SIZE, "")
-	bool result = as_write_modrm(as, WMRM_FIXED_OPERAND_SIZE, "0000 1111 : 1001 tttt", op(0b000), dest, (asm_var_t[]){
+	// registers. Otherwise, this instruction’s operation is the same as in legacy mode and compatibility mode.
+	// 
+	// The byte versions of RSI, RDI, RBP and RSP (SIL, DIL, BPL, SPL) can only
+	// be encoded by an empty REX byte. We we omit this we get AH, BH, CH and DH.
+	// So for now we force the precense of a REX byte with a flag.
+	bool result = as_write_modrm(as, WMRM_FIXED_OPERAND_SIZE | WMRM_FORCE_REX, "0000 1111 : 1001 tttt", op(0b000), dest, (asm_var_t[]){
 		{ "tttt", condition_code },
 		{ NULL, 0 }
 	});

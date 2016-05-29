@@ -51,6 +51,7 @@ var z = +17
 syscall 60, 0
 */
 
+/*
 // scopes
 var x = 1
 {
@@ -61,3 +62,18 @@ var x = 1
 		syscall 60, y
 	}
 }
+*/
+
+/*
+// comparison operators
+var x = 17
+syscall 60, x <= 16
+*/
+
+// if
+var x = 9
+if x < 10
+	x = 100
+else
+	x = 2
+syscall 60, x
