@@ -1,0 +1,162 @@
+# ToDo
+
+- Add while
+- Write test cases for assembler, parser and compiler (by executing external programs)
+- Fix mul/spilling bug
+- Add scope node, as extra struct, in a way that it can be overlayed into function, if, while, etc. nodes (because they also open a new scope)
+	- Nope, the scope node only reflects the fact that the user opened a new scope
+	  somewhere. It doesn't manage it or contains all symbols in the scope. That job
+	  is done by the symbol tables that are filled with definitions extract out of
+	  the AST.
+- Refactor compiler stuff into compiler.c
+- Proper error reporting in parser
+
+
+# Nice to have
+
+- Use central tables in lexer: one to map keywords between tokens and one for simple tokens and their names.
+
+
+# Things to think about
+
+- Think about user defined unary operators... really needed?
+	- For primary expressions it's the same as a funciton call without parenthisis and one argument:
+		func arg  // func can be an expression with dereferences, calls, etc.
+		not x     // not can only be an ID... at least when operators can't be namespaced...
+		ID ID
+	- Difference can only be found when first id is resolved
+- Can operators be namespaced? e.g. a numpy.+ b
+	- Nice to resolve conflicts
+	- But probably makes grammar a nightmare since we have to accept all operators as IDs, too
+
+
+# Source code structure
+
+ast.h
+	Big union with node definitions
+	Node spec structures
+	Compile function declarations
+
+ast.c
+	AST print function
+	AST pass function
+
+compiler.c
+	Compiler passes (e.g. uops reorder pass)
+	Compile function definitions
+
+register_allocator
+	assembler
+parser
+	lexer
+
+
+# Grammar history
+
+## Basic start grammar
+
+stmts = "syscall" ( expr ["," expr] )? eos
+        expr eos
+expr_wto = ID
+           INTL
+           STRL
+           "(" expr ")"
+	expr_wto means "expression without trailing operators"
+expr = expr_wto [ ID expr_wto ]
+
+
+## Added assignment "operator"
+
+stmts = "syscall" ( expr ["," expr] )? eos
+        expr eos
+expr_wto = ID
+           INTL
+           STRL
+           "(" expr ")"
+expr = expr_wto [ (ID | "=") expr_wto ]
+	ID is an operator, "=" is translated to the ID(=)
+
+
+## Added variables
+
+stmts = "syscall" ( expr ["," expr] )? eos
+        "var" ID ( "=" expr )? eos
+        expr eos
+expr_wto = ID
+           INTL
+           STRL
+           "(" expr ")"
+expr = expr_wto [ (ID | ASSIGN) expr_wto ]
+
+Scope:
+	parent-scope
+	hashtable: var-name → RSP-offset
+
+Scope node:
+	For now only the module is a scope node
+	recurse in: create new scope
+	recurse out: delete scope
+
+
+## Operators
+
+stmts = "syscall" ( expr ["," expr] )? eos
+        "var" ID ( "=" expr )? eos
+        expr eos
+expr_wto  = ID
+            INTL
+            STRL
+            "(" expr ")"
+            unary_op expr_wto
+expr      = expr_wto [ binary_op expr_wto ]
+unary_op  = + - not ~
+binary_op = ID . * / %  + - << >> < <= > >= == != & ^ | and or = *= /= %= += -= <<= >>= &= ^= |=
+
+
+## Scope nodes
+
+stmts = "syscall" ( expr ["," expr] )? eos
+        "var" ID ( "=" expr )? eos
+        "{" [ stmts ] "}"  // no eos needed
+        expr eos
+expr_wto  = ID
+            INTL
+            STRL
+            "(" expr ")"
+            unary_op expr_wto
+expr      = expr_wto [ binary_op expr_wto ]
+unary_op  = + - not ~
+binary_op = ID . * / %  + - << >> < <= > >= == != & ^ | and or = *= /= %= += -= <<= >>= &= ^= |=
+
+
+## if statement
+
+stmt = "syscall" ( expr ["," expr] )? eos
+       "var" ID ( "=" expr )? eos
+       "{" [ stmt ] "}"  // no eos needed
+       "if" expr ( eos | "then" ) stmt ( "else" stmt )?  // eos already part of trailing stmt
+       expr eos
+expr_wto  = ID
+            INTL
+            STRL
+            "(" expr ")"
+            unary_op expr_wto
+expr      = expr_wto [ binary_op expr_wto ]
+unary_op  = + - not ~
+binary_op = ID . * / %  + - << >> < <= > >= == != & ^ | and or = *= /= %= += -= <<= >>= &= ^= |=
+
+
+
+# Further ideas
+
+## Index access "operator"
+
+expr_wb = "[" expr ["," expr] "]"
+
+Same as function call but with different parenthesis
+
+## Collections
+
+word[] array → dynamic array with word elements
+word[7] array → static array with word elements
+word[string] array → hash table with string keys and word values
