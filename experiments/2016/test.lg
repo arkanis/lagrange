@@ -70,6 +70,7 @@ var x = 17
 syscall 60, x <= 16
 */
 
+/*
 // if
 var x = 9
 if x < 10
@@ -77,3 +78,13 @@ if x < 10
 else
 	x = 2
 syscall 60, x
+*/
+
+// while
+var x = 10
+var y = 0
+while x < 100 do {
+	x = x + 3
+	y = y + 1
+}
+syscall 60, y

@@ -1,6 +1,7 @@
 # ToDo
 
 - Add while
+- Reserve -> and <- operators
 - Write test cases for assembler, parser and compiler (by executing external programs)
 - Fix mul/spilling bug
 - Add scope node, as extra struct, in a way that it can be overlayed into function, if, while, etc. nodes (because they also open a new scope)
@@ -145,6 +146,25 @@ expr      = expr_wto [ binary_op expr_wto ]
 unary_op  = + - not ~
 binary_op = ID . * / %  + - << >> < <= > >= == != & ^ | and or = *= /= %= += -= <<= >>= &= ^= |=
 
+
+## while statement
+
+stmt = "syscall" ( expr ["," expr] )? eos
+       "var" ID ( "=" expr )? eos
+       "{" [ stmt ] "}"  // no eos needed
+       "if" expr ( eos | "then" ) stmt ( "else" stmt )?
+       "while" expr ( eos | "do" ) stmt
+       expr eos
+expr_wto  = ID
+            INTL
+            STRL
+            "(" expr ")"
+            unary_op expr_wto
+expr      = expr_wto [ binary_op expr_wto ]
+unary_op  = + - not ~
+binary_op = ID . * / %  + - << >> < <= > >= == != & ^ | and or = *= /= %= += -= <<= >>= &= ^= |=
+
+Just use rudimentary syntax because it will be replaced by function call syntax.
 
 
 # Further ideas

@@ -264,6 +264,7 @@ raa_t compile_scope(node_p node, compiler_ctx_p ctx);
 raa_t compile_syscall(node_p node, compiler_ctx_p ctx);
 raa_t compile_var(node_p node, compiler_ctx_p ctx);
 raa_t compile_if(node_p node, compiler_ctx_p ctx);
+raa_t compile_while(node_p node, compiler_ctx_p ctx);
 raa_t compile_op(node_p node, compiler_ctx_p ctx, int8_t req_reg);
 raa_t compile_intl(node_p node, compiler_ctx_p ctx, int8_t req_reg);
 raa_t compile_strl(node_p node, compiler_ctx_p ctx, int8_t req_reg);
@@ -300,6 +301,8 @@ raa_t compile_node(node_p node, compiler_ctx_p ctx, int8_t requested_result_regi
 			return compile_var(node, ctx);
 		case NT_IF:
 			return compile_if(node, ctx);
+		case NT_WHILE:
+			return compile_while(node, ctx);
 		case NT_INTL:
 			return compile_intl(node, ctx, requested_result_register);
 		case NT_STRL:
@@ -421,6 +424,29 @@ raa_t compile_if(node_p node, compiler_ctx_p ctx) {
 	as_mark_jmp_slot_target(ctx->as, to_false_case);
 	a = compile_node(node->if_stmt.false_case, ctx, -1);
 	ra_free_reg(ctx->ra, ctx->as, a);
+	
+	as_mark_jmp_slot_target(ctx->as, to_end);
+	return (raa_t){ -1, -1 };
+}
+
+raa_t compile_while(node_p node, compiler_ctx_p ctx) {
+	raa_t a;
+	
+	// Compile condition
+	size_t cond_target = as_target(ctx->as);
+	a = compile_node(node->while_stmt.cond, ctx, -1);
+	as_cmp(ctx->as, reg(a.reg_index), imm(0));
+	// freeing might add a MOV here to restore the previous value of a register
+	// but a MOV doesn't effect the Flags. So it's safe to use here.
+	ra_free_reg(ctx->ra, ctx->as, a);
+	// We jump to the end of the loop if the condition is equal to 0 (false)
+	asm_jump_slot_t to_end = as_jmp_cc(ctx->as, CC_EQUAL, 0);
+	
+	// Compile body, then jump back to condition
+	a = compile_node(node->while_stmt.body, ctx, -1);
+	ra_free_reg(ctx->ra, ctx->as, a);
+	asm_jump_slot_t to_cond = as_jmp(ctx->as, reld(0));
+	as_set_jmp_slot_target(ctx->as, to_cond, cond_target);
 	
 	as_mark_jmp_slot_target(ctx->as, to_end);
 	return (raa_t){ -1, -1 };

@@ -131,3 +131,6 @@ void as_set_cc(asm_p as, uint8_t condition_code, asm_arg_t dest);
 asm_jump_slot_t as_jmp(asm_p as, asm_arg_t target);
 asm_jump_slot_t as_jmp_cc(asm_p as, uint8_t condition_code, int32_t displacement);
 void as_mark_jmp_slot_target(asm_p as, asm_jump_slot_t jump_slot);
+
+size_t as_target(asm_p as);
+void   as_set_jmp_slot_target(asm_p as, asm_jump_slot_t jump_slot, size_t target);

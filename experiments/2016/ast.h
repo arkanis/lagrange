@@ -54,6 +54,7 @@ typedef enum {
 	NT_SYSCALL,
 	NT_VAR,
 	NT_IF,
+	NT_WHILE,
 	
 	NT_ID,
 	NT_INTL,
@@ -94,6 +95,10 @@ struct node_s {
 		struct {
 			node_p cond, true_case, false_case;  // false_case can be NULL if there is no else
 		} if_stmt;
+		
+		struct {
+			node_p cond, body;
+		} while_stmt;
 		
 		
 		struct {
@@ -164,6 +169,14 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 			{ MT_NODE, offsetof(node_t, if_stmt.cond),       "cond" },
 			{ MT_NODE, offsetof(node_t, if_stmt.true_case),  "true_case" },
 			{ MT_NODE, offsetof(node_t, if_stmt.false_case), "false_case" },
+			{ 0 }
+		}
+	},
+	
+	[ NT_WHILE ] = &(node_spec_t){
+		"while", (member_spec_t[]){
+			{ MT_NODE, offsetof(node_t, while_stmt.cond), "cond" },
+			{ MT_NODE, offsetof(node_t, while_stmt.body), "body" },
 			{ 0 }
 		}
 	},

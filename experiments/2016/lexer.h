@@ -44,6 +44,7 @@ typedef enum {
 	T_SYSCALL,
 	T_VAR,
 	T_IF, T_THEN, T_ELSE,
+	T_WHILE, T_DO,
 	
 	T_ERROR,
 	T_EOF

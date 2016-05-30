@@ -815,3 +815,13 @@ void as_mark_jmp_slot_target(asm_p as, asm_jump_slot_t jump_slot) {
 	int32_t* instr_disp_ptr = (int32_t*)(as->code_ptr + jump_slot.disp_offset);
 	*instr_disp_ptr = displacement;
 }
+
+size_t as_target(asm_p as) {
+	return as->code_len;
+}
+
+void as_set_jmp_slot_target(asm_p as, asm_jump_slot_t jump_slot, size_t target) {
+	int32_t displacement = (ssize_t)target - (ssize_t)jump_slot.base;
+	int32_t* instr_disp_ptr = (int32_t*)(as->code_ptr + jump_slot.disp_offset);
+	*instr_disp_ptr = displacement;
+}

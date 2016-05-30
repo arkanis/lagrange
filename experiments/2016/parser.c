@@ -141,6 +141,7 @@ static bool is_stmt_start(token_type_t type) {
 		case T_VAR:
 		case T_CBO:
 		case T_IF:
+		case T_WHILE:
 			return true;
 		default:
 			return is_expr_start(type);
@@ -230,6 +231,24 @@ node_p parse_stmt(parser_p parser) {
 					node_p false_case = parse_stmt(parser);
 					node_set(stmt, &stmt->if_stmt.false_case, false_case);
 				}
+			}
+			
+			return stmt;
+		case T_WHILE:
+			// "while" expr ( eos | "do" ) stmt
+			stmt = node_alloc(NT_WHILE);
+			
+			{
+				node_p cond = parse_expr(parser);
+				node_set(stmt, &stmt->while_stmt.cond, cond);
+				
+				if ( peek_type_with_eos(parser) == T_DO )
+					consume_type(parser, T_DO);
+				else
+					parse_eos(parser);
+				
+				node_p body = parse_stmt(parser);
+				node_set(stmt, &stmt->while_stmt.body, body);
 			}
 			
 			return stmt;

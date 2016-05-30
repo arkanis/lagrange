@@ -109,6 +109,8 @@ void token_print(FILE* stream, token_p token, uint32_t flags) {
 			case T_IF:      fprintf(stream, "if");       break;
 			case T_THEN:    fprintf(stream, "then");     break;
 			case T_ELSE:    fprintf(stream, "else");     break;
+			case T_WHILE:   fprintf(stream, "while");    break;
+			case T_DO:      fprintf(stream, "do");       break;
 			
 			case T_ERROR:   fprintf(stream, "error(%.*s)", token->str_val.len, token->str_val.ptr);  break;
 			case T_EOF:     fprintf(stream, "EOF");                                                  break;
@@ -373,6 +375,8 @@ static struct { const char* keyword; token_type_t type; } keywords[] = {
 	{ "if",   T_IF },
 	{ "then", T_THEN },
 	{ "else", T_ELSE },
+	{ "while", T_WHILE },
+	{ "do", T_DO },
 };
 
 static token_t next_token(lexer_p lexer) {
