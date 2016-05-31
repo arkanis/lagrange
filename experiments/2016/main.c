@@ -260,6 +260,7 @@ typedef struct {
 
 raa_t compile_node(node_p node, compiler_ctx_p ctx, int8_t requested_result_register);
 raa_t compile_module(node_p node, compiler_ctx_p ctx);
+raa_t compile_func(node_p node, compiler_ctx_p ctx);
 raa_t compile_scope(node_p node, compiler_ctx_p ctx);
 raa_t compile_syscall(node_p node, compiler_ctx_p ctx);
 raa_t compile_var(node_p node, compiler_ctx_p ctx);
@@ -293,6 +294,8 @@ raa_t compile_node(node_p node, compiler_ctx_p ctx, int8_t requested_result_regi
 	switch(node->type) {
 		case NT_MODULE:
 			return compile_module(node, ctx);
+		case NT_FUNC:
+			return compile_func(node, ctx);
 		case NT_SCOPE:
 			return compile_scope(node, ctx);
 		case NT_SYSCALL:
@@ -315,7 +318,10 @@ raa_t compile_node(node_p node, compiler_ctx_p ctx, int8_t requested_result_regi
 		case NT_UOPS:
 			fprintf(stderr, "compile_node(): uops nodes have to be reordered to op nodes before compilation!\n");
 			abort();
-			
+		case NT_ARG:
+			fprintf(stderr, "compile_node(): arg nodes should be handled by their parent func node and not compiled separatly!\n");
+			abort();
+		
 		case NT_UNARY_OP:
 			fprintf(stderr, "compile_node(): TODO\n");
 			abort();
@@ -325,12 +331,29 @@ raa_t compile_node(node_p node, compiler_ctx_p ctx, int8_t requested_result_regi
 }
 
 raa_t compile_module(node_p node, compiler_ctx_p ctx) {
+	// For now just compile all functions. The first one will be the start
+	// function... at least until we have proper function prologs and epilogs
+	// and an actual main function that takes the stuff from the stack (passed
+	// by the kernel).
+	for(size_t i = 0; i < node->module.defs.len; i++) {
+		raa_t allocation = compile_node(node->module.defs.ptr[i], ctx, -1);
+		// Just free in case something comes back for whatever reason
+		ra_free_reg(ctx->ra, ctx->as, allocation);
+	}
+	
+	return (raa_t){ -1, -1 };
+}
+
+raa_t compile_func(node_p node, compiler_ctx_p ctx) {
+	// in and out args go unused for now until we have proper prologs and
+	// epilogs and actual function calling.
+	
 	scope_t scope;
 	scope_new(&scope, ctx->scope);
 	ctx->scope = &scope;
 	
-	for(size_t i = 0; i < node->module.stmts.len; i++) {
-		raa_t allocation = compile_node(node->module.stmts.ptr[i], ctx, -1);
+	for(size_t i = 0; i < node->func.body.len; i++) {
+		raa_t allocation = compile_node(node->func.body.ptr[i], ctx, -1);
 		// Free allocations in case the statement is an expr (syscall and var
 		// don't return an allocated register)
 		ra_free_reg(ctx->ra, ctx->as, allocation);

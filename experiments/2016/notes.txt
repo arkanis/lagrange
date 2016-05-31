@@ -1,6 +1,6 @@
 # ToDo
 
-- Add while
+- Add function definitions
 - Reserve -> and <- operators
 - Write test cases for assembler, parser and compiler (by executing external programs)
 - Fix mul/spilling bug
@@ -16,6 +16,11 @@
 # Nice to have
 
 - Use central tables in lexer: one to map keywords between tokens and one for simple tokens and their names.
+- A try(token_type_t) function in the parser instead of peek_type(). When it's possible to use this everywhere the parser can automatically present the user a list of expected tokens at the position the parser failed:
+	- Every time try() is called it remembers the expected token.
+	- When a token is consumed the list is cleared.
+	- When the parser failes up the list contains all tried tokens at the current position.
+	- This is what we want to show the user in the error message. :)
 
 
 # Things to think about
@@ -165,6 +170,37 @@ unary_op  = + - not ~
 binary_op = ID . * / %  + - << >> < <= > >= == != & ^ | and or = *= /= %= += -= <<= >>= &= ^= |=
 
 Just use rudimentary syntax because it will be replaced by function call syntax.
+
+
+## function definitions
+
+module  = [ def ]
+def     = "func" ID [ def-mod ] "{" [ stmt ] "}"
+def-mod = ( "in" | "out" )  "(" ID ID? [ "," ID ID? ] ")"
+stmt = "syscall" ( expr ["," expr] )? eos
+       "var" ID ( "=" expr )? eos
+       "{" [ stmt ] "}"  // no eos needed
+       "if" expr ( eos | "then" ) stmt ( "else" stmt )?
+       "while" expr ( eos | "do" ) stmt
+       expr eos
+expr_wto  = ID
+            INTL
+            STRL
+            "(" expr ")"
+            unary_op expr_wto
+expr      = expr_wto [ binary_op expr_wto ]
+unary_op  = + - not ~
+binary_op = ID . * / %  + - << >> < <= > >= == != & ^ | and or = *= /= %= += -= <<= >>= &= ^= |=
+
+The argument type is an ID for now because expr can contain operators. "int argc"
+is then parsed as the ID "int" followed by the operator "argc" and then expects
+another expr as second operand.
+
+Therefore type expressions can't contain user defined operators. As soon as an ID
+can be parsed as operator (doesn't matter if binary or unary) this problem will
+occur.
+
+Next stop is to design a type-expr in the draft syntax and use this instead of IDs.
 
 
 # Further ideas

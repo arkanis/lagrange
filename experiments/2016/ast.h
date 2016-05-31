@@ -49,6 +49,8 @@ typedef struct {
 
 typedef enum {
 	NT_MODULE,
+	NT_FUNC,
+	NT_ARG,
 	NT_SCOPE,
 	
 	NT_SYSCALL,
@@ -76,8 +78,20 @@ struct node_s {
 	
 	union {
 		struct {
-			node_list_t stmts;
+			node_list_t defs;
 		} module;
+		
+		struct {
+			str_t name;
+			node_list_t in, out;
+			node_list_t body;
+		} func;
+		
+		struct {
+			//node_p type;
+			str_t type;
+			str_t name;  // Can be 0, NULL in case the arg is unnamed
+		} arg;
 		
 		struct {
 			node_list_t stmts;
@@ -137,7 +151,26 @@ struct node_s {
 __attribute__ ((weak)) node_spec_p node_specs[] = {
 	[ NT_MODULE ] = &(node_spec_t){
 		"module", (member_spec_t[]){
-			{ MT_NODE_LIST, offsetof(node_t, module.stmts), "stmts" },
+			{ MT_NODE_LIST, offsetof(node_t, module.defs), "defs" },
+			{ 0 }
+		}
+	},
+	
+	[ NT_FUNC ] = &(node_spec_t){
+		"func", (member_spec_t[]){
+			{ MT_STR,       offsetof(node_t, func.name), "name" },
+			{ MT_NODE_LIST, offsetof(node_t, func.in),   "in" },
+			{ MT_NODE_LIST, offsetof(node_t, func.out),  "out" },
+			{ MT_NODE_LIST, offsetof(node_t, func.body), "body" },
+			{ 0 }
+		}
+	},
+	
+	[ NT_ARG ] = &(node_spec_t){
+		"arg", (member_spec_t[]){
+			{ MT_STR,  offsetof(node_t, arg.name), "name" },
+			//{ MT_NODE, offsetof(node_t, arg.type), "type" },
+			{ MT_STR,  offsetof(node_t, arg.type), "type" },
 			{ 0 }
 		}
 	},
@@ -158,7 +191,7 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 	
 	[ NT_VAR ] = &(node_spec_t){
 		"var", (member_spec_t[]){
-			{ MT_STR, offsetof(node_t, var.name), "name" },
+			{ MT_STR,  offsetof(node_t, var.name), "name" },
 			{ MT_NODE, offsetof(node_t, var.value), "value" },
 			{ 0 }
 		}

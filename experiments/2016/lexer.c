@@ -7,6 +7,25 @@
 #include "lexer.h"
 
 
+static struct { const char* keyword; token_type_t type; } keywords[] = {
+	{ "or", T_OR },
+	{ "and", T_AND },
+	{ "not", T_NOT },
+	
+	{ "syscall", T_SYSCALL },
+	{ "var",   T_VAR },
+	{ "if",    T_IF },
+	{ "then",  T_THEN },
+	{ "else",  T_ELSE },
+	{ "while", T_WHILE },
+	{ "do",    T_DO },
+	
+	{ "func", T_FUNC },
+	{ "in",   T_IN },
+	{ "out",  T_OUT },
+};
+
+
 //
 // Token printing functions
 //
@@ -101,16 +120,19 @@ void token_print(FILE* stream, token_p token, uint32_t flags) {
 			case T_PERIOD: fprintf(stream, "\".\"");  break;
 			case T_COMPL:  fprintf(stream, "\"~\"");  break;
 			
-			case T_NOT:     fprintf(stream, "not");      break;
-			case T_AND:     fprintf(stream, "and");      break;
-			case T_OR:      fprintf(stream, "or");       break;
-			case T_SYSCALL: fprintf(stream, "syscall");  break;
-			case T_VAR:     fprintf(stream, "var");      break;
-			case T_IF:      fprintf(stream, "if");       break;
-			case T_THEN:    fprintf(stream, "then");     break;
-			case T_ELSE:    fprintf(stream, "else");     break;
-			case T_WHILE:   fprintf(stream, "while");    break;
-			case T_DO:      fprintf(stream, "do");       break;
+			
+			case T_NOT: case T_AND: case T_OR:
+			case T_SYSCALL: case T_VAR:
+			case T_IF: case T_THEN: case T_ELSE:
+			case T_WHILE: case T_DO:
+			case T_FUNC: case T_IN: case T_OUT:
+				for(size_t i = 0; i < sizeof(keywords) / sizeof(keywords[0]); i++) {
+					if ( strncmp(token->src.ptr, keywords[i].keyword, token->src.len) == 0 && (int)strlen(keywords[i].keyword) == token->src.len ) {
+						fprintf(stream, "%s", keywords[i].keyword);
+						break;
+					}
+				}
+				break;
 			
 			case T_ERROR:   fprintf(stream, "error(%.*s)", token->str_val.len, token->str_val.ptr);  break;
 			case T_EOF:     fprintf(stream, "EOF");                                                  break;
@@ -362,22 +384,9 @@ static token_t lex_string(lexer_p lexer) {
 				}
 				break;
 		}
-	}}
+	}
+}
 
-
-static struct { const char* keyword; token_type_t type; } keywords[] = {
-	{ "or", T_OR },
-	{ "and", T_AND },
-	{ "not", T_NOT },
-	
-	{ "syscall", T_SYSCALL },
-	{ "var",  T_VAR },
-	{ "if",   T_IF },
-	{ "then", T_THEN },
-	{ "else", T_ELSE },
-	{ "while", T_WHILE },
-	{ "do", T_DO },
-};
 
 static token_t next_token(lexer_p lexer) {
 	int c = peek1(lexer);
@@ -508,7 +517,7 @@ static token_t next_token(lexer_p lexer) {
 			putc_into_token(lexer, &t, c);
 		
 		for(size_t i = 0; i < sizeof(keywords) / sizeof(keywords[0]); i++) {
-			if ( strncmp(t.src.ptr, keywords[i].keyword, t.src.len) == 0 ) {
+			if ( strncmp(t.src.ptr, keywords[i].keyword, t.src.len) == 0 && (int)strlen(keywords[i].keyword) == t.src.len ) {
 				t.type = keywords[i].type;
 				break;
 			}

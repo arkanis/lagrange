@@ -80,6 +80,7 @@ else
 syscall 60, x
 */
 
+/*
 // while
 var x = 10
 var y = 0
@@ -88,3 +89,12 @@ while x < 100 do {
 	y = y + 1
 }
 syscall 60, y
+*/
+
+// function definitions
+func main in(int argc, array_t argv) out(int) {
+	syscall 60, 17
+}
+func foo in(int argc, array_t argv) out(int) {
+	syscall 60, 13
+}

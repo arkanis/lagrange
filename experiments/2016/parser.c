@@ -121,12 +121,92 @@ node_p parse(token_list_p list, parser_rule_func_t rule) {
 
 node_p parse_module(parser_p parser) {
 	node_p node = node_alloc(NT_MODULE);
-	while ( is_stmt_start(peek_type(parser)) ) {
-		node_p stmt = parse_stmt(parser);
-		node_append(node, &node->module.stmts, stmt);
+	
+	token_p t = NULL;
+	while ( (t = peek(parser))->type != T_EOF ) {
+		node_p def = NULL;
+		
+		switch( t->type ) {
+			case T_FUNC:
+				def = parse_func_def(parser);
+				break;
+			default:
+				fprintf(stderr, "%s:%d:%d: expectet FUNC, got:\n", parser->list->filename, token_line(t), token_col(t));
+				token_print_line(stderr, t, 0);
+				abort();
+		}
+		
+		node_append(node, &node->module.defs, def);
 	}
 	
 	consume_type(parser, T_EOF);
+	return node;
+}
+
+static bool is_func_def_mod_start(token_type_t type) {
+	switch(type) {
+		case T_IN:
+		case T_OUT:
+			return true;
+		default:
+			return false;
+	}
+}
+
+node_p parse_func_def(parser_p parser) {
+	node_p node = node_alloc(NT_FUNC);
+	
+	consume_type(parser, T_FUNC);
+	token_p name = consume_type(parser, T_ID);
+	node->func.name = name->src;
+	
+	while ( is_func_def_mod_start(peek_type(parser)) ) {
+		token_p mod = consume(parser);
+		node_list_p arg_list = NULL;
+		if (mod->type == T_IN)
+			arg_list = &node->func.in;
+		else if (mod->type == T_OUT)
+			arg_list = &node->func.out;
+		else
+			abort();
+		
+		consume_type(parser, T_RBO);
+		
+		while (true) {
+			node_p arg = node_alloc(NT_ARG);
+			
+			//node_p arg_type = parse_expr(parser);
+			//node_set(arg, &arg->arg.type, arg_type);
+			token_p arg_type = consume_type(parser, T_ID);
+			arg->arg.type = arg_type->src;
+			
+			if (peek_type(parser) == T_ID) {
+				token_p arg_name = consume(parser);
+				arg->arg.name = arg_name->src;
+			} else {
+				// Arg is unnamed, leave name at 0, NULL
+			}
+			
+			node_append(node, arg_list, arg);
+			
+			if ( !(peek_type(parser) == T_COMMA) )
+				break;
+			
+			consume_type(parser, T_COMMA);
+		}
+		
+		consume_type(parser, T_RBC);
+	}
+	
+	consume_type(parser, T_CBO);
+	
+	while ( is_stmt_start(peek_type(parser)) ) {
+		node_p stmt = parse_stmt(parser);
+		node_append(node, &node->func.body, stmt);
+	}
+	
+	consume_type(parser, T_CBC);
+	
 	return node;
 }
 
