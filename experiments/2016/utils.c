@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 #include "utils.h"
 
@@ -19,6 +20,15 @@ void str_putc(str_p str, char c) {
 	str->ptr = realloc(str->ptr, str->len);
 	str->ptr[str->len - 1] = c;
 }
+
+bool str_eq(str_p a, str_p b) {
+	return ( a->len == b->len && strncmp(a->ptr, b->ptr, a->len) == 0 );
+}
+
+bool str_eqc(str_p a, const char* b) {
+	return ( strncmp(a->ptr, b, a->len) == 0 && a->len == (int)strlen(b) );
+}
+
 
 
 //

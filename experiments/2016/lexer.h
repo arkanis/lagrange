@@ -41,7 +41,6 @@ typedef enum {
 	
 	// Keywords
 	T_NOT, T_AND, T_OR,
-	T_SYSCALL,
 	T_VAR,
 	T_IF, T_THEN, T_ELSE,
 	T_WHILE, T_DO,

@@ -262,10 +262,11 @@ raa_t compile_node(node_p node, compiler_ctx_p ctx, int8_t requested_result_regi
 raa_t compile_module(node_p node, compiler_ctx_p ctx);
 raa_t compile_func(node_p node, compiler_ctx_p ctx);
 raa_t compile_scope(node_p node, compiler_ctx_p ctx);
-raa_t compile_syscall(node_p node, compiler_ctx_p ctx);
 raa_t compile_var(node_p node, compiler_ctx_p ctx);
 raa_t compile_if(node_p node, compiler_ctx_p ctx);
 raa_t compile_while(node_p node, compiler_ctx_p ctx);
+raa_t compile_call(node_p node, compiler_ctx_p ctx, int8_t req_reg);
+raa_t compile_syscall(node_p node, compiler_ctx_p ctx, int8_t req_reg);
 raa_t compile_op(node_p node, compiler_ctx_p ctx, int8_t req_reg);
 raa_t compile_intl(node_p node, compiler_ctx_p ctx, int8_t req_reg);
 raa_t compile_strl(node_p node, compiler_ctx_p ctx, int8_t req_reg);
@@ -298,14 +299,14 @@ raa_t compile_node(node_p node, compiler_ctx_p ctx, int8_t requested_result_regi
 			return compile_func(node, ctx);
 		case NT_SCOPE:
 			return compile_scope(node, ctx);
-		case NT_SYSCALL:
-			return compile_syscall(node, ctx);
 		case NT_VAR:
 			return compile_var(node, ctx);
 		case NT_IF:
 			return compile_if(node, ctx);
 		case NT_WHILE:
 			return compile_while(node, ctx);
+		case NT_CALL:
+			return compile_call(node, ctx, requested_result_register);
 		case NT_INTL:
 			return compile_intl(node, ctx, requested_result_register);
 		case NT_STRL:
@@ -370,8 +371,20 @@ raa_t compile_scope(node_p node, compiler_ctx_p ctx) {
 	return compile_module(node, ctx);
 }
 
-raa_t compile_syscall(node_p node, compiler_ctx_p ctx) {
+raa_t compile_call(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
+	// "syscall" is a buildin that's compiled differently
+	if ( str_eqc(&node->call.name, "syscall") )
+		return compile_syscall(node, ctx, req_reg);
+	
+	fprintf(stderr, "compile_call(): TODO normal function call\n");
+	abort();
+	return (raa_t){ -1, -1 };
+}
+
+raa_t compile_syscall(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 	/*
+	Taken from http://wiki.osdev.org/Calling_Conventions
+	
 	Input:
 		RAX ← syscall_no
 		RDI
@@ -380,24 +393,27 @@ raa_t compile_syscall(node_p node, compiler_ctx_p ctx) {
 		RCX
 		R8
 		R9
-	Scratch
+	Scratch:
 		All input regs
 		R10
 		R11
+	Output:
+		RAX
+		RDX (no idea whats in there, not listed in man pages)
 	*/
 	
 	int8_t arg_regs[7] = { RAX.reg, RDI.reg, RSI.reg, RDX.reg, RCX.reg, R8.reg, R9.reg };
 	raa_t arg_allocs[7];
 	
 	// Need at least one argument (the syscall number)
-	if (node->syscall.args.len < 1) {
-		fprintf(stderr, "compile_syscall(): need at least 1 arg, got %zu\n", node->syscall.args.len);
+	if (node->call.args.len < 1) {
+		fprintf(stderr, "compile_syscall(): need at least 1 arg, got %zu\n", node->call.args.len);
 		abort();
 	}
 	
 	// Compile args
-	for(size_t i = 0; i < node->syscall.args.len; i++)
-		arg_allocs[i] = compile_node(node->syscall.args.ptr[i], ctx, arg_regs[i]);
+	for(size_t i = 0; i < node->call.args.len; i++)
+		arg_allocs[i] = compile_node(node->call.args.ptr[i], ctx, arg_regs[i]);
 	
 	// Allocate scratch registers
 	// TODO: Also allocate unused args as scratch regs
@@ -410,11 +426,19 @@ raa_t compile_syscall(node_p node, compiler_ctx_p ctx) {
 	ra_free_reg(ctx->ra, ctx->as, a2);
 	ra_free_reg(ctx->ra, ctx->as, a1);
 	
-	// Free argument registers
-	for(size_t i = 0; i < node->syscall.args.len; i++)
+	// Free argument registers (but leave RAX allocated since it's the result)
+	for(size_t i = 1; i < node->call.args.len; i++)
 		ra_free_reg(ctx->ra, ctx->as, arg_allocs[i]);
 	
-	return (raa_t){ -1, -1 };
+	// If the result is requested in RAX or it doesn't matter where we're done
+	if (req_reg == RAX.reg || req_reg == -1)
+		return arg_allocs[0];
+	
+	// Otherwise move it to the target register
+	raa_t a = ra_alloc_reg(ctx->ra, ctx->as, req_reg);
+	as_mov(ctx->as, reg(req_reg), RAX);
+	ra_free_reg(ctx->ra, ctx->as, arg_allocs[0]);
+	return a;
 }
 
 raa_t compile_var(node_p node, compiler_ctx_p ctx) {

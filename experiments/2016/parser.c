@@ -217,7 +217,6 @@ node_p parse_func_def(parser_p parser) {
 
 static bool is_stmt_start(token_type_t type) {
 	switch(type) {
-		case T_SYSCALL:
 		case T_VAR:
 		case T_CBO:
 		case T_IF:
@@ -249,24 +248,6 @@ node_p parse_stmt(parser_p parser) {
 	node_p stmt = NULL;
 	token_p t = consume(parser);
 	switch (t->type) {
-		case T_SYSCALL:
-			// syscall eos
-			// syscall expr ["," expr] eos
-			stmt = node_alloc(NT_SYSCALL);
-			
-			if ( is_expr_start(peek_type_with_eos(parser)) ) {
-				node_p expr = parse_expr(parser);
-				node_append(stmt, &stmt->syscall.args, expr);
-				
-				while ( peek_type_with_eos(parser) == T_COMMA ) {
-					consume_type(parser, T_COMMA);
-					expr = parse_expr(parser);
-					node_append(stmt, &stmt->syscall.args, expr);
-				}
-			}
-			
-			parse_eos(parser);
-			return stmt;
 		case T_VAR:
 			// var ID eos
 			// var ID = expr eos
@@ -371,8 +352,28 @@ node_p parse_expr_without_trailing_ops(parser_p parser) {
 	token_p t = consume(parser);
 	switch(t->type) {
 		case T_ID:
-			node = node_alloc(NT_ID);
-			node->id.name = t->src;
+			if ( peek_type(parser) == T_RBO ) {
+				// ID "(" ( expr ["," expr] )? ")"
+				node = node_alloc(NT_CALL);
+				node->call.name = t->src;
+				
+				consume_type(parser, T_RBO);
+					if ( peek_type(parser) != T_RBO ) {
+						node_p expr = parse_expr(parser);
+						node_append(node, &node->call.args, expr);
+						
+						while ( peek_type(parser) == T_COMMA ) {
+							consume_type(parser, T_COMMA);
+							expr = parse_expr(parser);
+							node_append(node, &node->call.args, expr);
+						}
+					}
+				consume_type(parser, T_RBC);
+			} else {
+				// Just an ID followed by something else
+				node = node_alloc(NT_ID);
+				node->id.name = t->src;
+			}
 			break;
 		case T_INT:
 			node = node_alloc(NT_INTL);

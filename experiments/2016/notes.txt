@@ -203,13 +203,178 @@ occur.
 Next stop is to design a type-expr in the draft syntax and use this instead of IDs.
 
 
+## function calls
+
+module  = [ def ]
+def     = "func" ID [ def-mod ] "{" [ stmt ] "}"
+def-mod = ( "in" | "out" )  "(" ID ID? [ "," ID ID? ] ")"
+stmt = "var" ID ( "=" expr )? eos
+       "{" [ stmt ] "}"  // no eos needed
+       "if" expr ( eos | "then" ) stmt ( "else" stmt )?
+       "while" expr ( eos | "do" ) stmt
+       expr eos
+expr_wto  = ID
+            INTL
+            STRL
+            "(" expr ")"
+            unary_op expr_wto
+            ID "(" ( expr ["," expr] )? ")"
+expr      = expr_wto [ binary_op expr_wto ]
+unary_op  = + - not ~
+binary_op = ID . * / %  + - << >> < <= > >= == != & ^ | and or = *= /= %= += -= <<= >>= &= ^= |=
+
+syscall is converted into a normal function call with ID "syscall" (a builtin).
+
+This is just rudimentary syntax. Real syntax development mostly happesn with the
+draft syntax in Plains. This makes it easier to focus on implementation.
+
+
+
 # Further ideas
+
+
+# function calls
+
+module  = [ def ]
+def     = "func" ID [ def-mod ] "{" [ stmt ] "}"
+def-mod = ( "in" | "out" )  "(" ID ID? [ "," ID ID? ] ")"
+
+block   = "{"  [ stmt ] "}"
+          "do" [ stmt ] "end"
+
+// syscall, while becomes expr (function call)
+// "{" bcomes block
+// "if" should resemble function call syntax
+stmt = "syscall" ( expr ["," expr] )? eos
+       "var" ID ( "=" expr )? eos
+       "{" [ stmt ] "}"  // no eos needed
+       "if" expr ( eos | "then" ) stmt ( "else" stmt )?
+       "while" expr ( eos | "do" ) stmt
+       expr eos
+eos  = EOF
+       WSNL
+       only-peek: "}"    // because of block
+       only-peek: "end"  // because of block
+
+// Safe to use as type: Always ends clean, no open end to type_expr
+basic_expr_start = ID
+                   INTL
+                   STRL
+                   "(" full_expr ")"
+basic_expr_tail  = "." ID
+                   "(" ( arg [ "," arg ] )? ")" block?
+                   "[" ( arg [ "," arg ] )? "]"
+arg              = ID ":" full_expr
+                   full_expr
+basic_expr       = basic_expr_start [ basic_expr_tail ]
+
+
+// Safe to use in arguments of func calls without paras. So it can't contain func
+// calls without paras by itself.
+child_expr_elem = basic_expr
+                  unary_op basic_expr
+child_expr_tail  = 
+child_expr = child_expr_start [ binary_op child_expr_start ]
+
+unary_op  = + - not ~
+binary_op = ID . * / %  + - << >> < <= > >= == != & ^ | and or = *= /= %= += -= <<= >>= &= ^= |=
+
+
+
+literal        = ID
+                 INTL
+                 STRL
+
+// Safe to use as type: Always ends clean, no open end to type_expr
+type_expr      = literal      [ type_expr_tail ]
+                 "(" expr ")" [ type_expr_tail ]
+type_expr_tail = "(" ( arg [ "," arg ] )? ")" ( "{" [stmt] "}" )?
+                 "[" ( arg [ "," arg ] )? "]"
+                 "." ID
+arg            = ID ":" expr
+                 expr
+
+// Safe to use in arguments of func calls without paras. So it can't contain func
+// calls without paras by itself.
+child_expr = expr_wto [ binary_op expr_wto ]
+             expr_wto "(" ( arg [ "," arg ] )? ")" ( "{" [stmt] "}" )?
+             expr_wto "[" ( arg [ "," arg ] )? "]"
+             
+
+expr       = 
+
+expr_wto  = literals
+            "(" expr ")"
+            unary_op expr_wto
+// Has to terminate on binary_op of: "," ")" "]" (arg in type_expr_tail) EOF
+expr      = expr_wto [ binary_op expr_wto ]        // (1)
+            expr_wto "(" ( arg [ "," arg ] )? ")" ( "{" [stmt] "}" )?
+            expr_wto "[" ( arg [ "," arg ] )? "]"
+expr_wp   = expr
+            // case without args already coverd by (1) with expr_wto "." expr_wto
+            // Need a 2 token look ahead to differ between:
+            //   arg (ID ":")
+            //   binary_op expr_wto (ID ...)
+            //   expr
+            expr_wto arg [ "," arg ] ( "{" [stmt] "}" )?
+unary_op  = + - not ~
+binary_op = ID . * / %  + - << >> < <= > >= == != & ^ | and or = *= /= %= += -= <<= >>= &= ^= |=
+
+type_expr:
+	Only stuff that can be chained: "." () []. No user defined operators.
+	If we see an ID we wouldn't know if it's the argument name or an operator.
+	
+	Could also be handled with two tokens look aheads: ID "," or ID ")". Then it
+	is the argument name, otherwise an operator for an expression.
+	For variable definitions: type_expr ID "=". So the look ahead would be ID "=".
+
 
 ## Index access "operator"
 
 expr_wb = "[" expr ["," expr] "]"
 
 Same as function call but with different parenthesis
+
+
+## Use [] with named args to avoid index-index, index-length confusion of number args/ranges
+
+Idea: In collection access it's confusing if we use index-index arguments or index-length
+arguments to specify what slice of the collection we want to have.
+
+Ruby uses ranges to differ: Ranges signal index-index style, normal number index-length style.
+
+Why not use named arguments like "len" and "to" to make it clear:
+
+collection[from: 7, to: 9]
+collection[from: 7, len: 2]
+collection[7, to: 9]
+collection[7, len: 2]
+collection[7, 2]  // from: 7, len: 2
+
+operator elem in(size_t from, size_t.nullable len, size_t.nullable to, size_t.nullable stride)
+              out(elem_t) { ... }
+
+Hm, well, better use a slice function for that and use named arguments in there.
+Kind of a strecht for the element access operator to also do slicing of
+collections...
+
+Problem: Arguments would allow to leave len and to at null. Can't completely
+validate at compile time that either one is set and not null.
+But: Could also use that as advantage. If both are null the entire rest of the
+list is returned.
+
+
+## Get struct types for function input and output "structs"
+
+Something like that:
+
+type_t func_type = overloadset(foo).in(int, int)
+func_type.in_type  → struct(int, int)
+func_type.out_type → struct(int)
+
+So that we can explicitly define variables that can contain the entire return
+data from a function.
+
 
 ## Collections
 

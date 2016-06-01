@@ -12,7 +12,6 @@ static struct { const char* keyword; token_type_t type; } keywords[] = {
 	{ "and", T_AND },
 	{ "not", T_NOT },
 	
-	{ "syscall", T_SYSCALL },
 	{ "var",   T_VAR },
 	{ "if",    T_IF },
 	{ "then",  T_THEN },
@@ -122,7 +121,7 @@ void token_print(FILE* stream, token_p token, uint32_t flags) {
 			
 			
 			case T_NOT: case T_AND: case T_OR:
-			case T_SYSCALL: case T_VAR:
+			case T_VAR:
 			case T_IF: case T_THEN: case T_ELSE:
 			case T_WHILE: case T_DO:
 			case T_FUNC: case T_IN: case T_OUT:

@@ -53,7 +53,6 @@ typedef enum {
 	NT_ARG,
 	NT_SCOPE,
 	
-	NT_SYSCALL,
 	NT_VAR,
 	NT_IF,
 	NT_WHILE,
@@ -63,7 +62,8 @@ typedef enum {
 	NT_STRL,
 	NT_UNARY_OP,
 	NT_UOPS,
-	NT_OP
+	NT_OP,
+	NT_CALL
 } node_type_t;
 
 
@@ -96,10 +96,6 @@ struct node_s {
 		struct {
 			node_list_t stmts;
 		} scope;
-		
-		struct {
-			node_list_t args;
-		} syscall;
 		
 		struct {
 			str_t name;
@@ -140,6 +136,11 @@ struct node_s {
 			int64_t idx;
 			node_p a, b;
 		} op;
+		
+		struct {
+			str_t name;
+			node_list_t args;
+		} call;
 	};
 };
 
@@ -178,13 +179,6 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 	[ NT_SCOPE ] = &(node_spec_t){
 		"scope", (member_spec_t[]){
 			{ MT_NODE_LIST, offsetof(node_t, scope.stmts), "stmts" },
-			{ 0 }
-		}
-	},
-	
-	[ NT_SYSCALL ] = &(node_spec_t){
-		"syscall", (member_spec_t[]){
-			{ MT_NODE_LIST, offsetof(node_t, syscall.args), "args" },
 			{ 0 }
 		}
 	},
@@ -255,6 +249,14 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 			{ MT_INT,  offsetof(node_t, op.idx), "idx" },
 			{ MT_NODE, offsetof(node_t, op.a), "a" },
 			{ MT_NODE, offsetof(node_t, op.b), "b" },
+			{ 0 }
+		}
+	},
+	
+	[ NT_CALL ] = &(node_spec_t){
+		"call", (member_spec_t[]){
+			{ MT_STR,       offsetof(node_t, call.name), "name" },
+			{ MT_NODE_LIST, offsetof(node_t, call.args), "args" },
 			{ 0 }
 		}
 	}
