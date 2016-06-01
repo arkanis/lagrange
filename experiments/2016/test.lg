@@ -91,10 +91,21 @@ while x < 100 do {
 syscall 60, y
 */
 
+/*
 // function definitions
 func main in(int argc, array_t argv) out(int) {
-	syscall(60, 17)
+	syscall 60, 17
 }
 func foo in(int argc, array_t argv) out(int) {
-	syscall(60, 13)
+	syscall 60, 13
+}
+*/
+
+// function call syntax
+func main in(int argc, array_t argv) out(int) {
+	var str_ptr = "Hello World!\n"
+	var str_len = 13
+	
+	var result = syscall(1, 1, str_ptr, str_len)
+	syscall(60, result)
 }
