@@ -1,7 +1,23 @@
+// For strdup
+#define _GNU_SOURCE
+
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 #include "ast.h"
 
+//
+// Namespaces
+//
+
+#define SLIM_HASH_IMPLEMENTATION
+#include "slim_hash.h"
+SH_GEN_DICT_DEF(ns, const char*, node_p);
+
+
+//
+// Node list
+//
 
 void node_list_append(node_list_p list, node_p node) {
 	list->len++;

@@ -3,10 +3,18 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
+#include "slim_hash.h"
 #include "utils.h"
 
 
 typedef struct node_s node_t, *node_p;
+
+
+//
+// Namespaces
+//
+
+SH_GEN_DECL(ns, const char*, node_p);
 
 
 //
