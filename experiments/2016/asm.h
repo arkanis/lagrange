@@ -134,3 +134,8 @@ void as_mark_jmp_slot_target(asm_p as, asm_jump_slot_t jump_slot);
 
 size_t as_target(asm_p as);
 void   as_set_jmp_slot_target(asm_p as, asm_jump_slot_t jump_slot, size_t target);
+
+void as_call(asm_p as, asm_arg_t target);
+void as_ret(asm_p as, int16_t stack_size_to_pop);
+void as_enter(asm_p as, int16_t stack_size, int8_t level);
+void as_leave(asm_p as);

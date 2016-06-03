@@ -200,6 +200,24 @@ void test_instructions_for_if() {
 	as_destroy(as);
 }
 
+void test_instructions_for_call() {
+	asm_p as = &(asm_t){ 0 };
+	as_new(as);
+	
+	as_call(as, reld(16));
+	as_call(as, RAX);
+	as_ret(as, 0);
+	as_ret(as, 16);
+	
+	as_enter(as, 65, 0);
+	as_leave(as);
+	as_enter(as, 0, 0);
+	as_leave(as);
+	
+	as_save_elf(as, "call.elf");
+	as_destroy(as);
+}
+
 
 int main() {
 	st_run(test_write);
@@ -207,5 +225,6 @@ int main() {
 	st_run(test_modrm_instructions);
 	st_run(test_write_elf);
 	st_run(test_instructions_for_if);
+	st_run(test_instructions_for_call);
 	return st_show_report();
 }
