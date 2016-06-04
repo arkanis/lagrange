@@ -12,7 +12,12 @@
 
 #define SLIM_HASH_IMPLEMENTATION
 #include "slim_hash.h"
-SH_GEN_DICT_DEF(ns, const char*, node_p);
+SH_GEN_DEF(node_ns, str_t, node_p,
+	node_ns_murmur3_32(key.ptr, key.len),  // hash_expr
+	((a.len == b.len) && strncmp(a.ptr, b.ptr, a.len) == 0),  // key_cmp_expr
+	(key),  // key_put_expr, no need to duplicate the str
+	(key)   // key_del_expr, no need to free the str
+);
 
 
 //
@@ -53,6 +58,14 @@ node_p node_alloc(node_type_t type) {
 	node->type = type;
 	node->spec = node_specs[type];
 	node->parent = NULL;
+	
+	for(member_spec_p member = node->spec->members; member->type != 0; member++) {
+		void* member_ptr = (uint8_t*)node + member->offset;
+		if (member->type == MT_NS) {
+			node_ns_p namespace = member_ptr;
+			node_ns_new(namespace);
+		}
+	}
 	
 	return node;
 }
@@ -107,7 +120,7 @@ void node_append(node_p parent, node_list_p list, node_p child) {
 // Other functions
 //
 
-static node_p node_iterate_recursive(node_p node, uint32_t level, node_it_func_t func) {
+static node_p node_iterate_recursive(node_p node, uint32_t level, node_it_func_t func, void* private) {
 	// Check if node has no children
 	bool has_children = false;
 	for(member_spec_p member = node->spec->members; member->type != 0; member++) {
@@ -125,33 +138,33 @@ static node_p node_iterate_recursive(node_p node, uint32_t level, node_it_func_t
 				break;
 			}
 		}
-	}	
+	}
 	
 	if (!has_children) {
 		// Node has no children
-		return func(node, level, NI_LEAF);
+		return func(node, level, NI_LEAF, private);
 	}
 	
 	// Node has children
-	node = func(node, level, NI_PRE);
+	node = func(node, level, NI_PRE, private);
 	
 	for(member_spec_p member = node->spec->members; member->type != 0; member++) {
 		void* member_ptr = (uint8_t*)node + member->offset;
 		if (member->type == MT_NODE) {
 			node_p* child_node = member_ptr;
-			*child_node = node_iterate_recursive(*child_node, level + 1, func);
+			*child_node = node_iterate_recursive(*child_node, level + 1, func, private);
 		} else if (member->type == MT_NODE_LIST) {
 			node_list_p list = member_ptr;
 			for(size_t i = 0; i < list->len; i++)
-				list->ptr[i] = node_iterate_recursive(list->ptr[i], level + 1, func);
+				list->ptr[i] = node_iterate_recursive(list->ptr[i], level + 1, func, private);
 		}
 	}
 	
-	return func(node, level, NI_POST);
+	return func(node, level, NI_POST, private);
 }
 
-node_p node_iterate(node_p node, node_it_func_t func) {
-	return node_iterate_recursive(node, 0, func);
+node_p node_iterate(node_p node, node_it_func_t func, void* private) {
+	return node_iterate_recursive(node, 0, func, private);
 }
 
 
@@ -163,7 +176,7 @@ static void node_print_recursive(node_p node, FILE* output, int level) {
 		// Print the first non-node member inline (no line break, no indention,
 		// don't print the member name). MT_NODE_LIST also prints it's member
 		// name by itself (with an index).
-		bool print_without_label = (member == node->spec->members && member->type != MT_NODE) || member->type == MT_NODE_LIST;
+		bool print_without_label = (member == node->spec->members && member->type != MT_NODE && member->type != MT_NS) || member->type == MT_NODE_LIST;
 		if ( !print_without_label )
 			fprintf(output, "\n%*s%s: ", (level+1)*2, "", member->name);
 		
@@ -178,6 +191,12 @@ static void node_print_recursive(node_p node, FILE* output, int level) {
 				for(size_t i = 0; i < list->len; i++) {
 					fprintf(output, "\n%*s%s[%zu]: ", (level+1)*2, "", member->name, i);
 					node_print_recursive(list->ptr[i], output, level+1);
+				}
+				} break;
+			case MT_NS:{
+				node_ns_p ns = member_ptr;
+				for(node_ns_it_p it = node_ns_start(ns); it != NULL; it = node_ns_next(ns, it)) {
+					fprintf(output, "\"%.*s\" ", it->key.len, it->key.ptr);
 				}
 				} break;
 			
@@ -215,6 +234,9 @@ void node_print_inline(node_p node, FILE* output) {
 				fprintf(output, "...");
 				break;
 			
+			case MT_NS:
+				fprintf(output, "ns");
+				break;
 			case MT_INT: {
 				int64_t* value = member_ptr;
 				fprintf(output, "%ld", *value);

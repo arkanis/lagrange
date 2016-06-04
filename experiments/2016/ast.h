@@ -14,7 +14,7 @@ typedef struct node_s node_t, *node_p;
 // Namespaces
 //
 
-SH_GEN_DECL(ns, const char*, node_p);
+SH_GEN_DECL(node_ns, str_t, node_p);
 
 
 //
@@ -37,6 +37,7 @@ void node_list_replace_n1(node_list_p list, size_t start_idx, size_t hole_len, n
 typedef enum {
 	MT_NODE = 1,
 	MT_NODE_LIST,
+	MT_NS,
 	
 	MT_INT,
 	MT_CHAR,
@@ -50,7 +51,7 @@ typedef struct {
 } member_spec_t, *member_spec_p;
 
 typedef struct {
-	char* name;
+	char*         name;
 	member_spec_p members;
 } node_spec_t, *node_spec_p;
 
@@ -87,12 +88,14 @@ struct node_s {
 	union {
 		struct {
 			node_list_t defs;
+			node_ns_t ns;
 		} module;
 		
 		struct {
 			str_t name;
 			node_list_t in, out;
 			node_list_t body;
+			node_ns_t ns;
 		} func;
 		
 		struct {
@@ -103,6 +106,7 @@ struct node_s {
 		
 		struct {
 			node_list_t stmts;
+			node_ns_t ns;
 		} scope;
 		
 		struct {
@@ -112,6 +116,7 @@ struct node_s {
 		
 		struct {
 			node_p cond, true_case, false_case;  // false_case can be NULL if there is no else
+			node_ns_t true_ns;
 		} if_stmt;
 		
 		struct {
@@ -160,6 +165,7 @@ struct node_s {
 __attribute__ ((weak)) node_spec_p node_specs[] = {
 	[ NT_MODULE ] = &(node_spec_t){
 		"module", (member_spec_t[]){
+			{ MT_NS,        offsetof(node_t, module.ns),   "ns" },
 			{ MT_NODE_LIST, offsetof(node_t, module.defs), "defs" },
 			{ 0 }
 		}
@@ -168,6 +174,7 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 	[ NT_FUNC ] = &(node_spec_t){
 		"func", (member_spec_t[]){
 			{ MT_STR,       offsetof(node_t, func.name), "name" },
+			{ MT_NS,        offsetof(node_t, func.ns),   "ns" },
 			{ MT_NODE_LIST, offsetof(node_t, func.in),   "in" },
 			{ MT_NODE_LIST, offsetof(node_t, func.out),  "out" },
 			{ MT_NODE_LIST, offsetof(node_t, func.body), "body" },
@@ -186,6 +193,7 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 	
 	[ NT_SCOPE ] = &(node_spec_t){
 		"scope", (member_spec_t[]){
+			{ MT_NS,        offsetof(node_t, scope.ns),    "ns" },
 			{ MT_NODE_LIST, offsetof(node_t, scope.stmts), "stmts" },
 			{ 0 }
 		}
@@ -201,6 +209,7 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 	
 	[ NT_IF ] = &(node_spec_t){
 		"if", (member_spec_t[]){
+			{ MT_NS,   offsetof(node_t, if_stmt.true_ns),    "true_ns" },
 			{ MT_NODE, offsetof(node_t, if_stmt.cond),       "cond" },
 			{ MT_NODE, offsetof(node_t, if_stmt.true_case),  "true_case" },
 			{ MT_NODE, offsetof(node_t, if_stmt.false_case), "false_case" },
@@ -285,8 +294,8 @@ void node_append(node_p parent, node_list_p list, node_p child);
 #define NI_PRE  (1 << 0)
 #define NI_POST (1 << 1)
 #define NI_LEAF (1 << 2)
-typedef node_p (*node_it_func_t)(node_p node, uint32_t level, uint32_t flags);
-node_p node_iterate(node_p node, node_it_func_t func);
+typedef node_p (*node_it_func_t)(node_p node, uint32_t level, uint32_t flags, void* private);
+node_p node_iterate(node_p node, node_it_func_t func, void* private);
 
 void node_print(node_p node, FILE* output);
 void node_print_inline(node_p node, FILE* output);

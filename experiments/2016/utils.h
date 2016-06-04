@@ -9,10 +9,18 @@
 //
 
 #define list_t(content_type_t)   struct { size_t len; content_type_t* ptr; }
-#define list_append(list, value)  do {                                         \
-	(list)->len++;                                                             \
+#define list_resize(list, new_len)  do {                                       \
+	(list)->len = new_len;                                                     \
 	(list)->ptr = realloc((list)->ptr, (list)->len * sizeof((list)->ptr[0]));  \
+} while(0)
+#define list_append(list, value)  do {                                         \
+    list_resize((list), (list)->len + 1);                                      \
 	(list)->ptr[(list)->len - 1] = (value);                                    \
+} while(0)
+#define list_free(list)  do {  \
+	free( (list)->ptr );       \
+	(list)->ptr = NULL;        \
+	(list)->len = 0;           \
 } while(0)
 
 

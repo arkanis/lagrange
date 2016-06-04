@@ -101,6 +101,7 @@ func foo in(int argc, array_t argv) out(int) {
 }
 */
 
+/*
 // function call syntax
 func main in(int argc, array_t argv) out(int) {
 	var str_ptr = "Hello World!\n"
@@ -108,4 +109,15 @@ func main in(int argc, array_t argv) out(int) {
 	
 	var result = syscall(1, 1, str_ptr, str_len)
 	syscall(60, result)
+}
+*/
+
+// function call
+func main in(int argc, array_t argv) out(int) {
+	var result = print("Hello World!\n", 13, 1)
+	syscall(60, result)
+}
+
+func print in(int ptr, int len, int offset) out(int) {
+	syscall(1, 1, ptr + offset, len - offset)
 }

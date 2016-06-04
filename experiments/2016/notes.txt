@@ -228,6 +228,35 @@ syscall is converted into a normal function call with ID "syscall" (a builtin).
 This is just rudimentary syntax. Real syntax development mostly happesn with the
 draft syntax in Plains. This makes it easier to focus on implementation.
 
+function call:
+
+input  R0 - R7
+CALL displ
+output R0 - R7
+
+caller has to safe unused input regs
+callee has to safe R8 - R15 if used
+
+prolog: ENTER
+epilog: LEAVE
+        RET
+
+compiler workflow:
+
+compile_func(func_node)
+	compiles func
+	sets vaddr attribute (virtual addr of the first instruction)
+func_get_vaddr(func_node)
+	if vaddr unset
+		compile_func(func_node)
+	return vaddr attribute
+
+to compile program:
+	elf.start_addr = func_get_vaddr(main_func_node)
+	
+	main func is compiled
+	all child funcs are compiled on demand
+
 
 
 # Further ideas

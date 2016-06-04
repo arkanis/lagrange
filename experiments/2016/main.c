@@ -14,8 +14,9 @@
 #include "reg_alloc.h"
 
 
-node_p expand_uops(node_p node, uint32_t level, uint32_t flags);
-void compile(node_p node, const char* filename);
+void   fill_namespaces(node_p node, node_ns_p current_ns);
+node_p expand_uops(node_p node, uint32_t level, uint32_t flags, void* private);
+void   compile(node_p node, const char* filename);
 
 
 int main(int argc, char** argv) {
@@ -61,11 +62,18 @@ int main(int argc, char** argv) {
 	printf("\n");
 	node_print(tree, stdout);
 	
-	node_iterate(tree, expand_uops);
+	
+	node_ns_t global_ns;
+	node_ns_new(&global_ns);
+	// TODO: add builtins like "syscall" to global namespace
+	fill_namespaces(tree, &global_ns);
+	
+	node_iterate(tree, expand_uops, NULL);
 	node_print(tree, stdout);
 	
 	compile(tree, "main.elf");
 	
+	node_ns_destroy(&global_ns);
 	lex_free(list);
 	str_free(&src);
 	
@@ -73,12 +81,63 @@ int main(int argc, char** argv) {
 }
 
 
+//
+// Fill namespaces with links to their defining nodes
+//
+
+void fill_namespaces(node_p node, node_ns_p current_ns) {
+	switch(node->type) {
+		case NT_MODULE:
+			for(size_t i = 0; i < node->module.defs.len; i++)
+				fill_namespaces(node->module.defs.ptr[i], &node->module.ns);
+			break;
+		case NT_FUNC:
+			node_ns_put(current_ns, node->func.name, node);
+			for(size_t i = 0; i < node->func.in.len; i++)
+				fill_namespaces(node->func.in.ptr[i], &node->func.ns);
+			for(size_t i = 0; i < node->func.out.len; i++)
+				fill_namespaces(node->func.out.ptr[i], &node->func.ns);
+			for(size_t i = 0; i < node->func.body.len; i++)
+				fill_namespaces(node->func.body.ptr[i], &node->func.ns);
+			break;
+		case NT_SCOPE:
+			for(size_t i = 0; i < node->scope.stmts.len; i++)
+				fill_namespaces(node->scope.stmts.ptr[i], &node->scope.ns);
+			break;
+		case NT_IF:
+			fill_namespaces(node->if_stmt.true_case, &node->if_stmt.true_ns);
+			fill_namespaces(node->if_stmt.false_case, current_ns);
+			break;
+		case NT_WHILE:
+			fill_namespaces(node->while_stmt.body, current_ns);
+			break;
+		
+		case NT_ARG:
+			// Don't add unnamed args to the namespace
+			if (node->arg.name.len > 0)
+				node_ns_put(current_ns, node->arg.name, node);
+			break;
+		case NT_VAR:
+			node_ns_put(current_ns, node->var.name, node);
+			break;
+		
+		default:
+			for(member_spec_p member = node->spec->members; member->type != 0; member++) {
+				if (member->type == MT_NS) {
+					fprintf(stderr, "fill_namespaces(): found unhandled node with a namespace!\n");
+					abort();
+				}
+			}
+	}
+}
+
 
 //
-// Normal transformation passes
+// Transformation passes
 // 
-// For now only transform unordered operations (uops) into binary operator
-// trees (op nodes).
+
+//
+// Transform unordered operations (uops) into binary operator trees (op nodes).
 //
 
 // Based on http://en.cppreference.com/w/c/language/operator_precedence
@@ -116,7 +175,7 @@ struct { char* name; int precedence; op_assoc_t assoc; } operators[] = {
  * the nodes it binds to with an op node. This is repeated until no operators
  * are left to replace. The uops node should just have one op child at the end.
  */
-node_p expand_uops(node_p node, uint32_t level, uint32_t flags) {
+node_p expand_uops(node_p node, uint32_t level, uint32_t flags, void* private) {
 	// We only want uops nodes with children in them (there should be no uops
 	// nodes without children).
 	if ( !( (flags & NI_PRE) && node->type == NT_UOPS ) )
