@@ -1,6 +1,11 @@
 # ToDo
 
-- Add function definitions
+- Exclude RBP and RSP from register allocator (because they're used for addressing)
+- Change local variable addressing to RBP
+- Add PUSH and POP to the assembler
+- Implement function compilation (including prolog, argument setup and epilog)
+- Implement linker pass to resolve address slots
+
 - Reserve -> and <- operators
 - Write test cases for assembler, parser and compiler (by executing external programs)
 - Fix mul/spilling bug
@@ -228,34 +233,64 @@ syscall is converted into a normal function call with ID "syscall" (a builtin).
 This is just rudimentary syntax. Real syntax development mostly happesn with the
 draft syntax in Plains. This makes it easier to focus on implementation.
 
-function call:
-
-input  R0 - R7
-CALL displ
-output R0 - R7
-
-caller has to safe unused input regs
-callee has to safe R8 - R15 if used
-
-prolog: ENTER
-epilog: LEAVE
-        RET
-
-compiler workflow:
-
-compile_func(func_node)
-	compiles func
-	sets vaddr attribute (virtual addr of the first instruction)
-func_get_vaddr(func_node)
-	if vaddr unset
-		compile_func(func_node)
-	return vaddr attribute
-
-to compile program:
-	elf.start_addr = func_get_vaddr(main_func_node)
+1st try at calling convention:
+	input  R0 - R7
+	CALL displ
+	output R0 - R7
 	
-	main func is compiled
-	all child funcs are compiled on demand
+	caller has to safe unused input regs
+	callee has to safe R8 - R15 if used
+	
+	problem: How to use registers as local variables in function? Not easy right
+	now. Better push the args on the stack so they're available for RBP relative
+	addressing, just like local vars. Then we only have to set them up as local
+	vars with the proper offsets.
+
+2nd try:
+	caller pushes output and input args on stack (first to last)
+	callee cleans up input args
+	
+	call:
+		alloc out args on stack, first to last
+		putsh in args on stack, first to last
+		CALL 0
+		put CALL disp into addr slot
+		for now free all but first out arg
+	
+	call:
+		sub RSP, out.argc*8
+		push in1
+		push inn
+		call displ
+		add RSP, (out.argc-1)*8
+	
+	prologue:
+		push RBP
+		mov RBP, RSP
+		sub RSP, stack_frame_size
+	
+	local args:
+		addressed as static RBP offsets (relative to stack frame)
+		in(n)  = [RBP + (1 + in.argc - n)*8]
+		out(n) = [RBP + (1 + in.argc + out.argc - n)*8]
+	
+	epilogue:
+		mov RSP, RBP
+		pop RBP
+		add RSP, in.argc*8
+		ret
+
+
+compile pass:
+	compiles main func
+	builds addr slot table for external references
+	all referenced function are added to compiler queue
+	compile all funcs in the queue until queue is empty
+
+linker pass:
+	take assembled functions and fill addr slots with proper displacements to
+	targets.
+	write output to executable.
 
 
 
