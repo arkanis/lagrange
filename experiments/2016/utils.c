@@ -9,6 +9,10 @@
 // Not zero-terminated strings
 //
 
+str_t str_from_c(char* zero_terminated_string) {
+	return (str_t){ .ptr = zero_terminated_string, .len = strlen(zero_terminated_string) };
+}
+
 void str_free(str_p str) {
 	free(str->ptr);
 	str->ptr = NULL;
