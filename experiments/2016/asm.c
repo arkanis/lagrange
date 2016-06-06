@@ -827,6 +827,10 @@ void as_set_jmp_slot_target(asm_p as, asm_jump_slot_t jump_slot, size_t target) 
 }
 
 
+size_t as_code_vaddr(asm_p as) {
+	return as->code_vaddr + as->code_len;
+}
+
 void as_call(asm_p as, asm_arg_t target) {
 	// Volume 2C - Instruction Set Reference, p93
 	if (target.type == ASM_T_MEM_REL_DISP) {
@@ -857,4 +861,27 @@ void as_enter(asm_p as, int16_t stack_size, int8_t level) {
 void as_leave(asm_p as) {
 	// Volume 2C - Instruction Set Reference, p96
 	as_write(as, "1100 1001");
+}
+
+
+void as_push(asm_p as, asm_arg_t source) {
+	// Volume 2C - Instruction Set Reference, p100
+	if (source.type == ASM_T_IMM) {
+		as_write(as, "0110 1000 : %32d", source.imm);
+		return;
+	} else if ( as_write_modrm(as, WMRM_FIXED_OPERAND_SIZE, "1111 1111", op(0b110), source, NULL) ) {
+		return;
+	}
+	
+	fprintf(stderr, "as_push(): unsupported arg type!\n");
+	abort();
+}
+
+void as_pop(asm_p as, asm_arg_t dest) {
+	// Volume 2C - Instruction Set Reference, p100
+	if ( as_write_modrm(as, WMRM_FIXED_OPERAND_SIZE, "1000 1111", op(0b000), dest, NULL) )
+		return;
+	
+	fprintf(stderr, "as_pop(): unsupported arg type!\n");
+	abort();
 }

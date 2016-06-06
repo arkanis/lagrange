@@ -150,7 +150,17 @@ void test_modrm_instructions() {
 	for(size_t i = 0; i < sizeof(condition_codes) / sizeof(condition_codes[0]); i++)
 		as_set_cc(as, condition_codes[i], reg(i));
 	
-	as_save_code(as, "asm_instructions.raw");
+	for(size_t i = 0; i < 16; i++)
+		as_push(as, reg(i));
+	for(size_t i = 0; i < 16; i++)
+		as_push(as, memrd(reg(i), 0xbeba));
+	as_push(as, imm(0x11223344));
+	for(size_t i = 0; i < 16; i++)
+		as_pop(as, reg(i));
+	for(size_t i = 0; i < 16; i++)
+		as_pop(as, memrd(reg(i), 0xbeba));
+	
+	as_save_elf(as, "instructions.elf");
 	as_destroy(as);
 }
 
