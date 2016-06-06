@@ -24,9 +24,13 @@ static inline bool reg_allocated(ra_p ra, uint8_t reg_index) {
 	return ((1 << reg_index) & ra->allocated_registers) != 0;
 }
 
+/**
+ * Finds the highest unmarked register bug ignores RSP (R4) and RBP (R5) because
+ * they're used for addressing of variable access.
+ */
 int8_t find_free_reg(ra_p ra) {
 	for(int8_t i = 15; i > 0; i--) {
-		if ( !reg_allocated(ra, i) )
+		if ( !(reg_allocated(ra, i) && i != RSP.reg && i != RBP.reg) )
 			return i;
 	}
 	
