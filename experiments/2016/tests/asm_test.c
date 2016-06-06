@@ -96,7 +96,11 @@ void test_modrm_instructions() {
 	for(size_t i = 0; i < 16; i++)
 		as_add(as, reg(i), reg(i));
 	for(size_t i = 0; i < 16; i++)
+		as_add(as, reg(i), imm(0xaabbccdd));
+	for(size_t i = 0; i < 16; i++)
 		as_sub(as, reg(i), reg(i));
+	for(size_t i = 0; i < 16; i++)
+		as_sub(as, reg(i), imm(0xaabbccdd));
 	
 	for(size_t i = 0; i < 16; i++)
 		as_mul(as, reg(i));

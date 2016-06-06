@@ -1,7 +1,7 @@
 #pragma once
 
 #include <stdint.h>
-#include <stddef.h>
+#include <stdlib.h>
 
 
 typedef struct {
@@ -120,10 +120,12 @@ typedef struct {
 
 void as_syscall(asm_p as);
 
-void as_add(asm_p as, asm_arg_t dest, asm_arg_t src);
-void as_sub(asm_p as, asm_arg_t dest, asm_arg_t src);
+// Return code position of the immidiate argument (if one is used as src)
+ssize_t as_add(asm_p as, asm_arg_t dest, asm_arg_t src);
+ssize_t as_sub(asm_p as, asm_arg_t dest, asm_arg_t src);
 void as_mul(asm_p as, asm_arg_t src);
 void as_div(asm_p as, asm_arg_t src);
+
 void as_mov(asm_p as, asm_arg_t dest, asm_arg_t src);
 
 void as_cmp(asm_p as, asm_arg_t arg1, asm_arg_t arg2);
