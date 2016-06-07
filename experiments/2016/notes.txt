@@ -527,3 +527,30 @@ data from a function.
 word[] array → dynamic array with word elements
 word[7] array → static array with word elements
 word[string] array → hash table with string keys and word values
+
+
+## Calling convention for tail-call optimization
+
+- Not something for the bootstrapping compiler.
+- To optimize a tail call we just want to leave the return address and saved BP
+  where they are. Just replace the input arguments with the ones for the tail
+  call target and jump there.
+
+Normal call     Tail call (replaces in args, then jumps)
+
+| ...      |    | ...
+| out 1    |    | out 1
+| out 2    |    | out 2
+| out n    |    | out n
+| ret addr |    | ret addr
+| saved BP |    | saved BP
+| in 1     |    | new in 1
+| in 2     |    | new in n
+| in n     |    | ...
+| ...      |    
+
+- On a tail call we just want to overwrite the in args with new values and jump
+  to the tail call target.
+- Number of output arguments have to match. Possible to do that, too?
+- Remember: Args should be passed in registers anyway, stack space only there
+  for spilling. Var args influence that, too.
