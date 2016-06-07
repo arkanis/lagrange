@@ -849,13 +849,13 @@ size_t as_code_vaddr(asm_p as) {
 	return as->code_vaddr + as->code_len;
 }
 
-void as_call(asm_p as, asm_arg_t target) {
+ssize_t as_call(asm_p as, asm_arg_t target) {
 	// Volume 2C - Instruction Set Reference, p93
 	if (target.type == ASM_T_MEM_REL_DISP) {
 		as_write(as, "1110 1000 : %32d", target.mem_disp);
-		return;
+		return as_target(as) - 4;
 	} else if ( as_write_modrm(as, WMRM_FIXED_OPERAND_SIZE, "1111 1111", op(0b010), target, NULL) ) {
-		return;
+		return -1;
 	}
 	
 	fprintf(stderr, "as_call(): unsupported arg type!\n");
