@@ -1,8 +1,6 @@
 # ToDo
 
-- Exclude RBP and RSP from register allocator (because they're used for addressing)
 - Change local variable addressing to RBP
-- Add PUSH and POP to the assembler
 - Implement function compilation (including prolog, argument setup and epilog)
 - Implement linker pass to resolve address slots
 
@@ -248,7 +246,7 @@ draft syntax in Plains. This makes it easier to focus on implementation.
 
 2nd try:
 	caller pushes output and input args on stack (first to last)
-	callee cleans up input args
+	callee cleans up the stack
 	
 	call:
 		alloc out args on stack, first to last
@@ -280,12 +278,96 @@ draft syntax in Plains. This makes it easier to focus on implementation.
 		add RSP, in.argc*8
 		ret
 
+3rd try:
+	Ideas:
+	- The caller knows the return RIP becuase it's just the address of the
+	  instruction after the call. So we can insert it statically. So we can build
+	  a CALL instruction by ourselves by PUSHing the address of the instruction
+	  after the "call" and jumping to the target function. The "ret" in the target
+	  function then just POPs the address and jumps to it.
+	- After the call the caller can free all unused input and output arguments by
+	  a single ADD RSP instruction. It knows how many input args it pushed so it
+	  can include that in the added offset.
+	
+	stack layout:
+	| ... caller stack
+	| out 1
+	| out 2
+	| out n
+	| in 1
+	| in 2
+	| in n
+	| ret addr
+	| saved BP  ← RSP at start of target_func code
+	| ... callee stack  ← RBP of target_func
+	
+	caller:
+	- allocates stack space for out args
+	- push in args
+	- call target_func
+	- cleanup input and unused output args
+	
+	callee:
+	- save BP
+	- set BP to local stack frame
+	- allocate space for local variables
+	- ... function body
+	- reset SP to BP (free all local variables)
+	- restore BP of caller
+	- return to caller
+	
+	call:
+		sub RSP, out.argc*8
+		push in_1
+		push in_2
+		push in_n
+		call target_func
+		add RSP, (in.argc + out.argc - 1)*8
+	
+	prologue:
+		push RBP
+		mov RBP, RSP
+		sub RSP, stack_frame_size
+	
+	local args:
+		The "2" offset skips the saved BP and return address.
+		in(n)  = [RBP + (2 + in.argc - n)*8]
+		out(n) = [RBP + (2 + in.argc + out.argc - n)*8]
+	
+	epilogue:
+		mov RSP, RBP
+		pop RBP
+		ret
 
 compile pass:
 	compiles main func
 	builds addr slot table for external references
 	all referenced function are added to compiler queue
 	compile all funcs in the queue until queue is empty
+	
+	local variables:
+		arg, var nodes: frame_offset member
+		func node: frame_size member
+		
+		on func node:
+			iterate over all out args, calculate their frame_offset members
+			iterate over all in args, calculate their frame_offset members
+			arg nodes not iterated by themselves but handled by their parent func node
+			
+			assemble prologue (remember location of sub immediate)
+			compile body (iterate over all var nodes inside, frame_size incremented for each one)
+			problem: we have to patch the stack frame size in the prologue!
+			assemble epilogue
+		
+		on var node:
+			calculate frame_offset:
+				get containing func node, use its frame_size member and increment it afterwards
+			compile value expr
+		
+		on id:
+			lookup definition via namespace
+			get frame_offset from definition node
+			assemble
 
 linker pass:
 	take assembled functions and fill addr slots with proper displacements to
