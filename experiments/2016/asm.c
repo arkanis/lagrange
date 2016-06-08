@@ -700,9 +700,10 @@ ssize_t as_add(asm_p as, asm_arg_t dest, asm_arg_t src) {
 	if (src.type == ASM_T_IMM) {
 		// 1000 00sw : mm 000, but for now we set s = 0 since we only have unsigned regs
 		// Presence of REX.W forces sign extention to 64 bits... (Combined Volumes, p1348)
-		// Without it it's written into the 32 bit registers which are implicitly zero
-		// extended to 64 bits. So set WMRM_FIXED_OPERAND_SIZE to not set the REX.W bit.
-		as_write_modrm(as, WMRM_FIXED_OPERAND_SIZE, "1000 000w", op(0b000), dest, NULL);
+		// Without it it's written into the 32 bit registers which zeros out the upper 32
+		// bits of that register. So effectively we can't disable sign-extention in 64 bit
+		// mode... :(
+		as_write_modrm(as, 0, "1000 000w", op(0b000), dest, NULL);
 		as_write(as, "%32d", src.imm);
 		return as_target(as) - 4;
 	} else if ( as_write_modrm(as, 0, "0000 00dw", dest, src, NULL) ) {
@@ -718,9 +719,10 @@ ssize_t as_sub(asm_p as, asm_arg_t dest, asm_arg_t src) {
 	if (src.type == ASM_T_IMM) {
 		// 1000 00sw : mm 101, but for now we set s = 0 since we only have unsigned regs
 		// Presence of REX.W forces sign extention to 64 bits... (Combined Volumes, p1348)
-		// Without it it's written into the 32 bit registers which are implicitly zero
-		// extended to 64 bits. So set WMRM_FIXED_OPERAND_SIZE to not set the REX.W bit.
-		as_write_modrm(as, WMRM_FIXED_OPERAND_SIZE, "1000 000w", op(0b101), dest, NULL);
+		// Without it it's written into the 32 bit registers which zeros out the upper 32
+		// bits of that register. So effectively we can't disable sign-extention in 64 bit
+		// mode... :(
+		as_write_modrm(as, 0, "1000 000w", op(0b101), dest, NULL);
 		as_write(as, "%32d", src.imm);
 		return as_target(as) - 4;
 	} else if ( as_write_modrm(as, 0, "0010 10dw", dest, src, NULL) ) {
