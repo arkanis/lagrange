@@ -1,9 +1,5 @@
 # ToDo
 
-- Implement function compilation (including prolog, argument setup and epilog)
-	- Add AST member types for compile information
-	- Add member specs to dump compile information
-	- Output AST after compile pass
 - Implement linker pass to resolve address slots
 
 - Reserve -> and <- operators
@@ -26,6 +22,13 @@
 	- When a token is consumed the list is cleared.
 	- When the parser failes up the list contains all tried tokens at the current position.
 	- This is what we want to show the user in the error message. :)
+- An AST iterator to loop over all direct children of a node.
+	- Like:
+	  for(ast_it_t it = ast_start(node); it != NULL; it = ast_next(node, it)) { ... }
+	- Iterator would have to remember the current member and if the member is a list the current list index.
+	- Would allow to write recursive passes that can iterate over all nodes yet still handle some nodes in special ways.
+	- We would also collect the code to iterate over the AST in one place. When we change the AST we wouldn't have to update all passes.
+  
 
 
 # Things to think about
@@ -332,9 +335,9 @@ draft syntax in Plains. This makes it easier to focus on implementation.
 		sub RSP, stack_frame_size
 	
 	local args:
-		The "2" offset skips the saved BP and return address.
-		in(n)  = [RBP + (2 + in.argc - n)*8]
-		out(n) = [RBP + (2 + in.argc + out.argc - n)*8]
+		The "1" offset skips the saved BP and return address.
+		in(n)  = [RBP + (1 + in.argc - n)*8]
+		out(n) = [RBP + (1 + in.argc + out.argc - n)*8]
 	
 	epilogue:
 		mov RSP, RBP

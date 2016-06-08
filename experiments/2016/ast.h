@@ -121,7 +121,7 @@ struct node_s {
 			
 			node_ns_t ns;
 			
-			bool compiled;
+			bool compiled, linked;
 			size_t as_offset;
 			size_t stack_frame_size;
 			list_t(node_addr_slot_t) addr_slots;
@@ -213,6 +213,7 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 			{ MT_NODE_LIST, offsetof(node_t, func.body), "body" },
 			
 			{ MT_BOOL,      offsetof(node_t, func.compiled), "compiled" },
+			{ MT_BOOL,      offsetof(node_t, func.linked), "linked" },
 			{ MT_SIZE,      offsetof(node_t, func.as_offset), "as_offset" },
 			{ MT_SIZE,      offsetof(node_t, func.stack_frame_size), "stack_frame_size" },
 			{ MT_ASL,       offsetof(node_t, func.addr_slots), "addr_slots" },

@@ -309,6 +309,8 @@ raa_t compile_intl(node_p node, compiler_ctx_p ctx, int8_t req_reg);
 raa_t compile_strl(node_p node, compiler_ctx_p ctx, int8_t req_reg);
 raa_t compile_id(node_p node, compiler_ctx_p ctx, int8_t req_reg);
 
+void resolve_addr_slots(node_p node, compiler_ctx_p ctx);
+
 
 void compile(node_p module, const char* filename) {
 	printf("starting compilation pass...\n");
@@ -340,6 +342,7 @@ void compile(node_p module, const char* filename) {
 	// Then save the linked code into a binary.
 	printf("compilation pass done...\n");
 	node_print(module, stdout);
+	resolve_addr_slots(main_func_node, &ctx);
 	
 	as_save_elf(ctx.as, filename);
 	
@@ -403,14 +406,17 @@ raa_t compile_func(node_p node, compiler_ctx_p ctx) {
 	as_mov(ctx->as, RBP, RSP);
 	ssize_t frame_size_offset = as_sub(ctx->as, RSP, imm(0));
 	
-	// Wire up frame offsets of input and output arguments
-	// The "2" offset skips the saved BP and return address.
-	// in(n)  = [RBP + (2 + in.argc - n)*8]
-	// out(n) = [RBP + (2 + in.argc + out.argc - n)*8]
+	// Wire up frame offsets of input and output arguments. The BP points to the
+	// saved BP, so we don't have to skip that (remember, stack grows downwards,
+	// so the SP always contains the address of the highest byte allocated on the
+	// stack).
+	// The "1" offset skips the saved BP and return address.
+	// in(n)  = [RBP + (1 + in.argc - n)*8]
+	// out(n) = [RBP + (1 + in.argc + out.argc - n)*8]
 	for(size_t i = 0; i < node->func.in.len; i++)
-		node->func.in.ptr[i]->arg.frame_displ = (2 + node->func.in.len - i) * 8;
+		node->func.in.ptr[i]->arg.frame_displ = (1 + node->func.in.len - i) * 8;
 	for(size_t i = 0; i < node->func.out.len; i++)
-		node->func.out.ptr[i]->arg.frame_displ = (2 + node->func.in.len + node->func.out.len - i) * 8;
+		node->func.out.ptr[i]->arg.frame_displ = (1 + node->func.in.len + node->func.out.len - i) * 8;
 	
 	// Compile function body
 	for(size_t i = 0; i < node->func.body.len; i++) {
@@ -491,18 +497,17 @@ raa_t compile_call(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 	} ));
 	
 	// Cleanup input and unused output args.
-	// For now we only use the first output argument and free the rest.
-	if (target->func.out.len > 1) {
-		// More than one output argument
-		as_add(ctx->as, RSP, imm(target->func.in.len + (target->func.out.len - 1) * 8));
-		
+	// For now we only use the first output argument (if there is one) and free the rest.
+	size_t args_to_free = target->func.in.len + (target->func.out.len > 1 ? target->func.out.len - 1 : target->func.out.len);
+	as_add(ctx->as, RSP, imm(args_to_free * 8));
+	
+	if (target->func.out.len > 0) {
 		// Get output argument into target register
 		raa_t a = ra_alloc_reg(ctx->ra, ctx->as, req_reg);
 		as_pop(ctx->as, reg(a.reg_index));
 		return a;
 	} else {
-		// No output argument, only free input args
-		as_add(ctx->as, RSP, imm(target->func.in.len * 8));
+		// No output argument, so nothing to return
 		return (raa_t){ -1, -1 };
 	}
 	
@@ -790,7 +795,40 @@ raa_t compile_id(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 	int32_t stack_offset = get_var_frame_displ(target);
 	
 	raa_t a = ra_alloc_reg(ctx->ra, ctx->as, req_reg);
-	as_mov(ctx->as, reg(a.reg_index), memrd(RSP, stack_offset));
+	as_mov(ctx->as, reg(a.reg_index), memrd(RBP, stack_offset));
 	
 	return a;
+}
+
+
+
+//
+// Linker pass
+//
+
+void resolve_addr_slots(node_p node, compiler_ctx_p ctx) {
+	if (node->type != NT_FUNC) {
+		fprintf(stderr, "resolve_addr_slots(): Can only link func nodes for now!\n");
+		abort();
+	}
+	
+	printf("linking %.*s\n", node->func.name.len, node->func.name.ptr);
+	
+	// Set the flag right at the start so we don't get an endless recursion on
+	// self recursive function calls.
+	node->func.linked = true;
+	
+	for(size_t i = 0; i < node->func.addr_slots.len; i++) {
+		node_p target = node->func.addr_slots.ptr[i].target;
+		size_t offset = node->func.addr_slots.ptr[i].offset;
+		size_t rip_after_call = offset + 4;
+		
+		int32_t call_displ = target->func.as_offset - rip_after_call;
+		
+		int32_t* call_displ_ptr = (int32_t*)(ctx->as->code_ptr + offset);
+		*call_displ_ptr = call_displ;
+		
+		if (!target->func.linked)
+			resolve_addr_slots(target, ctx);
+	}
 }

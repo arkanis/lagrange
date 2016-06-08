@@ -114,7 +114,7 @@ func main in(int argc, array_t argv) out(int) {
 
 // function call
 func main in(int argc, array_t argv) out(int) {
-	var result = print("Hello World!\n", 13, 1)
+	var result = print("Hello World!\n", 13, 0)
 	syscall(60, result)
 }
 
