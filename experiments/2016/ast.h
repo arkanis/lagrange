@@ -1,10 +1,12 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include "slim_hash.h"
 #include "utils.h"
+#include "asm.h"
 
 
 typedef struct node_s node_t, *node_p;
@@ -16,6 +18,18 @@ typedef struct node_s node_t, *node_p;
 
 SH_GEN_DECL(node_ns, str_t, node_p);
 
+node_p ns_lookup(node_p node, str_t name);
+
+
+//
+// Address slot
+//
+
+typedef struct {
+	size_t offset;
+	node_p target;
+	// type? 32bit displ, or something else?
+} node_addr_slot_t, *node_addr_slot_p;
 
 //
 // Node list
@@ -38,10 +52,13 @@ typedef enum {
 	MT_NODE = 1,
 	MT_NODE_LIST,
 	MT_NS,
+	MT_ASL,
 	
 	MT_INT,
 	MT_CHAR,
-	MT_STR
+	MT_STR,
+	MT_SIZE,
+	MT_BOOL
 } member_type_t;
 
 typedef struct {
@@ -86,6 +103,12 @@ struct node_s {
 	node_p parent;
 	
 	union {
+		// TODO: Refactor nodes that share the same aspects into "aspect" structures.
+		// Canditates:
+		//   namespace: module, func, operator, scope, if_stmt (only true case), lambda
+		//   asm (as_offset): func, operator, lambda
+		//   scope: func, operator, scope, lambda
+		
 		struct {
 			node_list_t defs;
 			node_ns_t ns;
@@ -95,13 +118,21 @@ struct node_s {
 			str_t name;
 			node_list_t in, out;
 			node_list_t body;
+			
 			node_ns_t ns;
+			
+			bool compiled;
+			size_t as_offset;
+			size_t stack_frame_size;
+			list_t(node_addr_slot_t) addr_slots;
 		} func;
 		
 		struct {
 			//node_p type;
 			str_t type;
 			str_t name;  // Can be 0, NULL in case the arg is unnamed
+			
+			int64_t frame_displ;
 		} arg;
 		
 		struct {
@@ -112,6 +143,8 @@ struct node_s {
 		struct {
 			str_t name;
 			node_p value;  // Can be NULL in case of declaration only
+			
+			int64_t frame_displ;
 		} var;
 		
 		struct {
@@ -178,6 +211,11 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 			{ MT_NODE_LIST, offsetof(node_t, func.in),   "in" },
 			{ MT_NODE_LIST, offsetof(node_t, func.out),  "out" },
 			{ MT_NODE_LIST, offsetof(node_t, func.body), "body" },
+			
+			{ MT_BOOL,      offsetof(node_t, func.compiled), "compiled" },
+			{ MT_SIZE,      offsetof(node_t, func.as_offset), "as_offset" },
+			{ MT_SIZE,      offsetof(node_t, func.stack_frame_size), "stack_frame_size" },
+			{ MT_ASL,       offsetof(node_t, func.addr_slots), "addr_slots" },
 			{ 0 }
 		}
 	},
@@ -187,6 +225,7 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 			{ MT_STR,  offsetof(node_t, arg.name), "name" },
 			//{ MT_NODE, offsetof(node_t, arg.type), "type" },
 			{ MT_STR,  offsetof(node_t, arg.type), "type" },
+			{ MT_INT,  offsetof(node_t, arg.frame_displ), "frame_displ" },
 			{ 0 }
 		}
 	},
@@ -203,6 +242,7 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 		"var", (member_spec_t[]){
 			{ MT_STR,  offsetof(node_t, var.name), "name" },
 			{ MT_NODE, offsetof(node_t, var.value), "value" },
+			{ MT_INT,  offsetof(node_t, arg.frame_displ), "frame_displ" },
 			{ 0 }
 		}
 	},

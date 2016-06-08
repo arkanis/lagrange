@@ -105,6 +105,8 @@ void fill_namespaces(node_p node, node_ns_p current_ns) {
 				fill_namespaces(node->scope.stmts.ptr[i], &node->scope.ns);
 			break;
 		case NT_IF:
+			// TODO: add variable defined in condition to true_ns so it can be
+			// used only within the true_case (inspired by D).
 			fill_namespaces(node->if_stmt.true_case, &node->if_stmt.true_ns);
 			fill_namespaces(node->if_stmt.false_case, current_ns);
 			break;
@@ -257,68 +259,44 @@ node_p expand_uops(node_p node, uint32_t level, uint32_t flags, void* private) {
 }
 
 
-
 //
-// Scope (support stuff for compilation of variables)
+// Compiler helper functions
 //
 
-typedef struct {
-	size_t stack_offset;
-} scope_binding_t, *scope_binding_p;
-
-SH_GEN_DECL(scope_dict, const char*, scope_binding_t);
-
-typedef struct scope_s scope_t, *scope_p;
-struct scope_s {
-	scope_p parent;
-	size_t allocated_stack_space;
-	scope_dict_t bindings;
-};
-
-SH_GEN_DICT_DEF(scope_dict, const char*, scope_binding_t);
-
-void scope_new(scope_p scope, scope_p parent) {
-	scope->parent = parent;
-	scope->allocated_stack_space = (parent != NULL) ? parent->allocated_stack_space : 0;
-	scope_dict_new(&scope->bindings);
-}
-
-void scope_destroy(scope_p scope) {
-	scope_dict_destroy(&scope->bindings);
-}
-
-size_t scope_put(scope_p scope, const char* name, size_t size) {
-	scope_binding_p binding = scope_dict_put_ptr(&scope->bindings, name);
-	
-	binding->stack_offset = scope->allocated_stack_space;
-	scope->allocated_stack_space += size;
-	
-	return binding->stack_offset;
-}
-
-size_t scope_get(scope_p scope, const char* name) {
-	for(scope_p current_scope = scope; current_scope != NULL; current_scope = current_scope->parent) {
-		scope_binding_p binding = scope_dict_get_ptr(&current_scope->bindings, name);
-		if (binding != NULL)
-			return binding->stack_offset;
+static int32_t get_var_frame_displ(node_p node) {
+	int32_t stack_offset;
+	switch(node->type) {
+		case NT_ARG:
+			stack_offset = node->arg.frame_displ;
+			break;
+		case NT_VAR:
+			stack_offset = node->var.frame_displ;
+			break;
+		default:
+			fprintf(stderr, "get_var_frame_displ(): ID references unknwon variable type!\n");
+			abort();
 	}
-	return -1;
+	
+	return stack_offset;
 }
-
-
 
 //
 // Compiler stuff (tree to asm)
+// 
+// Compiles and assembles a function node. Also fills the address slot table
+// with references to other symbols outside the function.
+// 
+// The same process is repeated (more or less recursivly) for all functions
+// referenced by this function.
 //
 
 typedef struct {
 	asm_p as;
 	ra_p ra;
-	scope_p scope;
+	list_t(node_p) compile_queue;
 } compiler_ctx_t, *compiler_ctx_p;
 
 raa_t compile_node(node_p node, compiler_ctx_p ctx, int8_t requested_result_register);
-raa_t compile_module(node_p node, compiler_ctx_p ctx);
 raa_t compile_func(node_p node, compiler_ctx_p ctx);
 raa_t compile_scope(node_p node, compiler_ctx_p ctx);
 raa_t compile_var(node_p node, compiler_ctx_p ctx);
@@ -332,28 +310,46 @@ raa_t compile_strl(node_p node, compiler_ctx_p ctx, int8_t req_reg);
 raa_t compile_id(node_p node, compiler_ctx_p ctx, int8_t req_reg);
 
 
-
-void compile(node_p node, const char* filename) {
+void compile(node_p module, const char* filename) {
+	printf("starting compilation pass...\n");
+	
 	compiler_ctx_t ctx = (compiler_ctx_t){
 		.as = &(asm_t){ 0 },
 		.ra = &(ra_t){ 0 },
-		.scope = NULL
+		.compile_queue = { 0, NULL }
 	};
 	as_new(ctx.as);
 	ra_new(ctx.ra);
+	list_new(&ctx.compile_queue);
 	
-	raa_t a = compile_node(node, &ctx, -1);
-	ra_free_reg(ctx.ra, ctx.as, a);
+	node_p main_func_node = ns_lookup(module, str_from_c("main"));
+	if (main_func_node == NULL) {
+		fprintf(stderr, "compile(): Failed to find main func!\n");
+		abort();
+	}
+	list_append(&ctx.compile_queue, main_func_node);
+	
+	while (ctx.compile_queue.len > 0) {
+		node_p node_to_compile = ctx.compile_queue.ptr[0];
+		list_shift(&ctx.compile_queue, 1);
+		raa_t a = compile_node(node_to_compile, &ctx, -1);
+		ra_free_reg(ctx.ra, ctx.as, a);
+	}
+	
+	// TODO: call linker pass before we throw the asm code away!
+	// Then save the linked code into a binary.
+	printf("compilation pass done...\n");
+	node_print(module, stdout);
+	
 	as_save_elf(ctx.as, filename);
 	
+	list_free(&ctx.compile_queue);
 	ra_destroy(ctx.ra);
 	as_destroy(ctx.as);
 }
 
 raa_t compile_node(node_p node, compiler_ctx_p ctx, int8_t requested_result_register) {
 	switch(node->type) {
-		case NT_MODULE:
-			return compile_module(node, ctx);
 		case NT_FUNC:
 			return compile_func(node, ctx);
 		case NT_SCOPE:
@@ -375,6 +371,9 @@ raa_t compile_node(node_p node, compiler_ctx_p ctx, int8_t requested_result_regi
 		case NT_ID:
 			return compile_id(node, ctx, requested_result_register);
 		
+		case NT_MODULE:
+			fprintf(stderr, "compile_node(): module nodes are just contains for definitions and can't be compiled!\n");
+			abort();
 		case NT_UOPS:
 			fprintf(stderr, "compile_node(): uops nodes have to be reordered to op nodes before compilation!\n");
 			abort();
@@ -390,28 +389,30 @@ raa_t compile_node(node_p node, compiler_ctx_p ctx, int8_t requested_result_regi
 	return (raa_t){ -1, -1 };
 }
 
-raa_t compile_module(node_p node, compiler_ctx_p ctx) {
-	// For now just compile all functions. The first one will be the start
-	// function... at least until we have proper function prologs and epilogs
-	// and an actual main function that takes the stuff from the stack (passed
-	// by the kernel).
-	for(size_t i = 0; i < node->module.defs.len; i++) {
-		raa_t allocation = compile_node(node->module.defs.ptr[i], ctx, -1);
-		// Just free in case something comes back for whatever reason
-		ra_free_reg(ctx->ra, ctx->as, allocation);
-	}
-	
-	return (raa_t){ -1, -1 };
-}
-
 raa_t compile_func(node_p node, compiler_ctx_p ctx) {
-	// in and out args go unused for now until we have proper prologs and
-	// epilogs and actual function calling.
+	// Mark this function as compiled and set this functions offset into the
+	// assembler code to the place where we're going to generate the
+	// instructions.
+	// If we don't do this at the start calls to our own function (recursion)
+	// would add this function to the compile queue over and over again.
+	node->func.compiled = true;
+	node->func.as_offset = as_target(ctx->as);
 	
-	scope_t scope;
-	scope_new(&scope, ctx->scope);
-	ctx->scope = &scope;
+	// Prologue
+	as_push(ctx->as, RBP);
+	as_mov(ctx->as, RBP, RSP);
+	ssize_t frame_size_offset = as_sub(ctx->as, RSP, imm(0));
 	
+	// Wire up frame offsets of input and output arguments
+	// The "2" offset skips the saved BP and return address.
+	// in(n)  = [RBP + (2 + in.argc - n)*8]
+	// out(n) = [RBP + (2 + in.argc + out.argc - n)*8]
+	for(size_t i = 0; i < node->func.in.len; i++)
+		node->func.in.ptr[i]->arg.frame_displ = (2 + node->func.in.len - i) * 8;
+	for(size_t i = 0; i < node->func.out.len; i++)
+		node->func.out.ptr[i]->arg.frame_displ = (2 + node->func.in.len + node->func.out.len - i) * 8;
+	
+	// Compile function body
 	for(size_t i = 0; i < node->func.body.len; i++) {
 		raa_t allocation = compile_node(node->func.body.ptr[i], ctx, -1);
 		// Free allocations in case the statement is an expr (syscall and var
@@ -419,25 +420,129 @@ raa_t compile_func(node_p node, compiler_ctx_p ctx) {
 		ra_free_reg(ctx->ra, ctx->as, allocation);
 	}
 	
-	ctx->scope = scope.parent;
-	scope_destroy(&scope);
+	// Now we know the size of the functions stack frame so patch the stack
+	// frame allocation in the prologue.
+	uint32_t* frame_size_ptr = (uint32_t*)(ctx->as->code_ptr + frame_size_offset);
+	*frame_size_ptr = node->func.stack_frame_size;
+	
+	// Epilogue
+	as_mov(ctx->as, RSP, RBP);
+	as_pop(ctx->as, RBP);
+	as_ret(ctx->as, 0);
 	
 	return (raa_t){ -1, -1 };
 }
 
 raa_t compile_scope(node_p node, compiler_ctx_p ctx) {
-	// compile_module() does the exact same for now...
-	return compile_module(node, ctx);
+	// Nested scope is created by namespace
+	
+	// Compile all statements
+	for(size_t i = 0; i < node->scope.stmts.len; i++) {
+		raa_t allocation = compile_node(node->scope.stmts.ptr[i], ctx, -1);
+		// Just free in case something comes back for whatever reason
+		ra_free_reg(ctx->ra, ctx->as, allocation);
+	}
+	
+	return (raa_t){ -1, -1 };
 }
 
 raa_t compile_call(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
-	// "syscall" is a buildin that's compiled differently
+	// "syscall" is a builtin that's compiled differently
+	// TODO: Refactor this into a proper "builtin" thing that can be added to
+	// the namespace.
 	if ( str_eqc(&node->call.name, "syscall") )
 		return compile_syscall(node, ctx, req_reg);
 	
-	fprintf(stderr, "compile_call(): TODO normal function call\n");
-	abort();
-	return (raa_t){ -1, -1 };
+	// Check that argument count is what the function expects
+	node_p target = ns_lookup(node, node->call.name);
+	if (node->call.args.len != target->func.in.len) {
+		fprintf(stderr, "compile_call(): function %.*s expected %zu arguments but %zu given!\n",
+			target->func.name.len, target->func.name.ptr, target->func.in.len, node->call.args.len);
+		abort();
+	}
+	
+	// Add target function to compile queue if it's not already compiled
+	if (!target->func.compiled)
+		list_append(&ctx->compile_queue, target);
+	
+	// Allocate stack space for output arguments
+	if (target->func.out.len > 0)
+		as_sub(ctx->as, RSP, imm(target->func.out.len * 8));
+	
+	// Push input arguments
+	for(size_t i = 0; i < node->call.args.len; i++) {
+		raa_t a = compile_node(node->call.args.ptr[i], ctx, -1);
+		as_push(ctx->as, reg(a.reg_index));
+		ra_free_reg(ctx->ra, ctx->as, a);
+	}
+	
+	// Call the target function and remember the displacement.
+	// We create an address slot with it in the enclosing function so the linker
+	// can patch it to the proper value later on.
+	ssize_t target_displ_offset = as_call(ctx->as, reld(0));
+	
+	// Find enclosing function
+	node_p encl_func = node->parent;
+	while (encl_func != NULL && encl_func->type != NT_FUNC)
+		encl_func = encl_func->parent;
+	list_append(&encl_func->func.addr_slots, ( (node_addr_slot_t){
+		.offset = target_displ_offset,
+		.target = target
+	} ));
+	
+	// Cleanup input and unused output args.
+	// For now we only use the first output argument and free the rest.
+	if (target->func.out.len > 1) {
+		// More than one output argument
+		as_add(ctx->as, RSP, imm(target->func.in.len + (target->func.out.len - 1) * 8));
+		
+		// Get output argument into target register
+		raa_t a = ra_alloc_reg(ctx->ra, ctx->as, req_reg);
+		as_pop(ctx->as, reg(a.reg_index));
+		return a;
+	} else {
+		// No output argument, only free input args
+		as_add(ctx->as, RSP, imm(target->func.in.len * 8));
+		return (raa_t){ -1, -1 };
+	}
+	
+	/*
+	// Put arguments into R0 - R7
+	size_t i;
+	raa_t alloced_reg[8];
+	for(i = 0; i < node->call.args.len; i++)
+		alloced_reg[i] = compile_node(node->call.args.ptr[i], ctx, i);
+	// Allocate remaining argument registers so the caller saves the values in
+	// any unused argument registers.
+	for(; i < 8; i++)
+		alloced_reg[i] = ra_alloc_reg(ctx->ra, ctx->as, i);
+	
+	// Insert the CALL with a displacement of 0 for now and add an address slot
+	// for the call. So the linker step later knows what to insert here.
+	// Remember: The IP of the next instruction is used for the displ. calculation!
+	// So we take the offset after assembling the call instruction.
+	as_call(ctx->as, reld(0));
+	list_append(&node->func.addr_slots, ( (node_addr_slot_t){
+		.offset = as_target(ctx->as),
+		.target = target
+	} ));
+	
+	// Add the target function to the compile queue if necessary
+	// If the target function is already compiled (has an as_offset) we could
+	// assemble the target displ. directly in the call instruction and wouldn't
+	// need an addr slot. But then the linker step wouldn't be able to completly
+	// replace a function with a new definition later on. So we don't optimize
+	// that here so the linker pass really gets addr slots for _all_ references.
+	if ( ! target->func.compiled )
+		list_append(&ctx->compile_queue, target);
+	
+	// Output registers are in R0 - R7
+	// For now only take R0 and throw away (free) R1 - R7
+	for(size_t i = 1; i < 8; i++)
+		ra_free_reg(ctx->ra, ctx->as, alloced_reg[i]);
+	
+	return alloced_reg[0];
+	*/
 }
 
 raa_t compile_syscall(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
@@ -501,16 +606,24 @@ raa_t compile_syscall(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 }
 
 raa_t compile_var(node_p node, compiler_ctx_p ctx) {
-	char* terminated_name = strndup(node->var.name.ptr, node->var.name.len);
+	// Find containing function
+	node_p func = node->parent;
+	while (func != NULL && func->type != NT_FUNC)
+		func = func->parent;
 	
-	size_t stack_offset = scope_put(ctx->scope, terminated_name, 8);
+	// Get stack frame offset for this var by "allocating" it on the enclosing
+	// functions stack frame. The frame displacement is negative since local
+	// variables are allocated below the base pointer.
+	node->var.frame_displ = -func->func.stack_frame_size;
+	func->func.stack_frame_size += 8;
+	
+	// Compile value expr if there is one
 	if (node->var.value != NULL) {
 		raa_t a = compile_node(node->var.value, ctx, -1);
-		as_mov(ctx->as, memrd(RSP, stack_offset), reg(a.reg_index));
+		as_mov(ctx->as, memrd(RBP, node->var.frame_displ), reg(a.reg_index));
 		ra_free_reg(ctx->ra, ctx->as, a);
 	}
 	
-	free(terminated_name);
 	return (raa_t){ -1, -1 };
 }
 
@@ -633,6 +746,13 @@ raa_t compile_op(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 				abort();
 			}
 			
+			node_p target = ns_lookup(node, a->id.name);
+			int32_t stack_offset = get_var_frame_displ(target);
+			
+			raa_t a = compile_node(b, ctx, -1);
+			as_mov(ctx->as, memrd(RBP, stack_offset), reg(a.reg_index));
+			return a;
+			/*
 			char* terminated_name = strndup(a->id.name.ptr, a->id.name.len);
 			
 			size_t stack_offset = scope_get(ctx->scope, terminated_name);
@@ -643,6 +763,7 @@ raa_t compile_op(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 			
 			free(terminated_name);
 			return alloc;
+			*/
 		}
 	}
 	
@@ -665,9 +786,8 @@ raa_t compile_strl(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 }
 
 raa_t compile_id(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
-	char* terminated_name = strndup(node->var.name.ptr, node->var.name.len);
-	int32_t stack_offset = scope_get(ctx->scope, terminated_name);
-	free(terminated_name);
+	node_p target = ns_lookup(node, node->id.name);
+	int32_t stack_offset = get_var_frame_displ(target);
 	
 	raa_t a = ra_alloc_reg(ctx->ra, ctx->as, req_reg);
 	as_mov(ctx->as, reg(a.reg_index), memrd(RSP, stack_offset));

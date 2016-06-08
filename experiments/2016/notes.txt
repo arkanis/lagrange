@@ -1,7 +1,9 @@
 # ToDo
 
-- Change local variable addressing to RBP
 - Implement function compilation (including prolog, argument setup and epilog)
+	- Add AST member types for compile information
+	- Add member specs to dump compile information
+	- Output AST after compile pass
 - Implement linker pass to resolve address slots
 
 - Reserve -> and <- operators
@@ -356,7 +358,7 @@ compile pass:
 			
 			assemble prologue (remember location of sub immediate)
 			compile body (iterate over all var nodes inside, frame_size incremented for each one)
-			problem: we have to patch the stack frame size in the prologue!
+			patch the stack frame size in the prologue
 			assemble epilogue
 		
 		on var node:

@@ -19,6 +19,49 @@ SH_GEN_DEF(node_ns, str_t, node_p,
 	(key)   // key_del_expr, no need to free the str
 );
 
+node_p ns_lookup(node_p node, str_t name) {
+	node_p current_node = node, child_node = NULL;
+	
+	while (current_node != NULL) {
+		node_p* value = NULL;
+		switch(current_node->type) {
+			case NT_MODULE:
+				value = node_ns_get_ptr(&current_node->module.ns, name);
+				break;
+			case NT_FUNC:
+				value = node_ns_get_ptr(&current_node->func.ns, name);
+				break;
+			case NT_SCOPE:
+				value = node_ns_get_ptr(&current_node->scope.ns, name);
+				break;
+			case NT_IF:
+				if (child_node == current_node->if_stmt.true_case) {
+					// Only look into the true_ns if we came from the true_case node
+					// Otherwise we would find bindings for the true_case even when
+					// we're in the false_case.
+					value = node_ns_get_ptr(&current_node->if_stmt.true_ns, name);
+				}
+				break;
+			
+			default:
+				for(member_spec_p member = current_node->spec->members; member->type != 0; member++) {
+					if (member->type == MT_NS) {
+						fprintf(stderr, "ns_lookup(): found unhandled node with a namespace!\n");
+						abort();
+					}
+				}
+		}
+		
+		if (value)
+			return *value;
+		
+		child_node = current_node;
+		current_node = current_node->parent;
+	}
+	
+	return NULL;
+}
+
 
 //
 // Node list
@@ -83,7 +126,7 @@ node_p node_alloc_append(node_type_t type, node_p parent, node_list_p list) {
 	node_p node = node_alloc(type);
 	
 	node->parent = parent;
-	list_append(list, node);
+	node_list_append(list, node);
 	
 	return node;
 }
@@ -199,6 +242,14 @@ static void node_print_recursive(node_p node, FILE* output, int level) {
 					fprintf(output, "\"%.*s\" ", it->key.len, it->key.ptr);
 				}
 				} break;
+			case MT_ASL:{
+				list_t(node_addr_slot_t)* asl = member_ptr;
+				for(size_t i = 0; i < asl->len; i++) {
+					fprintf(output, "\n%*soffset %zu → ", (level+2)*2, "", asl->ptr[i].offset);
+					node_print_inline(asl->ptr[i].target, output);
+					fprintf(output, "\n");
+				}
+				} break;
 			
 			case MT_INT: {
 				int64_t* value = member_ptr;
@@ -211,6 +262,14 @@ static void node_print_recursive(node_p node, FILE* output, int level) {
 			case MT_STR: {
 				str_p value = member_ptr;
 				fprintf(output, "\"%.*s\"", value->len, value->ptr);
+				} break;
+			case MT_SIZE: {
+				size_t* value = member_ptr;
+				fprintf(output, "%zu", *value);
+				} break;
+			case MT_BOOL: {
+				bool* value = member_ptr;
+				fprintf(output, "%s", *value ? "true" : "false");
 				} break;
 		}
 	}
@@ -237,6 +296,9 @@ void node_print_inline(node_p node, FILE* output) {
 			case MT_NS:
 				fprintf(output, "ns");
 				break;
+			case MT_ASL:
+				fprintf(output, "asl");
+				break;
 			case MT_INT: {
 				int64_t* value = member_ptr;
 				fprintf(output, "%ld", *value);
@@ -248,6 +310,14 @@ void node_print_inline(node_p node, FILE* output) {
 			case MT_STR: {
 				str_p value = member_ptr;
 				fprintf(output, "\"%.*s\"", value->len, value->ptr);
+				} break;
+			case MT_SIZE: {
+				size_t* value = member_ptr;
+				fprintf(output, "%zu", *value);
+				} break;
+			case MT_BOOL: {
+				bool* value = member_ptr;
+				fprintf(output, "%s", *value ? "true" : "false");
 				} break;
 		}
 	}
