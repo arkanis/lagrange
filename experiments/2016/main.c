@@ -498,7 +498,7 @@ raa_t compile_call(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 	
 	// Cleanup input and unused output args.
 	// For now we only use the first output argument (if there is one) and free the rest.
-	size_t args_to_free = target->func.in.len + (target->func.out.len > 1 ? target->func.out.len - 1 : target->func.out.len);
+	size_t args_to_free = target->func.in.len + (target->func.out.len > 1 ? target->func.out.len - 1 : 0);
 	as_add(ctx->as, RSP, imm(args_to_free * 8));
 	
 	if (target->func.out.len > 0) {
