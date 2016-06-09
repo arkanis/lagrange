@@ -1,4 +1,7 @@
 #include <stdbool.h>
+#include <stdio.h>
+#include <unistd.h>    // for popen
+#include <sys/stat.h>  // for chmod
 #include "../asm.h"
 
 #define SLIM_TEST_IMPLEMENTATION
@@ -16,6 +19,53 @@ bool code_cmp(asm_p as, uint8_t* data_ptr, size_t data_len) {
 	
 	return true;
 }
+
+int run_and_delete(const char* elf_filename, const char* command, char** output) {
+	if (elf_filename)
+		chmod(elf_filename, S_IRUSR | S_IWUSR | S_IXUSR);
+	
+	char* output_ptr = output ? *output : NULL;
+	size_t output_len = 0;
+	
+	FILE* child = popen(command, "r");
+	char line[512];
+	while(!feof(child)) {
+		char* result = fgets(line, sizeof(line), child);
+		if (result == NULL)
+			break;
+		size_t line_len = strlen(line);
+		
+		output_len += line_len;
+		output_ptr = realloc(output_ptr, output_len);
+		// The +1 at the end makes sure we also copy the zero terminator
+		memcpy(output_ptr + output_len - line_len, line, line_len + 1);
+	}
+	int exit_info =  pclose(child);
+	
+	//if (elf_filename)
+	//	unlink(elf_filename);
+	
+	if (output)
+		*output = output_ptr;
+	return WEXITSTATUS(exit_info);
+}
+
+// Useful commands:
+// objdump -m i386:x86-64 -M intel-mnemonic -d main.elf
+// objdump --wide -m i386:x86-64 -M intel-mnemonic -d if.elf | tail -n +8 | cut -f 3
+// objdump --wide --architecture=i386:x86-64 --disassembler-options=intel,intel-mnemonic --disassemble
+char* disassemble(asm_p as) {
+	as_save_elf(as, "dissassemble.elf");
+	char* output = NULL;
+	run_and_delete("dissassemble.elf",
+		"objdump --architecture=i386:x86-64 --disassembler-options=intel,intel-mnemonic "
+			"--wide --disassemble dissassemble.elf | "
+		"tail -n +8 | cut -f 3",
+		&output
+	);
+	return output;
+}
+
 
 
 void test_write() {
@@ -86,6 +136,54 @@ void test_write_with_vars() {
 	
 	as_destroy(as);
 }
+
+void test_write_elf() {
+	asm_p as = &(asm_t){ 0 };
+	as_new(as);
+	
+	const char* text_ptr = "Hello World!\n";
+	size_t text_len = strlen(text_ptr);
+	size_t text_vaddr = as_data(as, text_ptr, text_len);
+	
+	as_mov(as, RAX, imm(1));  // wirte
+	as_mov(as, RDI, imm(1));  // stdout
+	as_mov(as, RSI, imm(text_vaddr));  // text ptr
+	as_mov(as, RDX, imm(text_len));    // text len
+	as_syscall(as);
+	
+	as_mov(as, RAX, imm(60));  // exit
+	as_mov(as, RDI, imm(1));   // exit code
+	as_syscall(as);
+	
+	as_save_elf(as, "test_write_elf.elf");
+	as_destroy(as);
+	
+	char* output = NULL;
+	int status_code = run_and_delete("test_write_elf.elf", "./test_write_elf.elf", &output);
+	
+	st_check_int(status_code, 1);
+	st_check_str(output, text_ptr);
+	
+	free(output);
+}
+
+void test_basic_instructions() {
+	asm_p as = &(asm_t){ 0 };
+	char* disassembly = NULL;
+	as_new(as);
+	
+	
+	as_clear(as);
+		as_syscall(as);
+	disassembly = disassemble(as);
+	st_check_str(disassembly,
+		"syscall \n"
+	);
+	
+	free(disassembly);
+}
+
+
 
 void test_modrm_instructions() {
 	asm_p as = &(asm_t){ 0 };
@@ -168,27 +266,6 @@ void test_modrm_instructions() {
 	as_destroy(as);
 }
 
-void test_write_elf() {
-	asm_p as = &(asm_t){ 0 };
-	as_new(as);
-	
-	const char* text_ptr = "Hello World!\n";
-	size_t text_len = strlen(text_ptr);
-	size_t text_vaddr = as_data(as, text_ptr, text_len);
-	
-	as_mov(as, RAX, imm(1));  // wirte
-	as_mov(as, RDI, imm(1));  // stdout
-	as_mov(as, RSI, imm(text_vaddr));  // text ptr
-	as_mov(as, RDX, imm(text_len));    // text len
-	as_syscall(as);
-	
-	as_mov(as, RAX, imm(60));  // exit
-	as_mov(as, RDI, imm(1));   // exit code
-	as_syscall(as);
-	
-	as_save_elf(as, "asm.elf");
-	as_destroy(as);
-}
 
 void test_instructions_for_if() {
 	asm_p as = &(asm_t){ 0 };
@@ -236,8 +313,9 @@ void test_instructions_for_call() {
 int main() {
 	st_run(test_write);
 	st_run(test_write_with_vars);
-	st_run(test_modrm_instructions);
 	st_run(test_write_elf);
+	st_run(test_basic_instructions);
+	st_run(test_modrm_instructions);
 	st_run(test_instructions_for_if);
 	st_run(test_instructions_for_call);
 	return st_show_report();
