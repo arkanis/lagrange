@@ -703,6 +703,10 @@ ssize_t as_add(asm_p as, asm_arg_t dest, asm_arg_t src) {
 		// Without it it's written into the 32 bit registers which zeros out the upper 32
 		// bits of that register. So effectively we can't disable sign-extention in 64 bit
 		// mode... :(
+		if (src.imm & 0x80000000) {
+			fprintf(stderr, "as_add(): can't encode unsigned immediates larget than 31 bits!\n");
+			abort();
+		}
 		as_write_modrm(as, 0, "1000 000w", op(0b000), dest, NULL);
 		as_write(as, "%32d", src.imm);
 		return as_target(as) - 4;
@@ -722,6 +726,10 @@ ssize_t as_sub(asm_p as, asm_arg_t dest, asm_arg_t src) {
 		// Without it it's written into the 32 bit registers which zeros out the upper 32
 		// bits of that register. So effectively we can't disable sign-extention in 64 bit
 		// mode... :(
+		if (src.imm & 0x80000000) {
+			fprintf(stderr, "as_sub(): can't encode unsigned immediates larget than 31 bits!\n");
+			abort();
+		}
 		as_write_modrm(as, 0, "1000 000w", op(0b101), dest, NULL);
 		as_write(as, "%32d", src.imm);
 		return as_target(as) - 4;
