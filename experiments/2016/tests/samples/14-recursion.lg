@@ -1,0 +1,13 @@
+// status: 6
+
+func main {
+	var result = fac(3)
+	syscall(60, result)
+}
+
+func fac in(int n) out(int res) {
+	if (n <= 1)
+		res = 1
+	else
+		res = n * fac(n - 1)
+}

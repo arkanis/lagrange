@@ -1,0 +1,13 @@
+// status: 1
+
+func main {
+	var x = 1
+	{
+		var foo = 2
+		var bar = 3
+		{
+			var y = x
+			syscall(60, y)
+		}
+	}
+}

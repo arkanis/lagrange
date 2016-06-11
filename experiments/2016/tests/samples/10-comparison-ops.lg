@@ -1,0 +1,6 @@
+// status: 0
+
+func main {
+	var x = 17
+	syscall(60, x <= 16)
+}

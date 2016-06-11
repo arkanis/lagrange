@@ -1,0 +1,5 @@
+// status: 17
+
+func main {
+	syscall(60, 17)
+}

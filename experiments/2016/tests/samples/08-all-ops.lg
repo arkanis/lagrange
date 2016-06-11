@@ -1,0 +1,10 @@
+// Test for all C operators in lexer and parser. This doesn't compile so we don't
+// do any actual tests. Maybe later...
+
+func main {
+	var x = not (4 << 2 == 8 != 7 || y && z and foo or bar)
+	var y = -7
+	var z = +17
+	
+	syscall(60, 0)
+}

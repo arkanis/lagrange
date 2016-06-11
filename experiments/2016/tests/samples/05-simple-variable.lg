@@ -1,0 +1,8 @@
+// status: 0
+// output Hello World!
+
+func main {
+	var msg = "Hello World!"
+	syscall(1, 1, msg, 12)
+	syscall(60, 0)
+}

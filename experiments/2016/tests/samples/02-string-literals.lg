@@ -1,0 +1,7 @@
+// status: 17
+// output: Hello World!
+
+func main {
+	syscall(1, 1, "Hello World!", 12)  // write text
+	syscall(60, 17)
+}

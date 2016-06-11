@@ -1,0 +1,14 @@
+// status: 0
+// output: Hello Assigment!
+
+func main {
+	var str_ptr = "Hello World!"
+	var str_len = 12
+	
+	str_ptr = "Hello Assigment!"
+	str_len = 16 * 1 + 0
+	
+	syscall(1, 1, str_ptr, str_len)
+	
+	syscall(60, 0)
+}

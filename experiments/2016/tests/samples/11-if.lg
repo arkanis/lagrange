@@ -1,0 +1,10 @@
+// status: 100
+
+func main {
+	var x = 9
+	if x < 10
+		x = 100
+	else
+		x = 2
+	syscall(60, x)
+}

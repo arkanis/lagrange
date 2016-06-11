@@ -1,0 +1,11 @@
+// status: 30
+
+func main {
+	var x = 10
+	var y = 0
+	while x < 100 do {
+		x = x + 3
+		y = y + 1
+	}
+	syscall(60, y)
+}
