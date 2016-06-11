@@ -698,26 +698,26 @@ raa_t compile_op(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 		
 		case OP_MUL: case OP_DIV:
 		{
+			raa_t a1 = compile_node(a, ctx, RAX.reg);
+			raa_t a2 = compile_node(b, ctx, -1);
 			// reserve RDX since MUL and DIV overwrite it
-			raa_t a1 = ra_alloc_reg(ctx->ra, ctx->as, RDX.reg);
-			raa_t a2 = compile_node(a, ctx, RAX.reg);
-			raa_t a3 = compile_node(b, ctx, -1);
+			raa_t a3 = ra_alloc_reg(ctx->ra, ctx->as, RDX.reg);
 			
 			switch(op) {
-				case OP_MUL:  as_mul(ctx->as, reg(a3.reg_index));  break;
-				case OP_DIV:  as_div(ctx->as, reg(a3.reg_index));  break;
+				case OP_MUL:  as_mul(ctx->as, reg(a2.reg_index));  break;
+				case OP_DIV:  as_div(ctx->as, reg(a2.reg_index));  break;
 			}
 			
-			ra_free_reg(ctx->ra, ctx->as, a1);
 			ra_free_reg(ctx->ra, ctx->as, a3);
+			ra_free_reg(ctx->ra, ctx->as, a2);
 			
 			if (req_reg != RAX.reg && req_reg != -1) {
 				raa_t a4 = ra_alloc_reg(ctx->ra, ctx->as, req_reg);
 				as_mov(ctx->as, reg(req_reg), RAX);
-				ra_free_reg(ctx->ra, ctx->as, a2);
+				ra_free_reg(ctx->ra, ctx->as, a1);
 				return a4;
 			} else {
-				return a2;
+				return a1;
 			}
 		}
 		
