@@ -52,10 +52,12 @@ raa_t ra_alloc_reg(ra_p ra, asm_p as, int8_t reg_index) {
 		
 		// Mark the spill register as allocated
 		mark_reg(ra, allocation.spill_reg);
+		//printf("ALLOC r%d spill into r%d\n", reg_index, allocation.spill_reg);
 	} else {
 		// No need to spill, but mark the requested reg as allocated since it
 		// isn't yet
 		mark_reg(ra, reg_index);
+		//printf("ALLOC r%d\n", reg_index);
 	}
 	
 	return allocation;
@@ -63,9 +65,11 @@ raa_t ra_alloc_reg(ra_p ra, asm_p as, int8_t reg_index) {
 
 void ra_free_reg(ra_p ra, asm_p as, raa_t allocation) {
 	if (allocation.spill_reg != -1) {
+		//printf("FREE r%d restore from r%d\n", allocation.reg_index, allocation.spill_reg);
 		as_mov(as, reg(allocation.reg_index), reg(allocation.spill_reg));
 		unmark_reg(ra, allocation.spill_reg);
 	} else if (allocation.reg_index != -1) {
+		//printf("FREE r%d\n", allocation.reg_index);
 		unmark_reg(ra, allocation.reg_index);
 	}
 }
