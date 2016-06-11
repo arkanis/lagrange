@@ -419,12 +419,24 @@ raa_t compile_func(node_p node, compiler_ctx_p ctx) {
 		node->func.out.ptr[i]->arg.frame_displ = (1 + node->func.in.len + node->func.out.len - i) * 8;
 	
 	// Compile function body
+	raa_t last_stmt_result;
 	for(size_t i = 0; i < node->func.body.len; i++) {
 		raa_t allocation = compile_node(node->func.body.ptr[i], ctx, -1);
-		// Free allocations in case the statement is an expr (syscall and var
-		// don't return an allocated register)
-		ra_free_reg(ctx->ra, ctx->as, allocation);
+		// Free allocations in case the statement is an expr. If the statement
+		// returns no allocation this does nothing. The result of the last
+		// statement is not freed but stored so we can use it as return value.
+		if (i != node->func.body.len - 1)
+			ra_free_reg(ctx->ra, ctx->as, allocation);
+		else
+			last_stmt_result = allocation;
 	}
+	
+	if (last_stmt_result.reg_index != -1 && node->func.out.len >= 1) {
+		// The last statement actually returned a result, write it into the first
+		// output arg of the function (if the func has at least one out arg).
+		as_mov(ctx->as, memrd(RBP, node->func.out.ptr[0]->arg.frame_displ), reg(last_stmt_result.reg_index));
+	}
+	ra_free_reg(ctx->ra, ctx->as, last_stmt_result);
 	
 	// Now we know the size of the functions stack frame so patch the stack
 	// frame allocation in the prologue.
