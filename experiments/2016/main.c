@@ -108,7 +108,8 @@ void fill_namespaces(node_p node, node_ns_p current_ns) {
 			// TODO: add variable defined in condition to true_ns so it can be
 			// used only within the true_case (inspired by D).
 			fill_namespaces(node->if_stmt.true_case, &node->if_stmt.true_ns);
-			fill_namespaces(node->if_stmt.false_case, current_ns);
+			if (node->if_stmt.false_case)
+				fill_namespaces(node->if_stmt.false_case, current_ns);
 			break;
 		case NT_WHILE:
 			fill_namespaces(node->while_stmt.body, current_ns);
@@ -706,11 +707,18 @@ raa_t compile_if(node_p node, compiler_ctx_p ctx) {
 	ra_free_reg(ctx->ra, ctx->as, a);
 	asm_jump_slot_t to_end = as_jmp(ctx->as, reld(0));
 	
+	// If there no false case we jump here anyway since the next statement will
+	// continue here.
 	as_mark_jmp_slot_target(ctx->as, to_false_case);
-	a = compile_node(node->if_stmt.false_case, ctx, -1);
-	ra_free_reg(ctx->ra, ctx->as, a);
 	
-	as_mark_jmp_slot_target(ctx->as, to_end);
+	if (node->if_stmt.false_case) {
+		a = compile_node(node->if_stmt.false_case, ctx, -1);
+		ra_free_reg(ctx->ra, ctx->as, a);
+		
+		as_mark_jmp_slot_target(ctx->as, to_end);
+	}
+	
+	
 	return ra_empty();
 }
 

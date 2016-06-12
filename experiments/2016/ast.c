@@ -195,7 +195,8 @@ static node_p node_iterate_recursive(node_p node, uint32_t level, node_it_func_t
 		void* member_ptr = (uint8_t*)node + member->offset;
 		if (member->type == MT_NODE) {
 			node_p* child_node = member_ptr;
-			*child_node = node_iterate_recursive(*child_node, level + 1, func, private);
+			if (*child_node)
+				*child_node = node_iterate_recursive(*child_node, level + 1, func, private);
 		} else if (member->type == MT_NODE_LIST) {
 			node_list_p list = member_ptr;
 			for(size_t i = 0; i < list->len; i++)
@@ -227,7 +228,8 @@ static void node_print_recursive(node_p node, FILE* output, int level) {
 		switch(member->type) {
 			case MT_NODE: {
 				node_p value = *(node_p*)member_ptr;
-				node_print_recursive(value, output, level+1);
+				if (value != NULL)
+					node_print_recursive(value, output, level+1);
 				} break;
 			case MT_NODE_LIST: {
 				node_list_p list = member_ptr;
