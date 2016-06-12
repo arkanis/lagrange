@@ -389,7 +389,7 @@ raa_t compile_node(node_p node, compiler_ctx_p ctx, int8_t requested_result_regi
 			abort();
 	}
 	
-	return (raa_t){ -1, -1 };
+	return ra_empty();
 }
 
 raa_t compile_func(node_p node, compiler_ctx_p ctx) {
@@ -425,10 +425,14 @@ raa_t compile_func(node_p node, compiler_ctx_p ctx) {
 		// Free allocations in case the statement is an expr. If the statement
 		// returns no allocation this does nothing. The result of the last
 		// statement is not freed but stored so we can use it as return value.
-		if (i != node->func.body.len - 1)
+		if (i != node->func.body.len - 1) {
 			ra_free_reg(ctx->ra, ctx->as, allocation);
-		else
+			// Make sure that after the statement no registers are spilled on
+			// the stack.
+			ra_ensure(ctx->ra, 0, 0);
+		} else {
 			last_stmt_result = allocation;
+		}
 	}
 	
 	if (last_stmt_result.reg_index != -1 && node->func.out.len >= 1) {
@@ -448,7 +452,7 @@ raa_t compile_func(node_p node, compiler_ctx_p ctx) {
 	as_pop(ctx->as, RBP);
 	as_ret(ctx->as, 0);
 	
-	return (raa_t){ -1, -1 };
+	return ra_empty();
 }
 
 raa_t compile_scope(node_p node, compiler_ctx_p ctx) {
@@ -461,7 +465,7 @@ raa_t compile_scope(node_p node, compiler_ctx_p ctx) {
 		ra_free_reg(ctx->ra, ctx->as, allocation);
 	}
 	
-	return (raa_t){ -1, -1 };
+	return ra_empty();
 }
 
 raa_t compile_call(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
@@ -520,7 +524,7 @@ raa_t compile_call(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 		return a;
 	} else {
 		// No output argument, so nothing to return
-		return (raa_t){ -1, -1 };
+		return ra_empty();
 	}
 	
 	/*
@@ -641,7 +645,7 @@ raa_t compile_var(node_p node, compiler_ctx_p ctx) {
 		ra_free_reg(ctx->ra, ctx->as, a);
 	}
 	
-	return (raa_t){ -1, -1 };
+	return ra_empty();
 }
 
 raa_t compile_if(node_p node, compiler_ctx_p ctx) {
@@ -662,7 +666,7 @@ raa_t compile_if(node_p node, compiler_ctx_p ctx) {
 	ra_free_reg(ctx->ra, ctx->as, a);
 	
 	as_mark_jmp_slot_target(ctx->as, to_end);
-	return (raa_t){ -1, -1 };
+	return ra_empty();
 }
 
 raa_t compile_while(node_p node, compiler_ctx_p ctx) {
@@ -685,7 +689,7 @@ raa_t compile_while(node_p node, compiler_ctx_p ctx) {
 	as_set_jmp_slot_target(ctx->as, to_cond, cond_target);
 	
 	as_mark_jmp_slot_target(ctx->as, to_end);
-	return (raa_t){ -1, -1 };
+	return ra_empty();
 }
 
 
@@ -786,7 +790,7 @@ raa_t compile_op(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 	
 	fprintf(stderr, "compile_op(): unknown op idx: %zu!\n", op);
 	abort();
-	return (raa_t){ -1, -1 };
+	return ra_empty();
 }
 
 raa_t compile_intl(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
