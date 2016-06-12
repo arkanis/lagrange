@@ -401,22 +401,30 @@ raa_t compile_func(node_p node, compiler_ctx_p ctx) {
 	node->func.compiled = true;
 	node->func.as_offset = as_target(ctx->as);
 	
-	// Prologue
+	// Prologue: preserver callee saved regs rbx, rsp, rbp, r12, r13, r14, r15
+	as_push(ctx->as, RBX);
+	as_push(ctx->as, R12);
+	as_push(ctx->as, R13);
+	as_push(ctx->as, R14);
+	as_push(ctx->as, R15);
+	// Prologue: preserve callers base pointer and use stack pointer as out base pointer
 	as_push(ctx->as, RBP);
 	as_mov(ctx->as, RBP, RSP);
 	ssize_t frame_size_offset = as_sub(ctx->as, RSP, imm(0));
 	
 	// Wire up frame offsets of input and output arguments. The BP points to the
-	// saved BP, so we don't have to skip that (remember, stack grows downwards,
-	// so the SP always contains the address of the highest byte allocated on the
-	// stack).
-	// The "1" offset skips the saved BP and return address.
-	// in(n)  = [RBP + (1 + in.argc - n)*8]
-	// out(n) = [RBP + (1 + in.argc + out.argc - n)*8]
+	// saved BP, so we don't have to skip that, thats what the -1 is for.
+	// Remember, stack grows downwards, so the SP always contains the address of
+	// the highest byte allocated on the stack.
+	// We want to skip 7 64 bit values (1 saved BP, 5 callee saved regs and 1
+	// return address). The -1 offset accounts for the stack growing towards
+	// smaller addresses.
+	// in(n)  = [RBP + (7-1 + in.argc - n)*8]
+	// out(n) = [RBP + (7-1 + in.argc + out.argc - n)*8]
 	for(size_t i = 0; i < node->func.in.len; i++)
-		node->func.in.ptr[i]->arg.frame_displ = (1 + node->func.in.len - i) * 8;
+		node->func.in.ptr[i]->arg.frame_displ = (7-1 + node->func.in.len - i) * 8;
 	for(size_t i = 0; i < node->func.out.len; i++)
-		node->func.out.ptr[i]->arg.frame_displ = (1 + node->func.in.len + node->func.out.len - i) * 8;
+		node->func.out.ptr[i]->arg.frame_displ = (7-1 + node->func.in.len + node->func.out.len - i) * 8;
 	
 	// Compile function body
 	raa_t last_stmt_result;
@@ -447,9 +455,16 @@ raa_t compile_func(node_p node, compiler_ctx_p ctx) {
 	uint32_t* frame_size_ptr = (uint32_t*)(ctx->as->code_ptr + frame_size_offset);
 	*frame_size_ptr = node->func.stack_frame_size;
 	
-	// Epilogue
+	// Epilogue: restore callers stack and base pointer
 	as_mov(ctx->as, RSP, RBP);
 	as_pop(ctx->as, RBP);
+	// Epilogue: restore callee saved registeres
+	as_pop(ctx->as, R15);
+	as_pop(ctx->as, R14);
+	as_pop(ctx->as, R13);
+	as_pop(ctx->as, R12);
+	as_pop(ctx->as, RBX);
+	
 	as_ret(ctx->as, 0);
 	
 	return ra_empty();
@@ -487,6 +502,17 @@ raa_t compile_call(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 	if (!target->func.compiled)
 		list_append(&ctx->compile_queue, target);
 	
+	// Allocate stack space for currently allocated caller saved regs (that need to be saved)
+	// Caller saved regs: rax, rdi, rsi, rdx, rcx, r8, r9, r10, r11
+	asm_arg_t caller_saved_regs[] = { RAX, RDI, RSI, RDX, RCX, R8, R9, R10, R11 };
+	uint8_t csr_ptr[9];
+	size_t  csr_len = 0;
+	for(size_t i = 0; i < sizeof(caller_saved_regs) / sizeof(caller_saved_regs[0]); i++) {
+		if ( ra_reg_allocated(ctx->ra, caller_saved_regs[i].reg) )
+			csr_ptr[csr_len++] = caller_saved_regs[i].reg;
+	}
+	as_sub(ctx->as, RSP, imm(csr_len * 8));
+	
 	// Allocate stack space for output arguments
 	if (target->func.out.len > 0)
 		as_sub(ctx->as, RSP, imm(target->func.out.len * 8));
@@ -497,6 +523,11 @@ raa_t compile_call(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 		as_push(ctx->as, reg(a.reg_index));
 		ra_free_reg(ctx->ra, ctx->as, a);
 	}
+	
+	// Preserve caller saved regs into the space we allocated for them
+	size_t args_on_stack = node->call.args.len + target->func.out.len;
+	for(size_t i = 0; i < csr_len; i++)
+		as_mov(ctx->as, memrd(RSP, (args_on_stack + i)*8), reg(csr_ptr[i]));
 	
 	// Call the target function and remember the displacement.
 	// We create an address slot with it in the enclosing function so the linker
@@ -517,15 +548,27 @@ raa_t compile_call(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 	size_t args_to_free = target->func.in.len + (target->func.out.len > 1 ? target->func.out.len - 1 : 0);
 	as_add(ctx->as, RSP, imm(args_to_free * 8));
 	
+	int8_t out_arg_reg = -1;
+	// But if it has at least one out arg pop that value into the requested output arg
 	if (target->func.out.len > 0) {
-		// Get output argument into target register
-		raa_t a = ra_alloc_reg(ctx->ra, ctx->as, req_reg);
-		as_pop(ctx->as, reg(a.reg_index));
-		return a;
-	} else {
-		// No output argument, so nothing to return
-		return ra_empty();
+		// Pop the out arg into any free and not-caller-saved register
+		out_arg_reg = ra_find_free_reg(ctx->ra);
+		as_pop(ctx->as, reg(out_arg_reg));
 	}
+	
+	// Restore caller saved regs
+	for(size_t i = 0; i < csr_len; i++)
+		as_pop(ctx->as, reg(csr_ptr[i]));
+	
+	// Return nothing if the called func has no output argument
+	raa_t result_allocation = ra_empty();
+	// But if it has we allocate the requested register and put the out arg in there
+	if (out_arg_reg != -1) {
+		result_allocation = ra_alloc_reg(ctx->ra, ctx->as, req_reg);
+		as_mov(ctx->as, reg(result_allocation.reg_index), reg(out_arg_reg));
+	}
+	
+	return result_allocation;
 	
 	/*
 	// Put arguments into R0 - R7

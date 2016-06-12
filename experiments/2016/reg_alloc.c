@@ -26,21 +26,21 @@ static inline void unmark_reg(ra_p ra, uint8_t reg_index) {
 	ra->allocated_registers &= ~(1 << reg_index);
 }
 
-static inline bool reg_allocated(ra_p ra, uint8_t reg_index) {
+bool ra_reg_allocated(ra_p ra, uint8_t reg_index) {
 	return ((1 << reg_index) & ra->allocated_registers) != 0;
 }
 
 /**
- * Finds the highest unmarked register bug ignores RSP (R4) and RBP (R5) because
+ * Finds the highest unmarked register but ignores RSP (R4) and RBP (R5) because
  * they're used for addressing of variable access.
  */
-int8_t find_free_reg(ra_p ra) {
+int8_t ra_find_free_reg(ra_p ra) {
 	for(int8_t i = 15; i > 0; i--) {
-		if ( !(reg_allocated(ra, i) && i != RSP.reg && i != RBP.reg) )
+		if ( !(ra_reg_allocated(ra, i) && i != RSP.reg && i != RBP.reg) )
 			return i;
 	}
 	
-	fprintf(stderr, "find_free_reg(): no free register left!\n");
+	fprintf(stderr, "ra_find_free_reg(): no free register left!\n");
 	abort();
 	return -1;
 }
@@ -48,10 +48,10 @@ int8_t find_free_reg(ra_p ra) {
 
 raa_t ra_alloc_reg(ra_p ra, asm_p as, int8_t reg_index) {
 	if (reg_index == -1)
-		reg_index = find_free_reg(ra);
+		reg_index = ra_find_free_reg(ra);
 	
 	raa_t allocation = (raa_t){ reg_index, RA_NO_SPILL, 0 };
-	if ( reg_allocated(ra, reg_index) ) {
+	if ( ra_reg_allocated(ra, reg_index) ) {
 		ra->spill_depth++;
 		allocation.spill_depth = ra->spill_depth;
 		allocation.spill_reg = RA_STACK_SPILL;
@@ -59,7 +59,7 @@ raa_t ra_alloc_reg(ra_p ra, asm_p as, int8_t reg_index) {
 		
 		/*
 		// Spill it (old code, spilled into free registers, doesn't work for recursive functions)
-		allocation.spill_reg = find_free_reg(ra);
+		allocation.spill_reg = ra_find_free_reg(ra);
 		as_mov(as, reg(allocation.spill_reg), reg(reg_index));
 		
 		// Mark the spill register as allocated

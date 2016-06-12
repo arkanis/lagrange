@@ -1,4 +1,5 @@
 // status: 6
+// 1 * 2 * 3
 
 func main {
 	var result = fac(3)

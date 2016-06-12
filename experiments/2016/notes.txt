@@ -1,10 +1,6 @@
 # ToDo
 
-- Implement linker pass to resolve address slots
-
-- Reserve -> and <- operators
-- Write test cases for assembler, parser and compiler (by executing external programs)
-- Fix mul/spilling bug
+- return statement
 - Add scope node, as extra struct, in a way that it can be overlayed into function, if, while, etc. nodes (because they also open a new scope)
 	- Nope, the scope node only reflects the fact that the user opened a new scope
 	  somewhere. It doesn't manage it or contains all symbols in the scope. That job
@@ -12,6 +8,19 @@
 	  the AST.
 - Refactor compiler stuff into compiler.c
 - Proper error reporting in parser
+- structs for output arguments
+- "struct" deconstruction for function returns: a, b, c = my_struct
+
+
+# The great plan
+
+- Needed in bootstrapping compiler
+	- unsigned byte (for strings), optionally 16 and 32 bit ints
+	- arrays (for strings and mmaped buffers)
+	- structs
+	- metaprogramming
+	- debug symbols?
+- Then try to implement the compiler in lagrange
 
 
 # Nice to have
@@ -28,7 +37,6 @@
 	- Iterator would have to remember the current member and if the member is a list the current list index.
 	- Would allow to write recursive passes that can iterate over all nodes yet still handle some nodes in special ways.
 	- We would also collect the code to iterate over the AST in one place. When we change the AST we wouldn't have to update all passes.
-  
 
 
 # Things to think about
@@ -42,7 +50,8 @@
 - Can operators be namespaced? e.g. a numpy.+ b
 	- Nice to resolve conflicts
 	- But probably makes grammar a nightmare since we have to accept all operators as IDs, too
-
+- Reserve -> and <- operators
+	- Easy to type alternatives for → and ←. Kind of channel operators? Or better stay at >> and <<?
 
 # Source code structure
 
@@ -294,31 +303,42 @@ draft syntax in Plains. This makes it easier to focus on implementation.
 	  a single ADD RSP instruction. It knows how many input args it pushed so it
 	  can include that in the added offset.
 	
+	caller saved: rax, rdi, rsi, rdx, rcx, r8, r9, r10, r11
+	callee saved: rbx, rsp, rbp, r12, r13, r14, r15
+	
+	
 	stack layout:
 	| ... caller stack
+	| caller saved regs
 	| out 1
 	| out 2
 	| out n
 	| in 1
 	| in 2
 	| in n
-	| ret addr
-	| saved BP  ← RSP at start of target_func code
-	| ... callee stack  ← RBP of target_func
+	| ret addr           __
+	| callee saved regs    \ RSP at start of target_func code
+	| saved BP          __
+	| ... callee stack    \ RBP of target_func
 	
 	caller:
+	- allocate stack space for currently allocated regs (that need to be saved)
 	- allocates stack space for out args
-	- push in args
+	- push in args (can use all regs here)
+	- preserve caller saved regs into the space allocated for them in step 1
 	- call target_func
 	- cleanup input and unused output args
+	- if at least 1 out arg: pop out arg into RAX
+	- restore caller saved regs, except RAX
+	- if necessary: put output value from RAX into requested result register
 	
 	callee:
-	- save BP
+	- preserve callee saved regs (before: save BP)
 	- set BP to local stack frame
 	- allocate space for local variables
 	- ... function body
 	- reset SP to BP (free all local variables)
-	- restore BP of caller
+	- restore callee saved regs (before: restore BP of caller)
 	- return to caller
 	
 	call:
