@@ -1,0 +1,5 @@
+// status: 3
+
+func main {
+	syscall(60, 123 % 10)
+}

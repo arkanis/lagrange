@@ -147,7 +147,7 @@ void fill_namespaces(node_p node, node_ns_p current_ns) {
 // Worth a look because of bitwise and comparison ops: http://wiki.dlang.org/Operator_precedence
 typedef enum { LEFT_TO_RIGHT, RIGHT_TO_LEFT } op_assoc_t;
 typedef enum {
-	OP_MUL, OP_DIV,
+	OP_MUL, OP_DIV, OP_REM,
 	OP_ADD, OP_SUB,
 	OP_LT, OP_LE, OP_GT, OP_GE,
 	OP_EQ, OP_NEQ,
@@ -158,6 +158,7 @@ typedef enum {
 struct { char* name; int precedence; op_assoc_t assoc; } operators[] = {
 	[OP_MUL]    = { "*",  80, LEFT_TO_RIGHT },
 	[OP_DIV]    = { "/",  80, LEFT_TO_RIGHT },
+	[OP_REM]    = { "%",  80, LEFT_TO_RIGHT },
 	
 	[OP_ADD]    = { "+",  70, LEFT_TO_RIGHT },
 	[OP_SUB]    = { "-",  70, LEFT_TO_RIGHT },
@@ -697,8 +698,8 @@ raa_t compile_var(node_p node, compiler_ctx_p ctx) {
 raa_t compile_if(node_p node, compiler_ctx_p ctx) {
 	raa_t a = compile_node(node->if_stmt.cond, ctx, -1);
 	as_cmp(ctx->as, reg(a.reg_index), imm(0));
-	// freeing might add a MOV here to restore the previous value of a register
-	// but a MOV doesn't effect the Flags. So it's safe to use here.
+	// freeing might add a MOV or POP here to restore the previous value of a
+	// register but nither effects the Flags. So it's safe to use here.
 	ra_free_reg(ctx->ra, ctx->as, a);
 	// We jump to the false case if the condition is equal to 0 (false)
 	asm_jump_slot_t to_false_case = as_jmp_cc(ctx->as, CC_EQUAL, 0);
@@ -765,28 +766,54 @@ raa_t compile_op(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 			return a1;
 		}
 		
-		case OP_MUL: case OP_DIV:
+		case OP_MUL: case OP_DIV: case OP_REM:
 		{
-			raa_t a1 = compile_node(a, ctx, RAX.reg);
-			raa_t a2 = compile_node(b, ctx, -1);
-			// reserve RDX since MUL and DIV overwrite it
-			raa_t a3 = ra_alloc_reg(ctx->ra, ctx->as, RDX.reg);
+			raa_t arg_dest = compile_node(a, ctx, RAX.reg);
+			raa_t arg_src = compile_node(b, ctx, -1);
+			// Reserve RDX since MUL and DIV overwrite it
+			// For MUL it's the upper 64 bits of the result
+			// For DIV it's the remainder of the division
+			raa_t arg_up_rem = ra_alloc_reg(ctx->ra, ctx->as, RDX.reg);
 			
 			switch(op) {
-				case OP_MUL:  as_mul(ctx->as, reg(a2.reg_index));  break;
-				case OP_DIV:  as_div(ctx->as, reg(a2.reg_index));  break;
+				case OP_MUL:
+					as_mul(ctx->as, reg(arg_src.reg_index));
+					break;
+				case OP_DIV:
+				case OP_REM:
+					// Set RDX to 0 since DIV takes it as input as the upper
+					// 64 bits of the operand.
+					as_mov(ctx->as, RDX, imm(0));
+					as_div(ctx->as, reg(arg_src.reg_index));
+					if (op == OP_DIV)
+						break;
+					
+					// For REM we use RDX as destination operand since it
+					// contains the remainer. Instead we free RAX. Basically
+					// arg_dest and arg_up_rem switch roles here.
+					{
+						raa_t temp = arg_dest;
+						arg_dest = arg_up_rem;
+						arg_up_rem = temp;
+					}
+					break;
 			}
 			
-			ra_free_reg(ctx->ra, ctx->as, a3);
-			ra_free_reg(ctx->ra, ctx->as, a2);
+			ra_free_reg(ctx->ra, ctx->as, arg_up_rem);
+			ra_free_reg(ctx->ra, ctx->as, arg_src);
 			
-			if (req_reg != RAX.reg && req_reg != -1) {
-				raa_t a4 = ra_alloc_reg(ctx->ra, ctx->as, req_reg);
-				as_mov(ctx->as, reg(req_reg), RAX);
-				ra_free_reg(ctx->ra, ctx->as, a1);
-				return a4;
+			if (req_reg == -1 || req_reg == arg_dest.reg_index) {
+				// Caller either doesn't care in which register the result is
+				// returned or he wants it in the one it's alread in. Either way
+				// we're done.
+				return arg_dest;
 			} else {
-				return a1;
+				// Caller wants the result in a differen register. Allocate it
+				// and move the result there.
+				raa_t target_reg = ra_alloc_reg(ctx->ra, ctx->as, req_reg);
+				as_mov(ctx->as, reg(req_reg), reg(arg_dest.reg_index));
+				ra_free_reg(ctx->ra, ctx->as, arg_dest);
+				return target_reg;
 			}
 		}
 		
