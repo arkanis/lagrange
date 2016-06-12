@@ -59,6 +59,10 @@ node_p ns_lookup(node_p node, str_t name) {
 		current_node = current_node->parent;
 	}
 	
+	// For now print an error. Later on we can add a flags argument and callers
+	// can request if they want NULL or an error.
+	fprintf(stderr, "ns_lookup(): unknown symbol: %.*s\n", name.len, name.ptr);
+	abort();
 	return NULL;
 }
 
