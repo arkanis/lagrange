@@ -568,14 +568,16 @@ raa_t compile_call(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 
 raa_t compile_syscall(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 	/*
-	Taken from http://wiki.osdev.org/Calling_Conventions
+	Taken from:
+	- http://wiki.osdev.org/Calling_Conventions
+	- http://man7.org/linux/man-pages/man2/syscall.2.html
 	
 	Input:
 		RAX ← syscall_no
 		RDI
 		RSI
 		RDX
-		RCX
+		R10
 		R8
 		R9
 	Scratch:
@@ -587,7 +589,7 @@ raa_t compile_syscall(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 		RDX (no idea whats in there, not listed in man pages)
 	*/
 	
-	int8_t arg_regs[7] = { RAX.reg, RDI.reg, RSI.reg, RDX.reg, RCX.reg, R8.reg, R9.reg };
+	int8_t arg_regs[7] = { RAX.reg, RDI.reg, RSI.reg, RDX.reg, R10.reg, R8.reg, R9.reg };
 	raa_t arg_allocs[7];
 	
 	// Need at least one argument (the syscall number)
