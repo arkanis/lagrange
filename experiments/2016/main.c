@@ -336,6 +336,11 @@ void compile(node_p module, const char* filename) {
 	while (ctx.compile_queue.len > 0) {
 		node_p node_to_compile = ctx.compile_queue.ptr[0];
 		list_shift(&ctx.compile_queue, 1);
+		
+		// Skip compiled functions that got added multiple times (e.g. by
+		// multiple calls to it).
+		if (node_to_compile->type == NT_FUNC && node_to_compile->func.compiled == true)
+			continue;
 		raa_t a = compile_node(node_to_compile, &ctx, -1);
 		ra_free_reg(ctx.ra, ctx.as, a);
 	}
