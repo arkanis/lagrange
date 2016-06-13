@@ -1,0 +1,18 @@
+// status: 3
+
+func main {
+	var n = 99
+	var res = 0
+	
+	if (n == 0)
+		res = 0
+	else {
+		if (n == 1)
+			res = 1
+		else {
+			res = 3
+		}
+	}
+	
+	syscall(60, res)
+}
