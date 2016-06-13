@@ -726,24 +726,29 @@ raa_t compile_if(node_p node, compiler_ctx_p ctx) {
 	// freeing might add a MOV or POP here to restore the previous value of a
 	// register but nither effects the Flags. So it's safe to use here.
 	ra_free_reg(ctx->ra, ctx->as, a);
-	// We jump to the false case if the condition is equal to 0 (false)
-	asm_jump_slot_t to_false_case = as_jmp_cc(ctx->as, CC_EQUAL, 0);
 	
-	a = compile_node(node->if_stmt.true_case, ctx, -1);
-	ra_free_reg(ctx->ra, ctx->as, a);
-	asm_jump_slot_t to_end = as_jmp(ctx->as, reld(0));
-	
-	// If there no false case we jump here anyway since the next statement will
-	// continue here.
-	as_mark_jmp_slot_target(ctx->as, to_false_case);
-	
-	if (node->if_stmt.false_case) {
+	asm_jump_slot_t to_end;
+	if (node->if_stmt.false_case == NULL) {
+		// An if without an else (false case). Just execute the true case or
+		// jump to the code after it.
+		to_end = as_jmp_cc(ctx->as, CC_EQUAL, 0);
+		a = compile_node(node->if_stmt.true_case, ctx, -1);
+		ra_free_reg(ctx->ra, ctx->as, a);
+	} else {
+		// A full if with else (false case)
+		// We jump to the false case if the condition is equal to 0 (false)
+		asm_jump_slot_t to_false_case = as_jmp_cc(ctx->as, CC_EQUAL, 0);
+		
+		a = compile_node(node->if_stmt.true_case, ctx, -1);
+		ra_free_reg(ctx->ra, ctx->as, a);
+		to_end = as_jmp(ctx->as, reld(0));
+		
+		as_mark_jmp_slot_target(ctx->as, to_false_case);
 		a = compile_node(node->if_stmt.false_case, ctx, -1);
 		ra_free_reg(ctx->ra, ctx->as, a);
-		
-		as_mark_jmp_slot_target(ctx->as, to_end);
 	}
 	
+	as_mark_jmp_slot_target(ctx->as, to_end);
 	
 	return ra_empty();
 }
