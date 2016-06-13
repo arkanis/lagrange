@@ -221,6 +221,7 @@ static bool is_stmt_start(token_type_t type) {
 		case T_CBO:
 		case T_IF:
 		case T_WHILE:
+		case T_RETURN:
 			return true;
 		default:
 			return is_expr_start(type);
@@ -313,9 +314,31 @@ node_p parse_stmt(parser_p parser) {
 			}
 			
 			return stmt;
+		case T_RETURN:
+			// "return" ( expr ["," expr] )? eos
+			stmt = node_alloc(NT_RETURN);
+			
+			{
+				if ( peek_eos(parser) )
+					return stmt;
+				
+				node_p expr = parse_expr(parser);
+				node_append(stmt, &stmt->return_stmt.args, expr);
+				
+				while ( peek_type_with_eos(parser) == T_COMMA ) {
+					consume_type(parser, T_COMMA);
+					expr = parse_expr(parser);
+					node_append(stmt, &stmt->return_stmt.args, expr);
+				}
+				
+				parse_eos(parser);
+			}
+			
+			return stmt;
+		
 		
 		default:
-			printf("%s:%d:%d: expectet SYSCALL, VAR or expr, got:\n", parser->list->filename, token_line(t), token_col(t));
+			printf("%s:%d:%d: expectet var, \"{\", if, while, return or expr, got:\n", parser->list->filename, token_line(t), token_col(t));
 			token_print_line(stderr, t, 0);
 			abort();
 	}

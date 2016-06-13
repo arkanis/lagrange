@@ -44,7 +44,7 @@ typedef enum {
 	T_VAR,
 	T_IF, T_THEN, T_ELSE,
 	T_WHILE, T_DO,
-	T_FUNC, T_IN, T_OUT,
+	T_FUNC, T_IN, T_OUT, T_RETURN,
 	
 	T_ERROR,
 	T_EOF

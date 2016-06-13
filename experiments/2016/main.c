@@ -304,6 +304,7 @@ raa_t compile_scope(node_p node, compiler_ctx_p ctx);
 raa_t compile_var(node_p node, compiler_ctx_p ctx);
 raa_t compile_if(node_p node, compiler_ctx_p ctx);
 raa_t compile_while(node_p node, compiler_ctx_p ctx);
+raa_t compile_return(node_p node, compiler_ctx_p ctx);
 raa_t compile_call(node_p node, compiler_ctx_p ctx, int8_t req_reg);
 raa_t compile_syscall(node_p node, compiler_ctx_p ctx, int8_t req_reg);
 raa_t compile_op(node_p node, compiler_ctx_p ctx, int8_t req_reg);
@@ -377,6 +378,8 @@ raa_t compile_node(node_p node, compiler_ctx_p ctx, int8_t requested_result_regi
 			return compile_if(node, ctx);
 		case NT_WHILE:
 			return compile_while(node, ctx);
+		case NT_RETURN:
+			return compile_return(node, ctx);
 		case NT_CALL:
 			return compile_call(node, ctx, requested_result_register);
 		case NT_INTL:
@@ -468,6 +471,12 @@ raa_t compile_func(node_p node, compiler_ctx_p ctx) {
 	// frame allocation in the prologue.
 	uint32_t* frame_size_ptr = (uint32_t*)(ctx->as->code_ptr + frame_size_offset);
 	*frame_size_ptr = node->func.stack_frame_size;
+	
+	// We're at the end of the function code and at the start of the epilogue.
+	// This is where return statements jump to. So patch all the return jump
+	// slots to this address.
+	for(size_t i = 0; i < node->func.return_jump_slots.len; i++)
+		as_mark_jmp_slot_target(ctx->as, node->func.return_jump_slots.ptr[i]);
 	
 	// Epilogue: restore callers stack and base pointer
 	as_mov(ctx->as, RSP, RBP);
@@ -596,44 +605,6 @@ raa_t compile_call(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 	}
 	
 	return result_allocation;
-	
-	/*
-	// Put arguments into R0 - R7
-	size_t i;
-	raa_t alloced_reg[8];
-	for(i = 0; i < node->call.args.len; i++)
-		alloced_reg[i] = compile_node(node->call.args.ptr[i], ctx, i);
-	// Allocate remaining argument registers so the caller saves the values in
-	// any unused argument registers.
-	for(; i < 8; i++)
-		alloced_reg[i] = ra_alloc_reg(ctx->ra, ctx->as, i);
-	
-	// Insert the CALL with a displacement of 0 for now and add an address slot
-	// for the call. So the linker step later knows what to insert here.
-	// Remember: The IP of the next instruction is used for the displ. calculation!
-	// So we take the offset after assembling the call instruction.
-	as_call(ctx->as, reld(0));
-	list_append(&node->func.addr_slots, ( (node_addr_slot_t){
-		.offset = as_target(ctx->as),
-		.target = target
-	} ));
-	
-	// Add the target function to the compile queue if necessary
-	// If the target function is already compiled (has an as_offset) we could
-	// assemble the target displ. directly in the call instruction and wouldn't
-	// need an addr slot. But then the linker step wouldn't be able to completly
-	// replace a function with a new definition later on. So we don't optimize
-	// that here so the linker pass really gets addr slots for _all_ references.
-	if ( ! target->func.compiled )
-		list_append(&ctx->compile_queue, target);
-	
-	// Output registers are in R0 - R7
-	// For now only take R0 and throw away (free) R1 - R7
-	for(size_t i = 1; i < 8; i++)
-		ra_free_reg(ctx->ra, ctx->as, alloced_reg[i]);
-	
-	return alloced_reg[0];
-	*/
 }
 
 raa_t compile_syscall(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
@@ -696,6 +667,36 @@ raa_t compile_syscall(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 	as_mov(ctx->as, reg(req_reg), RAX);
 	ra_free_reg(ctx->ra, ctx->as, arg_allocs[0]);
 	return a;
+}
+
+raa_t compile_return(node_p node, compiler_ctx_p ctx) {
+	// Find containing function
+	node_p func = node->parent;
+	while (func != NULL && func->type != NT_FUNC)
+		func = func->parent;
+	
+	// For now check that the number of args exactly matches the functions out args
+	if (node->return_stmt.args.len != func->func.out.len) {
+		fprintf(stderr, "compile_return(): got %zu args, but function has %zu out args!\n",
+			node->return_stmt.args.len, func->func.out.len);
+		abort();
+	}
+	
+	// Assign expression values to out args
+	for(size_t i = 0; i < node->return_stmt.args.len; i++) {
+		node_p out_arg = func->func.out.ptr[i];
+		raa_t a = compile_node(node->return_stmt.args.ptr[i], ctx, -1);
+		as_mov(ctx->as, memrd(RBP, get_var_frame_displ(out_arg)), reg(a.reg_index));
+		ra_free_reg(ctx->ra, ctx->as, a);
+	}
+	
+	// Jump to function epilogue
+	asm_jump_slot_t slot = as_jmp(ctx->as, reld(0));
+	// Remember the jump slot so the function can patch in the address of the
+	// epilogue.
+	list_append(&func->func.return_jump_slots, slot);
+	
+	return ra_empty();
 }
 
 raa_t compile_var(node_p node, compiler_ctx_p ctx) {

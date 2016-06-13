@@ -1,6 +1,7 @@
 # ToDo
 
-- return statement
+- Add scratch register handling to syscalls
+- Create builtins and convert syscall to one
 - Add scope node, as extra struct, in a way that it can be overlayed into function, if, while, etc. nodes (because they also open a new scope)
 	- Nope, the scope node only reflects the fact that the user opened a new scope
 	  somewhere. It doesn't manage it or contains all symbols in the scope. That job
@@ -15,6 +16,7 @@
 # The great plan
 
 - Needed in bootstrapping compiler
+	- multiple modules
 	- unsigned byte (for strings), optionally 16 and 32 bit ints
 	- arrays (for strings and mmaped buffers)
 	- structs
@@ -398,6 +400,28 @@ linker pass:
 	take assembled functions and fill addr slots with proper displacements to
 	targets.
 	write output to executable.
+
+
+## return statement
+
+module  = [ def ]
+def     = "func" ID [ def-mod ] "{" [ stmt ] "}"
+def-mod = ( "in" | "out" )  "(" ID ID? [ "," ID ID? ] ")"
+stmt = "var" ID ( "=" expr )? eos
+       "{" [ stmt ] "}"  // no eos needed
+       "if" expr ( eos | "then" ) stmt ( "else" stmt )?
+       "while" expr ( eos | "do" ) stmt
+       "return" ( expr ["," expr] )? eos
+       expr eos
+expr_wto  = ID
+            INTL
+            STRL
+            "(" expr ")"
+            unary_op expr_wto
+            ID "(" ( expr ["," expr] )? ")"
+expr      = expr_wto [ binary_op expr_wto ]
+unary_op  = + - not ~
+binary_op = ID . * / %  + - << >> < <= > >= == != & ^ | and or = *= /= %= += -= <<= >>= &= ^= |=
 
 
 

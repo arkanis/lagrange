@@ -82,6 +82,7 @@ typedef enum {
 	NT_VAR,
 	NT_IF,
 	NT_WHILE,
+	NT_RETURN,
 	
 	NT_ID,
 	NT_INTL,
@@ -125,6 +126,7 @@ struct node_s {
 			size_t as_offset;
 			size_t stack_frame_size;
 			list_t(node_addr_slot_t) addr_slots;
+			list_t(asm_jump_slot_t)  return_jump_slots;
 		} func;
 		
 		struct {
@@ -155,6 +157,10 @@ struct node_s {
 		struct {
 			node_p cond, body;
 		} while_stmt;
+		
+		struct {
+			node_list_t args;
+		} return_stmt;
 		
 		
 		struct {
@@ -262,6 +268,13 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 		"while", (member_spec_t[]){
 			{ MT_NODE, offsetof(node_t, while_stmt.cond), "cond" },
 			{ MT_NODE, offsetof(node_t, while_stmt.body), "body" },
+			{ 0 }
+		}
+	},
+	
+	[ NT_RETURN ] = &(node_spec_t){
+		"return", (member_spec_t[]){
+			{ MT_NODE_LIST, offsetof(node_t, return_stmt.args), "args" },
 			{ 0 }
 		}
 	},

@@ -19,9 +19,10 @@ static struct { const char* keyword; token_type_t type; } keywords[] = {
 	{ "while", T_WHILE },
 	{ "do",    T_DO },
 	
-	{ "func", T_FUNC },
-	{ "in",   T_IN },
-	{ "out",  T_OUT },
+	{ "func",   T_FUNC },
+	{ "in",     T_IN },
+	{ "out",    T_OUT },
+	{ "return", T_RETURN },
 };
 
 
@@ -124,7 +125,7 @@ void token_print(FILE* stream, token_p token, uint32_t flags) {
 			case T_VAR:
 			case T_IF: case T_THEN: case T_ELSE:
 			case T_WHILE: case T_DO:
-			case T_FUNC: case T_IN: case T_OUT:
+			case T_FUNC: case T_IN: case T_OUT: case T_RETURN:
 				for(size_t i = 0; i < sizeof(keywords) / sizeof(keywords[0]); i++) {
 					if ( strncmp(token->src.ptr, keywords[i].keyword, token->src.len) == 0 && (int)strlen(keywords[i].keyword) == token->src.len ) {
 						fprintf(stream, "%s", keywords[i].keyword);
