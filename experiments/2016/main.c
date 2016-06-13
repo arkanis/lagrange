@@ -337,10 +337,17 @@ void compile(node_p module, const char* filename) {
 		node_p node_to_compile = ctx.compile_queue.ptr[0];
 		list_shift(&ctx.compile_queue, 1);
 		
+		/*
+		fprintf(stderr, "COMPILE %.*s %s\n",
+			node_to_compile->func.name.len, node_to_compile->func.name.ptr,
+			(node_to_compile->func.compiled) ? "already compiled" : ""
+		);
+		*/
 		// Skip compiled functions that got added multiple times (e.g. by
 		// multiple calls to it).
 		if (node_to_compile->type == NT_FUNC && node_to_compile->func.compiled == true)
 			continue;
+		
 		raa_t a = compile_node(node_to_compile, &ctx, -1);
 		ra_free_reg(ctx.ra, ctx.as, a);
 	}
@@ -508,6 +515,19 @@ raa_t compile_call(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 	// Add target function to compile queue if it's not already compiled
 	if (!target->func.compiled)
 		list_append(&ctx->compile_queue, target);
+	/*
+	fprintf(stderr, "ADD CALL %.*s %s\n",
+		target->func.name.len, target->func.name.ptr,
+		(target->func.compiled) ? "already compiled" : ""
+	);
+	fprintf(stderr, "  queue:");
+	for(size_t i = 0; i < ctx->compile_queue.len; i++)
+		fprintf(stderr, " %.*s",
+			ctx->compile_queue.ptr[i]->func.name.len,
+			ctx->compile_queue.ptr[i]->func.name.ptr
+		);
+	fprintf(stderr, "\n");
+	*/
 	
 	// Allocate stack space for currently allocated caller saved regs (that need to be saved)
 	// Caller saved regs: rax, rdi, rsi, rdx, rcx, r8, r9, r10, r11

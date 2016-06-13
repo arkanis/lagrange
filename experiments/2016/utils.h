@@ -33,7 +33,7 @@
 
 #define list_shift(list_ptr, n)  do {                  \
 	for(ssize_t i = (list_ptr)->len - 1; i >= n; i--)  \
-		(list_ptr)->ptr[i] = (list_ptr)->ptr[i-n];     \
+		(list_ptr)->ptr[i-n] = (list_ptr)->ptr[i];     \
 	list_resize((list_ptr), (list_ptr)->len - n);      \
 } while(0)
 
