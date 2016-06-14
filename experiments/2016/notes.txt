@@ -1,12 +1,11 @@
 # ToDo
 
 - Add scratch register handling to syscalls
+- Add 8 bit data type
+	- To assambler as operand (8 bit registers)
+	- To compiler via tracking of variable and expression types (type info in
+	  returned raa_t).
 - Create builtins and convert syscall to one
-- Add scope node, as extra struct, in a way that it can be overlayed into function, if, while, etc. nodes (because they also open a new scope)
-	- Nope, the scope node only reflects the fact that the user opened a new scope
-	  somewhere. It doesn't manage it or contains all symbols in the scope. That job
-	  is done by the symbol tables that are filled with definitions extract out of
-	  the AST.
 - Refactor compiler stuff into compiler.c
 - Proper error reporting in parser
 - structs for output arguments
@@ -22,6 +21,11 @@
 	- structs
 	- metaprogramming
 	- debug symbols?
+- Needed for a game
+	- Linking with C shared objects
+		- 32 bit ints (because of integer promotion)
+		- floats, doubles (because of promotion again)
+		- C calling convention
 - Then try to implement the compiler in lagrange
 
 
