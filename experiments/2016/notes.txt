@@ -1,6 +1,5 @@
 # ToDo
 
-- Add scratch register handling to syscalls
 - Add 8 bit data type
 	- To assambler as operand (8 bit registers)
 	- To compiler via tracking of variable and expression types (type info in

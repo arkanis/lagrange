@@ -633,9 +633,13 @@ raa_t compile_syscall(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 	int8_t arg_regs[7] = { RAX.reg, RDI.reg, RSI.reg, RDX.reg, R10.reg, R8.reg, R9.reg };
 	raa_t arg_allocs[7];
 	
-	// Need at least one argument (the syscall number)
+	// Need at least one argument (the syscall number) but not more than 7
 	if (node->call.args.len < 1) {
 		fprintf(stderr, "compile_syscall(): need at least 1 arg, got %zu\n", node->call.args.len);
+		abort();
+	}
+	if (node->call.args.len > 7) {
+		fprintf(stderr, "compile_syscall(): only support 7 args at max, got %zu\n", node->call.args.len);
 		abort();
 	}
 	
@@ -644,18 +648,18 @@ raa_t compile_syscall(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 		arg_allocs[i] = compile_node(node->call.args.ptr[i], ctx, arg_regs[i]);
 	
 	// Allocate scratch registers
-	// TODO: Also allocate unused args as scratch regs
+	for(size_t i = node->call.args.len; i < 7; i++)
+		arg_allocs[i] = ra_alloc_reg(ctx->ra, ctx->as, arg_regs[i]);
 	raa_t a1 = ra_alloc_reg(ctx->ra, ctx->as, R10.reg);
 	raa_t a2 = ra_alloc_reg(ctx->ra, ctx->as, R11.reg);
 	
 	as_syscall(ctx->as);
 	
-	// Free scratch registers
+	// Free scratch registers and argument registers (but leave RAX allocated
+	// since it's the result)
 	ra_free_reg(ctx->ra, ctx->as, a2);
 	ra_free_reg(ctx->ra, ctx->as, a1);
-	
-	// Free argument registers (but leave RAX allocated since it's the result)
-	for(size_t i = 1; i < node->call.args.len; i++)
+	for(size_t i = 6; i >= 1; i--)
 		ra_free_reg(ctx->ra, ctx->as, arg_allocs[i]);
 	
 	// If the result is requested in RAX or it doesn't matter where we're done
