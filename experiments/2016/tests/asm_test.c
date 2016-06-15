@@ -617,7 +617,7 @@ void test_conditional_instructions() {
 	
 	as_clear(as);
 		for(size_t i = 0; i < sizeof(condition_codes) / sizeof(condition_codes[0]); i++)
-			as_set_cc(as, condition_codes[i], reg(i));
+			as_set_cc(as, condition_codes[i], regb(i));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"seto   al\n"
@@ -810,6 +810,180 @@ void test_instructions_for_call() {
 	free(disassembly);
 }
 
+void test_byte_registers() {
+	asm_p as = &(asm_t){ 0 };
+	char* disassembly = NULL;
+	as_new(as);
+	
+	// reg reg
+	as_clear(as);
+		for(size_t i = 0; i < 16; i++)
+			as_mov(as, regb(i), regb(i));
+	disassembly = disassemble(as);
+	st_check_str(disassembly,
+		"mov    al,al\n"
+		"mov    cl,cl\n"
+		"mov    dl,dl\n"
+		"mov    bl,bl\n"
+		"mov    spl,spl\n"
+		"mov    bpl,bpl\n"
+		"mov    sil,sil\n"
+		"mov    dil,dil\n"
+		"mov    r8b,r8b\n"
+		"mov    r9b,r9b\n"
+		"mov    r10b,r10b\n"
+		"mov    r11b,r11b\n"
+		"mov    r12b,r12b\n"
+		"mov    r13b,r13b\n"
+		"mov    r14b,r14b\n"
+		"mov    r15b,r15b\n"
+	);
+	
+	
+	// reg [RIP + displ]
+	as_clear(as);
+		for(size_t i = 0; i < 16; i++)
+			as_mov(as, regb(i), reldb(0x7abbccdd));
+	disassembly = disassemble(as);
+	st_check_str(disassembly,
+		"mov    al,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcce4\n"
+		"mov    cl,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcceb\n"
+		"mov    dl,BYTE PTR [rip+0x7abbccdd]        # 0x7afbccf2\n"
+		"mov    bl,BYTE PTR [rip+0x7abbccdd]        # 0x7afbccf9\n"
+		"mov    spl,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcd00\n"
+		"mov    bpl,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcd07\n"
+		"mov    sil,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcd0e\n"
+		"mov    dil,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcd15\n"
+		"mov    r8b,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcd1c\n"
+		"mov    r9b,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcd23\n"
+		"mov    r10b,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcd2a\n"
+		"mov    r11b,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcd31\n"
+		"mov    r12b,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcd38\n"
+		"mov    r13b,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcd3f\n"
+		"mov    r14b,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcd46\n"
+		"mov    r15b,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcd4d\n"
+	);
+	
+	// reg [displ]
+	as_clear(as);
+		for(size_t i = 0; i < 16; i++)
+			as_mov(as, regb(i), memdb(0x7abbccdd));
+	disassembly = disassemble(as);
+	st_check_str(disassembly,
+		"mov    al,BYTE PTR ds:0x7abbccdd\n"
+		"mov    cl,BYTE PTR ds:0x7abbccdd\n"
+		"mov    dl,BYTE PTR ds:0x7abbccdd\n"
+		"mov    bl,BYTE PTR ds:0x7abbccdd\n"
+		"mov    spl,BYTE PTR ds:0x7abbccdd\n"
+		"mov    bpl,BYTE PTR ds:0x7abbccdd\n"
+		"mov    sil,BYTE PTR ds:0x7abbccdd\n"
+		"mov    dil,BYTE PTR ds:0x7abbccdd\n"
+		"mov    r8b,BYTE PTR ds:0x7abbccdd\n"
+		"mov    r9b,BYTE PTR ds:0x7abbccdd\n"
+		"mov    r10b,BYTE PTR ds:0x7abbccdd\n"
+		"mov    r11b,BYTE PTR ds:0x7abbccdd\n"
+		"mov    r12b,BYTE PTR ds:0x7abbccdd\n"
+		"mov    r13b,BYTE PTR ds:0x7abbccdd\n"
+		"mov    r14b,BYTE PTR ds:0x7abbccdd\n"
+		"mov    r15b,BYTE PTR ds:0x7abbccdd\n"
+	);
+	
+	// reg [reg + displ]
+	as_clear(as);
+		for(size_t i = 0; i < 16; i++)
+			as_mov(as, regb(i), memrdb(reg(i), 0x7abbccdd));
+	disassembly = disassemble(as);
+	st_check_str(disassembly,
+		"mov    al,BYTE PTR [rax+0x7abbccdd]\n"
+		"mov    cl,BYTE PTR [rcx+0x7abbccdd]\n"
+		"mov    dl,BYTE PTR [rdx+0x7abbccdd]\n"
+		"mov    bl,BYTE PTR [rbx+0x7abbccdd]\n"
+		"mov    spl,BYTE PTR [rsp+0x7abbccdd]\n"
+		"mov    bpl,BYTE PTR [rbp+0x7abbccdd]\n"
+		"mov    sil,BYTE PTR [rsi+0x7abbccdd]\n"
+		"mov    dil,BYTE PTR [rdi+0x7abbccdd]\n"
+		"mov    r8b,BYTE PTR [r8+0x7abbccdd]\n"
+		"mov    r9b,BYTE PTR [r9+0x7abbccdd]\n"
+		"mov    r10b,BYTE PTR [r10+0x7abbccdd]\n"
+		"mov    r11b,BYTE PTR [r11+0x7abbccdd]\n"
+		"mov    r12b,BYTE PTR [r12+0x7abbccdd]\n"
+		"mov    r13b,BYTE PTR [r13+0x7abbccdd]\n"
+		"mov    r14b,BYTE PTR [r14+0x7abbccdd]\n"
+		"mov    r15b,BYTE PTR [r15+0x7abbccdd]\n"
+	);
+	
+	as_clear(as);
+		for(size_t i = 0; i < 16; i++)
+			as_mul(as, regb(i));
+	disassembly = disassemble(as);
+	st_check_str(disassembly,
+		"mul    al\n"
+		"mul    cl\n"
+		"mul    dl\n"
+		"mul    bl\n"
+		"mul    spl\n"
+		"mul    bpl\n"
+		"mul    sil\n"
+		"mul    dil\n"
+		"mul    r8b\n"
+		"mul    r9b\n"
+		"mul    r10b\n"
+		"mul    r11b\n"
+		"mul    r12b\n"
+		"mul    r13b\n"
+		"mul    r14b\n"
+		"mul    r15b\n"
+	);
+	
+	as_clear(as);
+		for(size_t i = 0; i < 16; i++)
+			as_cmp(as, regb(i), regb(i));
+	disassembly = disassemble(as);
+	st_check_str(disassembly,
+		"cmp    al,al\n"
+		"cmp    cl,cl\n"
+		"cmp    dl,dl\n"
+		"cmp    bl,bl\n"
+		"cmp    spl,spl\n"
+		"cmp    bpl,bpl\n"
+		"cmp    sil,sil\n"
+		"cmp    dil,dil\n"
+		"cmp    r8b,r8b\n"
+		"cmp    r9b,r9b\n"
+		"cmp    r10b,r10b\n"
+		"cmp    r11b,r11b\n"
+		"cmp    r12b,r12b\n"
+		"cmp    r13b,r13b\n"
+		"cmp    r14b,r14b\n"
+		"cmp    r15b,r15b\n"
+	);
+	
+	as_clear(as);
+		for(size_t i = 0; i < 16; i++)
+			as_cmp(as, regb(i), reldb(0x7abbccdd));
+	disassembly = disassemble(as);
+	st_check_str(disassembly,
+		"cmp    al,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcce4\n"
+		"cmp    cl,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcceb\n"
+		"cmp    dl,BYTE PTR [rip+0x7abbccdd]        # 0x7afbccf2\n"
+		"cmp    bl,BYTE PTR [rip+0x7abbccdd]        # 0x7afbccf9\n"
+		"cmp    spl,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcd00\n"
+		"cmp    bpl,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcd07\n"
+		"cmp    sil,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcd0e\n"
+		"cmp    dil,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcd15\n"
+		"cmp    r8b,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcd1c\n"
+		"cmp    r9b,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcd23\n"
+		"cmp    r10b,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcd2a\n"
+		"cmp    r11b,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcd31\n"
+		"cmp    r12b,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcd38\n"
+		"cmp    r13b,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcd3f\n"
+		"cmp    r14b,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcd46\n"
+		"cmp    r15b,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcd4d\n"
+	);
+	
+	free(disassembly);
+}
+
 
 int main() {
 	st_run(test_write);
@@ -824,5 +998,6 @@ int main() {
 	st_run(test_stack_instructions);
 	st_run(test_instructions_for_if);
 	st_run(test_instructions_for_call);
+	st_run(test_byte_registers);
 	return st_show_report();
 }

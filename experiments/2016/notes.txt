@@ -57,6 +57,22 @@
 	- But probably makes grammar a nightmare since we have to accept all operators as IDs, too
 - Reserve -> and <- operators
 	- Easy to type alternatives for → and ←. Kind of channel operators? Or better stay at >> and <<?
+- Names for data types:
+	- Still need a good name for 32 bit integer type
+	- int is a generic name for all integer types
+	i int
+		b byte
+		s short
+		? ???
+		l long
+		w word
+	f float
+		h half
+		s single
+		d double
+		q quad (quadruple)
+		o ??? (octuple)
+
 
 # Source code structure
 

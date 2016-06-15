@@ -503,8 +503,8 @@ as_call(as, addr_mem(0x11223344));
 	  
 **/
 
-#define WMRM_FIXED_OPERAND_SIZE (1 << 0)
-#define WMRM_FORCE_REX          (1 << 1)
+#define WMRM_NO_REX_W_BIT (1 << 0)
+#define WMRM_FORCE_REX    (1 << 1)
 
 bool as_write_modrm(asm_p as, uint32_t flags, const char* format, asm_arg_t dest, asm_arg_t src, asm_var_t vars[]) {
 	// Variables for parts of the opcode format:
@@ -517,18 +517,45 @@ bool as_write_modrm(asm_p as, uint32_t flags, const char* format, asm_arg_t dest
 	int16_t scale, index, base;
 	int32_t* displacement_ptr = NULL;
 	
+	// Figure out the operand size
+	uint8_t bits = 0;
+	if ( dest.bits == 0 && src.bits > 0 )
+		bits = src.bits;
+	else if ( dest.bits > 0 && src.bits == 0 )
+		bits = dest.bits;
+	else if ( dest.bits == src.bits && dest.bits > 0 )
+		bits = dest.bits;
+	
 	// operand size   w bit           REX.W bit          66H prefix
 	// 8 bit          0 (byte size)   ignored            ignored
 	// 16 bit         1 (full size)   0 (default size)   yes (16 bit size)
 	// 32 bit         1 (full size)   0 (default size)   no (default size)
 	// 64 bit         1 (full size)   1 (64 bit size)    ignored
+	switch(bits) {
+		case 8:
+			prefix_66h = false;
+			op_w = 0;
+			rex_W = 0;
+			// The byte versions of RSI, RDI, RBP and RSP (SIL, DIL, BPL, SPL) can only
+			// be encoded by an empty REX byte. We we omit this we get AH, BH, CH and DH.
+			// So for now we force the precense of a REX byte with a flag.
+			// TODO: Only needed for RSI, RDI, RBP and RSP registers, don't set for the rest.
+			flags |= WMRM_FORCE_REX;
+			break;
+		case 64:
+			prefix_66h = false;
+			op_w = 1;
+			rex_W = 1;
+			break;
+		default:
+			fprintf(stderr, "as_write_modrm(): unsupported bit sizes of operands!\n");
+			abort();
+	}
 	
-	// Just use 64 bit operand size for everything for now (write no 66H prefix)
-	prefix_66h = false;
-	op_w = 1;
 	// If the operand size is fixed for this instruct (e.g. JMP, SETcc) we don't
 	// need to set the REX.W bit.
-	rex_W = (flags & WMRM_FIXED_OPERAND_SIZE) ? 0 : 1;
+	if (flags & WMRM_NO_REX_W_BIT)
+		rex_W = 0;
 	
 	asm_arg_t reg_arg, r_m_arg;
 	asm_arg_type_t dt = dest.type, st = src.type;
@@ -574,6 +601,7 @@ bool as_write_modrm(asm_p as, uint32_t flags, const char* format, asm_arg_t dest
 		rex_R = 0;
 	} else {
 		// Should never happen
+		fprintf(stderr, "as_write_modrm(): unsupported reg operand!\n");
 		abort();
 	}
 	
@@ -707,6 +735,10 @@ ssize_t as_add(asm_p as, asm_arg_t dest, asm_arg_t src) {
 			fprintf(stderr, "as_add(): can't encode unsigned immediates larget than 31 bits!\n");
 			abort();
 		}
+		if (dest.bits < 32) {
+			fprintf(stderr, "as_add(): can't put immediates into smaller register!\n");
+			abort();
+		}
 		as_write_modrm(as, 0, "1000 000w", op(0b000), dest, NULL);
 		as_write(as, "%32d", src.imm);
 		return as_target(as) - 4;
@@ -728,6 +760,10 @@ ssize_t as_sub(asm_p as, asm_arg_t dest, asm_arg_t src) {
 		// mode... :(
 		if (src.imm & 0x80000000) {
 			fprintf(stderr, "as_sub(): can't encode unsigned immediates larget than 31 bits!\n");
+			abort();
+		}
+		if (dest.bits < 32) {
+			fprintf(stderr, "as_sub(): can't put immediates into smaller register!\n");
 			abort();
 		}
 		as_write_modrm(as, 0, "1000 000w", op(0b101), dest, NULL);
@@ -764,6 +800,10 @@ void as_div(asm_p as, asm_arg_t src) {
 void as_mov(asm_p as, asm_arg_t dest, asm_arg_t src) {
 	if (dest.type == ASM_T_REG && src.type == ASM_T_IMM) {
 		// Volume 2C - Instruction Set Reference, p97 (B.2.1 General Purpose Instruction Formats and Encodings for 64-Bit Mode)
+		if (dest.bits < 64) {
+			fprintf(stderr, "as_mov(): can't put immediates into smaller register!\n");
+			abort();
+		}
 		as_write(as, "0100 100B : 1011 1bbb : %64d", dest.reg >> 3, dest.reg, src.imm);
 		return;
 	} else if ( as_write_modrm(as, 0, "1000 10dw", dest, src, NULL) ) {
@@ -780,6 +820,10 @@ void as_mov(asm_p as, asm_arg_t dest, asm_arg_t src) {
 void as_cmp(asm_p as, asm_arg_t arg1, asm_arg_t arg2) {
 	// Volume 2C - Instruction Set Reference, p93 (B.2.1 General Purpose Instruction Formats and Encodings for 64-Bit Mode)
 	if (arg1.type == ASM_T_REG && arg2.type == ASM_T_IMM) {
+		if (arg1.bits < 32) {
+			fprintf(stderr, "as_cmp(): can't compare immediates with smaller register!\n");
+			abort();
+		}
 		as_write(as, "0100 100B : 1000 0001 : 11 111 bbb : %32d", arg1.reg >> 3, arg1.reg, arg2.imm);
 		return;
 	} else if ( as_write_modrm(as, 0, "0011 10dw", arg1, arg2, NULL) ) {
@@ -803,7 +847,11 @@ void as_set_cc(asm_p as, uint8_t condition_code, asm_arg_t dest) {
 	// The byte versions of RSI, RDI, RBP and RSP (SIL, DIL, BPL, SPL) can only
 	// be encoded by an empty REX byte. We we omit this we get AH, BH, CH and DH.
 	// So for now we force the precense of a REX byte with a flag.
-	bool result = as_write_modrm(as, WMRM_FIXED_OPERAND_SIZE | WMRM_FORCE_REX, "0000 1111 : 1001 tttt", op(0b000), dest, (asm_var_t[]){
+	if ( dest.bits != 8 ) {
+		fprintf(stderr, "as_set_cc(): target has to be an 8 bit r/m!\n");
+		abort();
+	}
+	bool result = as_write_modrm(as, WMRM_NO_REX_W_BIT | WMRM_FORCE_REX, "0000 1111 : 1001 tttt", op(0b000), dest, (asm_var_t[]){
 		{ "tttt", condition_code },
 		{ NULL, 0 }
 	});
@@ -818,7 +866,7 @@ asm_jump_slot_t as_jmp(asm_p as, asm_arg_t target) {
 	if (target.type == ASM_T_MEM_REL_DISP) {
 		as_write(as, "1110 1001 : %32d", target.mem_disp);
 		return (asm_jump_slot_t){ .base = as->code_len, .disp_offset = as->code_len - 4 };
-	} else if ( as_write_modrm(as, WMRM_FIXED_OPERAND_SIZE, "1111 1111", op(0b100), target, NULL) ) {
+	} else if ( as_write_modrm(as, WMRM_NO_REX_W_BIT, "1111 1111", op(0b100), target, NULL) ) {
 		// Combined Volumes 1, 2ABC, 3ABC, p856:
 		// In 64-Bit Mode — The instruction’s operation size is fixed at 64 bits. If a selector points to a gate, then RIP equals
 		// the 64-bit displacement taken from gate; else RIP equals the zero-extended offset from the far pointer referenced
@@ -826,6 +874,10 @@ asm_jump_slot_t as_jmp(asm_p as, asm_arg_t target) {
 		// 
 		// register indirect  0100 W00B : 1111 1111 : 11  100 reg
 		// memory indirect    0100 W0XB : 1111 1111 : mod 100 r/m
+		if ( target.bits != 64 ) {
+			fprintf(stderr, "as_jmp(): jump target has to be 64 bits!\n");
+			abort();
+		}
 		return (asm_jump_slot_t){ .base = as->code_len, .disp_offset = as->code_len - 4 };
 	}
 	
@@ -864,7 +916,11 @@ ssize_t as_call(asm_p as, asm_arg_t target) {
 	if (target.type == ASM_T_MEM_REL_DISP) {
 		as_write(as, "1110 1000 : %32d", target.mem_disp);
 		return as_target(as) - 4;
-	} else if ( as_write_modrm(as, WMRM_FIXED_OPERAND_SIZE, "1111 1111", op(0b010), target, NULL) ) {
+	} else if ( as_write_modrm(as, WMRM_NO_REX_W_BIT, "1111 1111", op(0b010), target, NULL) ) {
+		if ( target.bits != 64 ) {
+			fprintf(stderr, "as_call(): target has to be 64 bit for now!\n");
+			abort();
+		}
 		return -1;
 	}
 	
@@ -897,7 +953,11 @@ void as_push(asm_p as, asm_arg_t source) {
 	if (source.type == ASM_T_IMM) {
 		as_write(as, "0110 1000 : %32d", source.imm);
 		return;
-	} else if ( as_write_modrm(as, WMRM_FIXED_OPERAND_SIZE, "1111 1111", op(0b110), source, NULL) ) {
+	} else if ( as_write_modrm(as, WMRM_NO_REX_W_BIT, "1111 1111", op(0b110), source, NULL) ) {
+		if ( source.bits == 8 ) {
+			fprintf(stderr, "as_push(): source can't be 8 bit, sorry.\n");
+			abort();
+		}
 		return;
 	}
 	
@@ -907,7 +967,11 @@ void as_push(asm_p as, asm_arg_t source) {
 
 void as_pop(asm_p as, asm_arg_t dest) {
 	// Volume 2C - Instruction Set Reference, p100
-	if ( as_write_modrm(as, WMRM_FIXED_OPERAND_SIZE, "1000 1111", op(0b000), dest, NULL) )
+	if ( dest.bits == 8 ) {
+		fprintf(stderr, "as_push(): source can't be 8 bit, sorry.\n");
+		abort();
+	}
+	if ( as_write_modrm(as, WMRM_NO_REX_W_BIT, "1000 1111", op(0b000), dest, NULL) )
 		return;
 	
 	fprintf(stderr, "as_pop(): unsupported arg type!\n");

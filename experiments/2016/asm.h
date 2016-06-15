@@ -43,6 +43,7 @@ typedef enum {
 
 typedef struct {
 	asm_arg_type_t type;
+	uint8_t bits;
 	union {
 		uint8_t reg;
 		uint64_t imm;
@@ -55,18 +56,31 @@ typedef struct {
 	};
 } asm_arg_t, asm_arg_p;
 
-static inline asm_arg_t reg(uint8_t index)  { return (asm_arg_t){ ASM_T_REG, .reg = index }; }
+static inline asm_arg_t reg(uint8_t index)  { return (asm_arg_t){ ASM_T_REG, .reg = index, .bits = 64 }; }
+static inline asm_arg_t regb(uint8_t index) { return (asm_arg_t){ ASM_T_REG, .reg = index, .bits = 8 }; }
 static inline asm_arg_t imm(uint64_t value) { return (asm_arg_t){ ASM_T_IMM, .imm = value }; }
 static inline asm_arg_t op(uint8_t op_code) { return (asm_arg_t){ ASM_T_OP, .op_code = op_code }; }
-static inline asm_arg_t memd(int32_t disp)  { return (asm_arg_t){ ASM_T_MEM_DISP, .mem_disp = disp }; }
-static inline asm_arg_t reld(int32_t disp)  { return (asm_arg_t){ ASM_T_MEM_REL_DISP, .mem_disp = disp }; }
+static inline asm_arg_t memd(int32_t disp)  { return (asm_arg_t){ ASM_T_MEM_DISP, .mem_disp = disp, .bits = 64 }; }
+static inline asm_arg_t memdb(int32_t disp) { return (asm_arg_t){ ASM_T_MEM_DISP, .mem_disp = disp, .bits = 8 }; }
+static inline asm_arg_t reld(int32_t disp)  { return (asm_arg_t){ ASM_T_MEM_REL_DISP, .mem_disp = disp, .bits = 64 }; }
+static inline asm_arg_t reldb(int32_t disp) { return (asm_arg_t){ ASM_T_MEM_REL_DISP, .mem_disp = disp, .bits = 8 }; }
 static inline asm_arg_t memrd(asm_arg_t reg, int32_t disp) {
-	asm_arg_t arg;
+	asm_arg_t arg = { 0 };
 	arg.type = ASM_T_MEM_REG_DISP;
+	arg.bits = 64;
 	arg.mem_reg = reg.reg;
 	arg.mem_disp = disp;
 	return arg;
 }
+static inline asm_arg_t memrdb(asm_arg_t reg, int32_t disp) {
+	asm_arg_t arg = { 0 };
+	arg.type = ASM_T_MEM_REG_DISP;
+	arg.bits = 8;
+	arg.mem_reg = reg.reg;
+	arg.mem_disp = disp;
+	return arg;
+}
+
 
 #define R0  reg(0)
 #define R1  reg(1)
@@ -93,6 +107,32 @@ static inline asm_arg_t memrd(asm_arg_t reg, int32_t disp) {
 #define RBP R5
 #define RSI R6
 #define RDI R7
+
+#define R0b  reg8(0)
+#define R1b  reg8(1)
+#define R2b  reg8(2)
+#define R3b  reg8(3)
+#define R4b  reg8(4)
+#define R5b  reg8(5)
+#define R6b  reg8(6)
+#define R7b  reg8(7)
+#define R8b  reg8(8)
+#define R9b  reg8(9)
+#define R10b reg8(10)
+#define R11b reg8(11)
+#define R12b reg8(12)
+#define R13b reg8(13)
+#define R14b reg8(14)
+#define R15b reg8(15)
+
+#define RAXb R0
+#define RCXb R1
+#define RDXb R2
+#define RBXb R3
+#define RSPb R4
+#define RBPb R5
+#define RSIb R6
+#define RDIb R7
 
 // Volume 2C - Instruction Set Reference, p77 (B.1.4.7 Condition Test (tttn) Field)
 #define CC_OVERFLOW          0b0000

@@ -871,7 +871,7 @@ raa_t compile_op(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 			as_cmp(ctx->as, reg(a1.reg_index), reg(a2.reg_index));
 			ra_free_reg(ctx->ra, ctx->as, a2);
 			
-			as_set_cc(ctx->as, condition_code, reg(a1.reg_index));
+			as_set_cc(ctx->as, condition_code, regb(a1.reg_index));
 			return a1;
 		}
 		
