@@ -65,6 +65,15 @@ int main(int argc, char** argv) {
 	
 	node_ns_t global_ns;
 	node_ns_new(&global_ns);
+		node_p ulong_type = node_alloc(NT_TYPE_T);
+		ulong_type->type_t.name = str_from_c("ulong");
+		ulong_type->type_t.bits = 64;
+	node_ns_put(&global_ns, ulong_type->type_t.name, ulong_type);
+		node_p ubyte = node_alloc(NT_TYPE_T);
+		ubyte->type_t.name = str_from_c("ubyte");
+		ubyte->type_t.bits = 8;
+	node_ns_put(&global_ns, ubyte->type_t.name, ubyte);
+	
 	// TODO: add builtins like "syscall" to global namespace
 	fill_namespaces(tree, &global_ns);
 	
@@ -312,6 +321,7 @@ raa_t compile_intl(node_p node, compiler_ctx_p ctx, int8_t req_reg);
 raa_t compile_strl(node_p node, compiler_ctx_p ctx, int8_t req_reg);
 raa_t compile_id(node_p node, compiler_ctx_p ctx, int8_t req_reg);
 
+uint8_t type_get_bits(node_p node, str_t type_name);
 void resolve_addr_slots(node_p node, compiler_ctx_p ctx);
 
 
@@ -401,6 +411,8 @@ raa_t compile_node(node_p node, compiler_ctx_p ctx, int8_t requested_result_regi
 			fprintf(stderr, "compile_node(): arg nodes should be handled by their parent func node and not compiled separatly!\n");
 			abort();
 		
+		case NT_TYPE_T:
+			// TODO: compile it into a static struct
 		case NT_UNARY_OP:
 			fprintf(stderr, "compile_node(): TODO\n");
 			abort();
@@ -962,4 +974,19 @@ void resolve_addr_slots(node_p node, compiler_ctx_p ctx) {
 		if (!target->func.linked)
 			resolve_addr_slots(target, ctx);
 	}
+}
+
+
+
+//
+// Utilities
+//
+
+uint8_t type_get_bits(node_p node, str_t type_name) {
+	node_p type = ns_lookup(node, type_name);
+	if (type == NULL || type->type != NT_TYPE_T) {
+		fprintf(stderr, "type_get_bits(): type name didn't resolve to a type_t node!\n");
+		abort();
+	}
+	return type->type_t.bits;
 }

@@ -4,6 +4,12 @@
 	- To assambler as operand (8 bit registers)
 	- To compiler via tracking of variable and expression types (type info in
 	  returned raa_t).
+		OK add to raa_t struct
+		OK create ast nodes for ulong and ubyte
+		OK add type nodes to var and arg
+		OK extend the parser to add them
+		 - use ns_lookup to get the bits when allocating registers
+		   helper function that aborts when name doesn't resolve to a type node
 - Create builtins and convert syscall to one
 - Refactor compiler stuff into compiler.c
 - Proper error reporting in parser

@@ -177,8 +177,9 @@ node_p parse_func_def(parser_p parser) {
 			
 			//node_p arg_type = parse_expr(parser);
 			//node_set(arg, &arg->arg.type, arg_type);
-			token_p arg_type = consume_type(parser, T_ID);
-			arg->arg.type = arg_type->src;
+			token_p arg_type_tok = consume_type(parser, T_ID);
+			node_p arg_type_node = node_alloc_set(NT_ID, arg, &arg->arg.type);
+			arg_type_node->id.name = arg_type_tok->src;
 			
 			if (peek_type(parser) == T_ID) {
 				token_p arg_name = consume(parser);
@@ -255,6 +256,11 @@ node_p parse_stmt(parser_p parser) {
 			stmt = node_alloc(NT_VAR);
 			token_p id = consume_type(parser, T_ID);
 			stmt->var.name = id->src;
+			{
+				// For now set the id(ulong) as type
+				node_p type = node_alloc_set(NT_ID, stmt, &stmt->var.type);
+				type->id.name = str_from_c("ulong");
+			}
 			
 			if ( peek_type_with_eos(parser) == T_ASSIGN ) {
 				consume_type(parser, T_ASSIGN);

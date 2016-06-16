@@ -90,7 +90,9 @@ typedef enum {
 	NT_UNARY_OP,
 	NT_UOPS,
 	NT_OP,
-	NT_CALL
+	NT_CALL,
+	
+	NT_TYPE_T
 } node_type_t;
 
 
@@ -130,9 +132,8 @@ struct node_s {
 		} func;
 		
 		struct {
-			//node_p type;
-			str_t type;
 			str_t name;  // Can be 0, NULL in case the arg is unnamed
+			node_p type;
 			
 			int64_t frame_displ;
 		} arg;
@@ -144,6 +145,7 @@ struct node_s {
 		
 		struct {
 			str_t name;
+			node_p type;
 			node_p value;  // Can be NULL in case of declaration only
 			
 			int64_t frame_displ;
@@ -193,6 +195,12 @@ struct node_s {
 			str_t name;
 			node_list_t args;
 		} call;
+		
+		
+		struct {
+			str_t name;
+			int64_t bits;
+		} type_t;
 	};
 };
 
@@ -330,7 +338,14 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 			{ MT_NODE_LIST, offsetof(node_t, call.args), "args" },
 			{ 0 }
 		}
-	}
+	},
+	
+	[ NT_TYPE_T ] = &(node_spec_t){
+		"type_t", (member_spec_t[]){
+			{ MT_STR,  offsetof(node_t, type_t.name), "name" },
+			{ MT_INT,  offsetof(node_t, type_t.bits), "bits" },
+		}
+	},
 };
 
 
