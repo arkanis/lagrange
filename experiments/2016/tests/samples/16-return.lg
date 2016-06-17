@@ -1,0 +1,12 @@
+// status: 30
+
+func main {
+	var result = foo(0) + foo(1)
+	syscall(60, result)
+}
+
+func foo in(int n) out(int) {
+	if (n == 0)
+		return 10
+	return 20
+}
