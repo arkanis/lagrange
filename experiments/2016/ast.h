@@ -238,8 +238,8 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 	[ NT_ARG ] = &(node_spec_t){
 		"arg", (member_spec_t[]){
 			{ MT_STR,  offsetof(node_t, arg.name), "name" },
-			//{ MT_NODE, offsetof(node_t, arg.type), "type" },
-			{ MT_STR,  offsetof(node_t, arg.type), "type" },
+			{ MT_NODE, offsetof(node_t, arg.type), "type" },
+			//{ MT_STR,  offsetof(node_t, arg.type), "type" },
 			{ MT_INT,  offsetof(node_t, arg.frame_displ), "frame_displ" },
 			{ 0 }
 		}
@@ -255,8 +255,9 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 	
 	[ NT_VAR ] = &(node_spec_t){
 		"var", (member_spec_t[]){
-			{ MT_STR,  offsetof(node_t, var.name), "name" },
+			{ MT_STR,  offsetof(node_t, var.name),  "name" },
 			{ MT_NODE, offsetof(node_t, var.value), "value" },
+			{ MT_NODE, offsetof(node_t, var.type),  "type" },
 			{ MT_INT,  offsetof(node_t, arg.frame_displ), "frame_displ" },
 			{ 0 }
 		}
