@@ -368,3 +368,16 @@ node_p node_iterate(node_p node, node_it_func_t func, void* private);
 
 void node_print(node_p node, FILE* output);
 void node_print_inline(node_p node, FILE* output);
+
+
+typedef struct {
+	ssize_t member_index;
+	ssize_t node_index;
+	node_p node;
+} ast_it_t;
+
+ast_it_t ast_start(node_p node);
+ast_it_t ast_next(node_p node, ast_it_t it);
+
+//for(ast_it_t it = ast_start(node); it != NULL; it = ast_next(node, it))
+//	foo(it.node);

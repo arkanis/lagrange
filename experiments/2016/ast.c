@@ -330,6 +330,90 @@ void node_print_inline(node_p node, FILE* output) {
 }
 
 
+
+//
+// Iteration functions
+//
+/*
+new iterator
+	search for first node or list
+	node:
+		member_index = idx of first member
+		node_index = -1
+		node = ptr
+	list:
+		member_index = idx of first member
+		node_index = 0
+		node = list.ptr[0]
+
+next iterator:
+	if member[member_idx] is node
+		new iterator for member_idx+1
+	is list
+		node_index++
+		if node_index < list.len
+			node = list.ptr[node_index]
+		else
+			new iterator for member_idx+1
+*/
+
+static ast_it_t ast_it_for_node(node_p node, size_t member_index) {
+	for(size_t i = member_index; node->spec->members[i].type != 0; i++) {
+		member_spec_p member = &node->spec->members[i];
+		void* member_ptr = (uint8_t*)node + member->offset;
+		
+		if (member->type == MT_NODE) {
+			node_p* child_node = member_ptr;
+			if (*child_node) {
+				return (ast_it_t){
+					.member_index = i,
+					.node_index = -1,
+					.node = *child_node
+				};
+			}
+		} else if (member->type == MT_NODE_LIST) {
+			node_list_p list = member_ptr;
+			if (list->len > 0) {
+				return (ast_it_t){
+					.member_index = i,
+					.node_index = 0,
+					.node = list->ptr[0]
+				};
+			}
+		}
+	}
+	
+	return (ast_it_t){
+		.member_index = -1,
+		.node_index = -1,
+		.node = NULL
+	};
+}
+
+ast_it_t ast_start(node_p node) {
+	return ast_it_for_node(node, 0);
+}
+
+ast_it_t ast_next(node_p node, ast_it_t it) {
+	if (it.member_index == -1)
+		return it;
+	
+	member_spec_p member = &node->spec->members[it.member_index];
+	void* member_ptr = (uint8_t*)node + member->offset;
+	if ( member->type == MT_NODE_LIST ) {
+		node_list_p list = member_ptr;
+		it.node_index++;
+		if (it.node_index < (ssize_t)list->len) {
+			it.node = list->ptr[it.node_index];
+			return it;
+		}
+	}
+	
+	return ast_it_for_node(node, it.member_index + 1);
+}
+
+
+
 /*
 node_p demo_pass(node_p node, uint32_t level, uint32_t flags) {
 	if (flags & NI_PRE) {
