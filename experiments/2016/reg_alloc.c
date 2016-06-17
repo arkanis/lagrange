@@ -46,7 +46,7 @@ int8_t ra_find_free_reg(ra_p ra) {
 }
 
 
-raa_t ra_alloc_reg(ra_p ra, asm_p as, int8_t reg_index, uint8_t bits) {
+raa_t ra_alloc_reg(ra_p ra, asm_p as, int8_t reg_index/*, uint8_t bits*/) {
 	if (reg_index == -1)
 		reg_index = ra_find_free_reg(ra);
 	
@@ -54,7 +54,7 @@ raa_t ra_alloc_reg(ra_p ra, asm_p as, int8_t reg_index, uint8_t bits) {
 		.reg_index = reg_index,
 		.spill_reg = RA_NO_SPILL,
 		.spill_depth = 0,
-		.bits = bits
+		.bits = 64  /*bits*/
 	};
 	if ( ra_reg_allocated(ra, reg_index) ) {
 		ra->spill_depth++;

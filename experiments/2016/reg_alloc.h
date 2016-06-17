@@ -22,7 +22,7 @@ typedef struct {
 #define RA_NO_SPILL    -1
 #define RA_STACK_SPILL -2
 
-raa_t ra_alloc_reg(ra_p ra, asm_p as, int8_t reg_index, uint8_t bits);
+raa_t ra_alloc_reg(ra_p ra, asm_p as, int8_t reg_index/*, uint8_t bits*/);
 void  ra_free_reg(ra_p ra, asm_p as, raa_t allocation);
 void  ra_ensure(ra_p ra, uint8_t allocated_reg_count, size_t spilled_reg_count);
 bool  ra_reg_allocated(ra_p ra, uint8_t reg_index);
