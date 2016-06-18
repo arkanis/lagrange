@@ -10,6 +10,10 @@
 		OK extend the parser to add them
 		 - use ns_lookup to get the bits when allocating registers
 		   helper function that aborts when name doesn't resolve to a type node
+	- Write type pass
+		- Create a type struct: name, bitwidth
+		- Add type members to all expr nodes (nodes that generate output that can be stored)
+		- Add builtin types: ulong, ubyte
 - Create builtins and convert syscall to one
 - Refactor compiler stuff into compiler.c
 - Proper error reporting in parser
