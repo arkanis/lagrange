@@ -424,7 +424,7 @@ node_p parse_expr_without_trailing_ops(parser_p parser) {
 		case T_NOT:
 		case T_COMPL:
 			node = node_alloc(NT_UNARY_OP);
-			node->unary_op.type = t->type;
+			node->unary_op.token_type = t->type;
 			node_set(node, &node->unary_op.arg, parse_expr_without_trailing_ops(parser) );
 			break;
 		

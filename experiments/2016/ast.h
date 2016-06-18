@@ -31,6 +31,7 @@ typedef struct {
 	// type? 32bit displ, or something else?
 } node_addr_slot_t, *node_addr_slot_p;
 
+
 //
 // Node list
 //
@@ -119,6 +120,11 @@ struct node_s {
 		
 		struct {
 			str_t name;
+			int64_t bits;
+		} type_t;
+		
+		struct {
+			str_t name;
 			node_list_t in, out;
 			node_list_t body;
 			
@@ -178,7 +184,7 @@ struct node_s {
 		} strl;
 		
 		struct {
-			int64_t type;
+			int64_t token_type;
 			node_p arg;
 		} unary_op;
 		
@@ -195,7 +201,6 @@ struct node_s {
 			str_t name;
 			node_list_t args;
 		} call;
-		
 		
 		struct {
 			str_t name;
@@ -311,7 +316,7 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 	
 	[ NT_UNARY_OP ] = &(node_spec_t){
 		"unary_op", (member_spec_t[]){
-			{ MT_INT,  offsetof(node_t, unary_op.type), "type" },
+			{ MT_INT,  offsetof(node_t, unary_op.token_type), "token_type" },
 			{ MT_NODE, offsetof(node_t, unary_op.arg),  "arg" },
 			{ 0 }
 		}
