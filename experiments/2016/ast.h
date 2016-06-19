@@ -201,11 +201,6 @@ struct node_s {
 			str_t name;
 			node_list_t args;
 		} call;
-		
-		struct {
-			str_t name;
-			int64_t bits;
-		} type_t;
 	};
 };
 
