@@ -95,23 +95,18 @@ int main(int argc, char** argv) {
 //
 
 void fill_namespaces(node_p node, node_ns_p current_ns) {
+	node_ns_p ns_for_children = current_ns;
+	
 	switch(node->type) {
 		case NT_MODULE:
-			for(size_t i = 0; i < node->module.defs.len; i++)
-				fill_namespaces(node->module.defs.ptr[i], &node->module.ns);
+			ns_for_children = &node->module.ns;
 			break;
 		case NT_FUNC:
 			node_ns_put(current_ns, node->func.name, node);
-			for(size_t i = 0; i < node->func.in.len; i++)
-				fill_namespaces(node->func.in.ptr[i], &node->func.ns);
-			for(size_t i = 0; i < node->func.out.len; i++)
-				fill_namespaces(node->func.out.ptr[i], &node->func.ns);
-			for(size_t i = 0; i < node->func.body.len; i++)
-				fill_namespaces(node->func.body.ptr[i], &node->func.ns);
+			ns_for_children = &node->func.ns;
 			break;
 		case NT_SCOPE:
-			for(size_t i = 0; i < node->scope.stmts.len; i++)
-				fill_namespaces(node->scope.stmts.ptr[i], &node->scope.ns);
+			ns_for_children = &node->scope.ns;
 			break;
 		case NT_IF:
 			// TODO: add variable defined in condition to true_ns so it can be
@@ -119,10 +114,8 @@ void fill_namespaces(node_p node, node_ns_p current_ns) {
 			fill_namespaces(node->if_stmt.true_case, &node->if_stmt.true_ns);
 			if (node->if_stmt.false_case)
 				fill_namespaces(node->if_stmt.false_case, current_ns);
-			break;
-		case NT_WHILE:
-			fill_namespaces(node->while_stmt.body, current_ns);
-			break;
+			// We already iterated over all children so return right away
+			return;
 		
 		case NT_ARG:
 			// Don't add unnamed args to the namespace
@@ -141,6 +134,9 @@ void fill_namespaces(node_p node, node_ns_p current_ns) {
 				}
 			}
 	}
+	
+	for(ast_it_t it = ast_start(node); it.node != NULL; it = ast_next(node, it))
+		fill_namespaces(it.node, ns_for_children);
 }
 
 
