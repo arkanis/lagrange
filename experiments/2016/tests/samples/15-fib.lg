@@ -17,7 +17,7 @@ func main {
 	syscall(60, 0)
 }
 
-func fib in(int n) out(int res) {
+func fib in(ulong n) out(ulong res) {
 	/*
 	syscall(1, 1, "fib: ", 5)
 	print_decimal(n)
@@ -35,13 +35,13 @@ func fib in(int n) out(int res) {
 	}
 }
 
-func print_num in(int n) {
+func print_num in(ulong n) {
 	if (n > 9)
 		print_num(n / 10)
 	print_decimal(n % 10)
 }
 
-func print_decimal in(int n) {
+func print_decimal in(ulong n) {
 	if n == 0
 		syscall(1, 1, "0", 1)
 	else if n == 1

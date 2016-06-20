@@ -1,25 +1,30 @@
 # ToDo
 
 - Add 8 bit data type
-	X To assambler as operand (8 bit registers)
-	X Create a type struct: name, bitwidth
-	X Add type members to all expr nodes (nodes that generate output that can be stored)
-	X Update parser to add NULL types
-	X Write type pass to insert ulong as type for everything
-	X Fix member specs (wrong offsets)!!!
-	X Rewrite compiler to use type size for reg allocation
-	- Add ubyte type
+	x To assambler as operand (8 bit registers)
+	x Create a type struct: name, bitwidth
+	x Add type members to all expr nodes (nodes that generate output that can be stored)
+	x Update parser to add NULL types
+	x Write type pass to insert ulong as type for everything
+	x Fix member specs (wrong offsets)!!!
+	x Rewrite compiler to use type size for reg allocation
+	x Add ubyte type
+	x Update type pass to set type based on type_expr of node
+	- Make function call arguments respect load/store for type
 	- Add type name to var statement?
-	- Update type pass to set type based on type_expr of node
 	- Extract compiler code into operator and load/store functions of type
 	- Go through the compiler functions and promote reg allocation bit width to the result width for all operations
-	- Change register allocator and assembler to use bytes instead of bits for type width
 	- reg alloc:
+		- Change register allocator and assembler to use bytes instead of bits
+		  for type width
 		- make allocator return reg() structure with index and width instead of
 		  just the index. So it can be used directly as args for asm functions.
 		- Change spilling information in allocation to a chain. Otherwise it
 		  breaks as soon as the same register is spilled more than once in a
 		  row.
+- Refactoring
+	- Make str functions use str_t instead of str_p. Easier to pass strings
+	  directly from AST nodes.
 - Create builtins and convert syscall to one
 - Refactor compiler stuff into compiler.c
 - Proper error reporting in parser

@@ -294,12 +294,16 @@ struct type_s {
 	builtin_store_func_t store;
 };
 
-type_p type_ulong;
+type_p type_ulong, type_ubyte;
 
 void setup_builtin_types() {
 	type_ulong = calloc(1, sizeof(type_t));
 	type_ulong->name = str_from_c("ulong");
 	type_ulong->size = 8;
+	
+	type_ubyte = calloc(1, sizeof(type_t));
+	type_ubyte->name = str_from_c("ubyte");
+	type_ubyte->size = 1;
 }
 
 type_p type_negotiate(type_p a, type_p b) {
@@ -315,7 +319,7 @@ type_p node_expr_type(node_p node) {
 		if (member->type == MT_TYPE) {
 			void* member_ptr = (uint8_t*)node + member->offset;
 			type_p type = *(type_p*)member_ptr;
-			if (type != type_ulong) {
+			if (type != type_ulong && type != type_ubyte) {
 				abort();
 			}
 			return type;
@@ -358,7 +362,18 @@ void infere_types(node_p node) {
 			infere_types(node->var.value);  // recurse into value expr but not into type_expr
 			return;
 		case NT_ARG:
-			node->arg.type = type_ulong;
+			if (node->arg.type_expr->type != NT_ID) {
+				fprintf(stderr, "infere_types(): type_expr has to be an ID for now\n");
+				abort();
+			}
+			if ( str_eqc(&node->arg.type_expr->id.name, "ulong") ) {
+				node->arg.type = type_ulong;
+			} else if ( str_eqc(&node->arg.type_expr->id.name, "ubyte") ) {
+				node->arg.type = type_ubyte;
+			} else {
+				fprintf(stderr, "infere_types(): only ulong and ubyte supported for now!\n");
+				abort();
+			}
 			return;
 		
 		// For now these are fixed to ulong

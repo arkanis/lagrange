@@ -3,18 +3,18 @@
 
 /*
 // function definitions
-func main in(int argc, array_t argv) out(int) {
+func main in(ulong argc, array_t argv) out(ulong) {
 	syscall 60, 17
 }
 
-func foo in(int argc, array_t argv) out(int) {
+func foo in(ulong argc, array_t argv) out(ulong) {
 	syscall 60, 13
 }
 */
 
 /*
 // function call syntax
-func main in(int argc, array_t argv) out(int) {
+func main in(ulong argc, array_t argv) out(ulong) {
 	var str_ptr = "Hello World!\n"
 	var str_len = 13
 	
@@ -29,6 +29,6 @@ func main {
 	syscall(60, result)
 }
 
-func print in(int ptr, int len, int offset) out(int) {
+func print in(ulong ptr, ulong len, ulong offset) out(ulong) {
 	syscall(1, 1, ptr + offset, len - offset)
 }
