@@ -14,6 +14,15 @@
 		- Create a type struct: name, bitwidth
 		- Add type members to all expr nodes (nodes that generate output that can be stored)
 		- Add builtin types: ulong, ubyte
+	
+	OK Update parser to add NULL types
+	- Write type pass to insert ulong as type for everything
+	- Fix member specs (wrong offsets)!!!
+	- Rewrite compiler to use type size for reg allocation
+	- Add ubyte type
+	- Add type name to var statement?
+	- Update type pass to set type based on type_expr of node
+	- Extract compiler code into operator and load/store functions of type
 - Create builtins and convert syscall to one
 - Refactor compiler stuff into compiler.c
 - Proper error reporting in parser
@@ -52,6 +61,12 @@
 	- Iterator would have to remember the current member and if the member is a list the current list index.
 	- Would allow to write recursive passes that can iterate over all nodes yet still handle some nodes in special ways.
 	- We would also collect the code to iterate over the AST in one place. When we change the AST we wouldn't have to update all passes.
+- Nodes that represent an aspect of a real node:
+	- Node returns a value (and has a type)
+	- Node is a var definition (has frame displ member)
+	  More or less the same as: Can be assigned a new value (still not sure this
+	  makes sense here).
+	- Namespace (if statement makes this complicated...)
 
 
 # Things to think about

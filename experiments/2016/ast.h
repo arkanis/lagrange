@@ -5,11 +5,12 @@
 #include <stddef.h>
 #include <stdio.h>
 #include "slim_hash.h"
-#include "utils.h"
+#include "common.h"
 #include "asm.h"
 
 
 typedef struct node_s node_t, *node_p;
+typedef struct type_s type_t, *type_p;
 
 
 //
@@ -54,6 +55,7 @@ typedef enum {
 	MT_NODE_LIST,
 	MT_NS,
 	MT_ASL,
+	MT_TYPE,
 	
 	MT_INT,
 	MT_CHAR,
@@ -91,9 +93,7 @@ typedef enum {
 	NT_UNARY_OP,
 	NT_UOPS,
 	NT_OP,
-	NT_CALL,
-	
-	NT_TYPE_T
+	NT_CALL
 } node_type_t;
 
 
@@ -120,11 +120,6 @@ struct node_s {
 		
 		struct {
 			str_t name;
-			int64_t bits;
-		} type_t;
-		
-		struct {
-			str_t name;
 			node_list_t in, out;
 			node_list_t body;
 			
@@ -139,7 +134,9 @@ struct node_s {
 		
 		struct {
 			str_t name;  // Can be 0, NULL in case the arg is unnamed
-			node_p type;
+			node_p type_expr;
+			
+			type_p type;
 			
 			int64_t frame_displ;
 		} arg;
@@ -151,8 +148,10 @@ struct node_s {
 		
 		struct {
 			str_t name;
-			node_p type;
+			node_p type_expr;
 			node_p value;  // Can be NULL in case of declaration only
+			
+			type_p type;
 			
 			int64_t frame_displ;
 		} var;
@@ -173,33 +172,46 @@ struct node_s {
 		
 		struct {
 			str_t name;
+			
+			type_p type;
 		} id;
 		
 		struct {
 			int64_t value;
+			
+			type_p type;
 		} intl;
 		
 		struct {
 			str_t value;
+			
+			type_p type;
 		} strl;
 		
 		struct {
 			int64_t token_type;
 			node_p arg;
+			
+			type_p type;
 		} unary_op;
 		
 		struct {
 			node_list_t list;
+			// has no type since it's resolved to op nodes before the type pass
 		} uops;
 		
 		struct {
 			int64_t idx;
 			node_p a, b;
+			
+			type_p type;
 		} op;
 		
 		struct {
 			str_t name;
 			node_list_t args;
+			
+			type_p type;
 		} call;
 	};
 };
@@ -226,20 +238,20 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 			{ MT_NODE_LIST, offsetof(node_t, func.out),  "out" },
 			{ MT_NODE_LIST, offsetof(node_t, func.body), "body" },
 			
-			{ MT_BOOL,      offsetof(node_t, func.compiled), "compiled" },
-			{ MT_BOOL,      offsetof(node_t, func.linked), "linked" },
-			{ MT_SIZE,      offsetof(node_t, func.as_offset), "as_offset" },
+			{ MT_BOOL,      offsetof(node_t, func.compiled),         "compiled" },
+			{ MT_BOOL,      offsetof(node_t, func.linked),           "linked" },
+			{ MT_SIZE,      offsetof(node_t, func.as_offset),        "as_offset" },
 			{ MT_SIZE,      offsetof(node_t, func.stack_frame_size), "stack_frame_size" },
-			{ MT_ASL,       offsetof(node_t, func.addr_slots), "addr_slots" },
+			{ MT_ASL,       offsetof(node_t, func.addr_slots),       "addr_slots" },
 			{ 0 }
 		}
 	},
 	
 	[ NT_ARG ] = &(node_spec_t){
 		"arg", (member_spec_t[]){
-			{ MT_STR,  offsetof(node_t, arg.name), "name" },
-			{ MT_NODE, offsetof(node_t, arg.type), "type" },
-			//{ MT_STR,  offsetof(node_t, arg.type), "type" },
+			{ MT_STR,  offsetof(node_t, arg.name),        "name" },
+			{ MT_NODE, offsetof(node_t, arg.type_expr),   "type_expr" },
+			{ MT_TYPE, offsetof(node_t, arg.type),        "type" },
 			{ MT_INT,  offsetof(node_t, arg.frame_displ), "frame_displ" },
 			{ 0 }
 		}
@@ -255,10 +267,11 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 	
 	[ NT_VAR ] = &(node_spec_t){
 		"var", (member_spec_t[]){
-			{ MT_STR,  offsetof(node_t, var.name),  "name" },
-			{ MT_NODE, offsetof(node_t, var.value), "value" },
-			{ MT_NODE, offsetof(node_t, var.type),  "type" },
-			{ MT_INT,  offsetof(node_t, arg.frame_displ), "frame_displ" },
+			{ MT_STR,  offsetof(node_t, var.name),        "name" },
+			{ MT_NODE, offsetof(node_t, var.value),       "value" },
+			{ MT_NODE, offsetof(node_t, var.type_expr),   "type_expr" },
+			{ MT_TYPE, offsetof(node_t, var.type),        "type" },
+			{ MT_INT,  offsetof(node_t, var.frame_displ), "frame_displ" },
 			{ 0 }
 		}
 	},
@@ -290,21 +303,24 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 	
 	[ NT_ID ] = &(node_spec_t){
 		"id", (member_spec_t[]){
-			{ MT_STR, offsetof(node_t, id.name), "name" },
+			{ MT_STR,  offsetof(node_t, id.name), "name" },
+			{ MT_TYPE, offsetof(node_t, id.type), "type" },
 			{ 0 }
 		}
 	},
 	
 	[ NT_INTL ] = &(node_spec_t){
 		"intl", (member_spec_t[]){
-			{ MT_INT, offsetof(node_t, intl.value), "value" },
+			{ MT_INT,  offsetof(node_t, intl.value), "value" },
+			{ MT_TYPE, offsetof(node_t, intl.type),  "type" },
 			{ 0 }
 		}
 	},
 	
 	[ NT_STRL ] = &(node_spec_t){
 		"strl", (member_spec_t[]){
-			{ MT_STR, offsetof(node_t, strl.value), "value" },
+			{ MT_STR,  offsetof(node_t, strl.value), "value" },
+			{ MT_TYPE, offsetof(node_t, strl.type),  "type" },
 			{ 0 }
 		}
 	},
@@ -312,7 +328,8 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 	[ NT_UNARY_OP ] = &(node_spec_t){
 		"unary_op", (member_spec_t[]){
 			{ MT_INT,  offsetof(node_t, unary_op.token_type), "token_type" },
-			{ MT_NODE, offsetof(node_t, unary_op.arg),  "arg" },
+			{ MT_NODE, offsetof(node_t, unary_op.arg),        "arg" },
+			{ MT_TYPE, offsetof(node_t, unary_op.type),       "type" },
 			{ 0 }
 		}
 	},
@@ -326,9 +343,10 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 	
 	[ NT_OP ] = &(node_spec_t){
 		"op", (member_spec_t[]){
-			{ MT_INT,  offsetof(node_t, op.idx), "idx" },
-			{ MT_NODE, offsetof(node_t, op.a), "a" },
-			{ MT_NODE, offsetof(node_t, op.b), "b" },
+			{ MT_INT,  offsetof(node_t, op.idx),  "idx" },
+			{ MT_NODE, offsetof(node_t, op.a),    "a" },
+			{ MT_NODE, offsetof(node_t, op.b),    "b" },
+			{ MT_TYPE, offsetof(node_t, op.type), "type" },
 			{ 0 }
 		}
 	},
@@ -337,14 +355,8 @@ __attribute__ ((weak)) node_spec_p node_specs[] = {
 		"call", (member_spec_t[]){
 			{ MT_STR,       offsetof(node_t, call.name), "name" },
 			{ MT_NODE_LIST, offsetof(node_t, call.args), "args" },
+			{ MT_TYPE,      offsetof(node_t, call.type), "type" },
 			{ 0 }
-		}
-	},
-	
-	[ NT_TYPE_T ] = &(node_spec_t){
-		"type_t", (member_spec_t[]){
-			{ MT_STR,  offsetof(node_t, type_t.name), "name" },
-			{ MT_INT,  offsetof(node_t, type_t.bits), "bits" },
 		}
 	},
 };

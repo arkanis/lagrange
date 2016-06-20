@@ -3,6 +3,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#include "reg_alloc.h"
+
 
 //
 // Simple variable length buffer
@@ -38,6 +40,7 @@
 } while(0)
 
 
+
 //
 // Not zero-terminated strings
 //
@@ -53,6 +56,7 @@ void  str_free(str_p str);
 void str_putc(str_p str, char c);
 bool str_eq(str_p a, str_p b);
 bool str_eqc(str_p a, const char* b);
+
 
 
 //

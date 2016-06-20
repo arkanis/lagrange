@@ -217,6 +217,16 @@ node_p node_iterate(node_p node, node_it_func_t func, void* private) {
 
 
 
+//
+// Printing functions
+//
+
+// Just some local helper definition so we can output the type name
+struct type_s {
+	str_t name;
+	size_t size;
+};
+
 static void node_print_recursive(node_p node, FILE* output, int level) {
 	fprintf(output, "%s: ", node->spec->name);
 	
@@ -242,19 +252,26 @@ static void node_print_recursive(node_p node, FILE* output, int level) {
 					node_print_recursive(list->ptr[i], output, level+1);
 				}
 				} break;
-			case MT_NS:{
+			case MT_NS: {
 				node_ns_p ns = member_ptr;
 				for(node_ns_it_p it = node_ns_start(ns); it != NULL; it = node_ns_next(ns, it)) {
 					fprintf(output, "\"%.*s\" ", it->key.len, it->key.ptr);
 				}
 				} break;
-			case MT_ASL:{
+			case MT_ASL: {
 				list_t(node_addr_slot_t)* asl = member_ptr;
 				for(size_t i = 0; i < asl->len; i++) {
 					fprintf(output, "\n%*soffset %zu → ", (level+2)*2, "", asl->ptr[i].offset);
 					node_print_inline(asl->ptr[i].target, output);
 					fprintf(output, "\n");
 				}
+				} break;
+			case MT_TYPE: {
+				type_p type = *(type_p*)member_ptr;
+				if (type == NULL)
+					fprintf(output, "NULL");
+				else
+					fprintf(output, "%.*s (%zu bytes)", type->name.len, type->name.ptr, type->size);
 				} break;
 			
 			case MT_INT: {
@@ -305,6 +322,14 @@ void node_print_inline(node_p node, FILE* output) {
 			case MT_ASL:
 				fprintf(output, "asl");
 				break;
+			case MT_TYPE: {
+				type_p type = *(type_p*)member_ptr;
+				if (type == NULL)
+					fprintf(output, "NULL");
+				else
+					fprintf(output, "%.*s (%zu bytes)", type->name.len, type->name.ptr, type->size);
+				} break;
+				
 			case MT_INT: {
 				int64_t* value = member_ptr;
 				fprintf(output, "%ld", *value);

@@ -8,7 +8,7 @@
 #define SLIM_HASH_IMPLEMENTATION
 #include "slim_hash.h"
 
-#include "utils.h"
+#include "common.h"
 #include "lexer.h"
 #include "parser.h"
 #include "reg_alloc.h"
@@ -17,6 +17,10 @@
 void   fill_namespaces(node_p node, node_ns_p current_ns);
 node_p expand_uops(node_p node, uint32_t level, uint32_t flags, void* private);
 void   compile(node_p node, const char* filename);
+void   setup_builtin_types();
+void   infere_types(node_p node);
+
+typedef struct compiler_ctx_s compiler_ctx_t, *compiler_ctx_p;
 
 
 int main(int argc, char** argv) {
@@ -42,7 +46,7 @@ int main(int argc, char** argv) {
 		str_free(&src);
 		return 1;
 	}
-	
+	/*
 	for(size_t i = 0; i < list->tokens.len; i++) {
 		token_p t = &list->tokens.ptr[i];
 		if (t->type == T_COMMENT || t->type == T_WS) {
@@ -56,15 +60,17 @@ int main(int argc, char** argv) {
 		}
 	}
 	printf("\n");
+	*/
 	
 	printf("\n");
 	node_p tree = parse(list, parse_module);
 	printf("\n");
 	node_print(tree, stdout);
 	
-	
+	setup_builtin_types();
 	node_ns_t global_ns;
 	node_ns_new(&global_ns);
+	/* maybe add types into normal namespace as soon as we can define types...
 		node_p ulong_type = node_alloc(NT_TYPE_T);
 		ulong_type->type_t.name = str_from_c("ulong");
 		ulong_type->type_t.bits = 64;
@@ -73,11 +79,15 @@ int main(int argc, char** argv) {
 		ubyte->type_t.name = str_from_c("ubyte");
 		ubyte->type_t.bits = 8;
 	node_ns_put(&global_ns, ubyte->type_t.name, ubyte);
-	
+	*/
 	// TODO: add builtins like "syscall" to global namespace
 	fill_namespaces(tree, &global_ns);
 	
 	node_iterate(tree, expand_uops, NULL);
+	//node_print(tree, stdout);
+	
+	printf("PASS: infere types...\n");
+	infere_types(tree);
 	node_print(tree, stdout);
 	
 	compile(tree, "main.elf");
@@ -156,7 +166,9 @@ typedef enum {
 	OP_ADD, OP_SUB,
 	OP_LT, OP_LE, OP_GT, OP_GE,
 	OP_EQ, OP_NEQ,
-	OP_ASSIGN
+	OP_ASSIGN,
+	
+	OP_COUNT  // last ID is reserved to represent the number of existing operators
 } op_idx_t;
 // CAUTION: Operators with the same precedence need the same associativity!
 // Otherwise it probably gets complicates... not sure.
@@ -267,6 +279,170 @@ node_p expand_uops(node_p node, uint32_t level, uint32_t flags, void* private) {
 
 
 //
+// Propagate type information through the AST
+//
+
+typedef raa_t (*builtin_func_t)(node_p node, compiler_ctx_p ctx, int8_t requested_result_register);
+typedef raa_t (*builtin_store_func_t)(raa_t allocation, node_p target, compiler_ctx_p ctx, int8_t requested_result_register);
+
+struct type_s {
+	str_t name;
+	size_t size;
+	
+	builtin_func_t operators[OP_COUNT];
+	builtin_func_t load;
+	builtin_store_func_t store;
+};
+
+type_p type_ulong;
+
+void setup_builtin_types() {
+	type_ulong = calloc(1, sizeof(type_t));
+	type_ulong->name = str_from_c("ulong");
+	type_ulong->size = 8;
+}
+
+type_p type_negotiate(type_p a, type_p b) {
+	// return the largest type
+	if ( a->size > b->size )
+		return a;
+	else
+		return b;
+}
+
+type_p node_expr_type(node_p node) {
+	for(member_spec_p member = node->spec->members; member->type != 0; member++) {
+		if (member->type == MT_TYPE) {
+			void* member_ptr = (uint8_t*)node + member->offset;
+			type_p type = *(type_p*)member_ptr;
+			if (type != type_ulong) {
+				abort();
+			}
+			return type;
+		}
+	}
+	
+	fprintf(stderr, "node_expr_type(): Called on a node that doesn't has a type member!\n");
+	abort();
+	return NULL;
+}
+
+uint8_t node_expr_bits(node_p node) {
+	return node_expr_type(node)->size * 8;
+}
+
+
+/**
+ * This pass sets the type member of all nodes that have it.
+ * 
+ * Types are infered from 3 different sources:
+ * - Roots (don't recurse, type known from node itself)
+ * - From child nodes (e.g. op node)
+ * - From another root(!) in the AST (e.g. call)
+ * 
+ * Sine (3) can only infer from other root nodes we don't get any dependencies
+ * between AST nodes and can jump around freely. Only for nodes of type (2) we
+ * have to make sure that all child nodes are iterated before.
+ */
+void infere_types(node_p node) {
+	//node_print_inline(node, stdout);
+	//printf("\n");
+	
+	// The nodes returning here don't recurse into their children
+	switch(node->type) {
+		// These are our roots with known types. The parser sets the type_expr
+		// for some of them.
+		// TODO: Use the type_expr to actually set the real type.
+		case NT_VAR:
+			node->var.type = type_ulong;
+			infere_types(node->var.value);  // recurse into value expr but not into type_expr
+			return;
+		case NT_ARG:
+			node->arg.type = type_ulong;
+			return;
+		
+		// For now these are fixed to ulong
+		case NT_INTL:
+			node->intl.type = type_ulong;
+			return;
+		case NT_STRL:
+			node->strl.type = type_ulong;
+			return;
+		
+		case NT_UOPS:
+			fprintf(stderr, "infere_types(): Got an uops node! Those should all have been resolved in a prior pass!\n");
+			abort();
+		
+		// Everything else need to iterate over the children first
+		default:
+			break;
+	}
+	
+	
+	// Handle all child nodes so they have their type members set
+	for(ast_it_t it = ast_start(node); it.node != NULL; it = ast_next(node, it))
+		infere_types(it.node);
+	
+	switch(node->type) {
+		// These nodes infer their type from nodes somewhere else in the AST
+		case NT_ID: {
+			// type of lookup target (a var or arg node)
+			node_p target = ns_lookup(node, node->id.name);
+			// Make sure the target root has its type member set
+			infere_types(target);
+			if (target->type == NT_VAR) {
+				node->id.type = target->var.type;
+			} else if (target->type == NT_ARG) {
+				node->id.type = target->arg.type;
+			} else {
+				fprintf(stderr, "infere_types(): Got unexpected target node for ID!\n");
+				abort();
+			}
+			break;
+		}
+		case NT_CALL: {
+			// type of first out arg of target function
+			// TODO: Remove special handling for syscall by replacing it with a builtin
+			if ( str_eqc(&node->call.name, "syscall") ) {
+				node->call.type = type_ulong;
+				break;
+			}
+			
+			node_p target = ns_lookup(node, node->call.name);
+			if (target->type != NT_FUNC) {
+				fprintf(stderr, "infere_types(): Call target isn't a function node!\n");
+				abort();
+			}
+			// Make sure the target root has its type member set
+			infere_types(target);
+			
+			if (target->func.out.len >= 1)
+				node->call.type = target->func.out.ptr[0]->arg.type;
+			else
+				node->call.type = NULL;
+			
+			break;
+		}
+		
+		// Node infering their type from child nodes
+		case NT_OP: {
+			// negotiate(a.type, b.type)
+			type_p type_a = node_expr_type(node->op.a);
+			type_p type_b = node_expr_type(node->op.b);
+			node->op.type = type_negotiate(type_a, type_b);
+			break;
+		}
+		case NT_UNARY_OP:
+			// type of arg
+			node->unary_op.type = node_expr_type(node->unary_op.arg);
+		
+		default:
+			break;
+	}
+}
+
+
+//
 // Compiler helper functions
 //
 
@@ -297,11 +473,11 @@ static int32_t get_var_frame_displ(node_p node) {
 // referenced by this function.
 //
 
-typedef struct {
+struct compiler_ctx_s {
 	asm_p as;
 	ra_p ra;
 	list_t(node_p) compile_queue;
-} compiler_ctx_t, *compiler_ctx_p;
+};
 
 raa_t compile_node(node_p node, compiler_ctx_p ctx, int8_t requested_result_register);
 raa_t compile_func(node_p node, compiler_ctx_p ctx);
@@ -407,8 +583,8 @@ raa_t compile_node(node_p node, compiler_ctx_p ctx, int8_t requested_result_regi
 			fprintf(stderr, "compile_node(): arg nodes should be handled by their parent func node and not compiled separatly!\n");
 			abort();
 		
-		case NT_TYPE_T:
-			// TODO: compile it into a static struct
+		//case NT_TYPE_T:
+			// TODO: compile type definitions into a static struct (runtime type information)
 		case NT_UNARY_OP:
 			fprintf(stderr, "compile_node(): TODO\n");
 			abort();
@@ -970,19 +1146,4 @@ void resolve_addr_slots(node_p node, compiler_ctx_p ctx) {
 		if (!target->func.linked)
 			resolve_addr_slots(target, ctx);
 	}
-}
-
-
-
-//
-// Utilities
-//
-
-uint8_t type_get_bits(node_p node, str_t type_name) {
-	node_p type = ns_lookup(node, type_name);
-	if (type == NULL || type->type != NT_TYPE_T) {
-		fprintf(stderr, "type_get_bits(): type name didn't resolve to a type_t node!\n");
-		abort();
-	}
-	return type->type_t.bits;
 }
