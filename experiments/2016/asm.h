@@ -58,6 +58,7 @@ typedef struct {
 
 static inline asm_arg_t reg(uint8_t index)  { return (asm_arg_t){ ASM_T_REG, .reg = index, .bits = 64 }; }
 static inline asm_arg_t regb(uint8_t index) { return (asm_arg_t){ ASM_T_REG, .reg = index, .bits = 8 }; }
+static inline asm_arg_t regx(uint8_t index, uint8_t bits) { return (asm_arg_t){ ASM_T_REG, .reg = index, .bits = bits }; }
 static inline asm_arg_t imm(uint64_t value) { return (asm_arg_t){ ASM_T_IMM, .imm = value }; }
 static inline asm_arg_t op(uint8_t op_code) { return (asm_arg_t){ ASM_T_OP, .op_code = op_code }; }
 static inline asm_arg_t memd(int32_t disp)  { return (asm_arg_t){ ASM_T_MEM_DISP, .mem_disp = disp, .bits = 64 }; }

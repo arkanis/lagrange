@@ -781,14 +781,15 @@ raa_t compile_call(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 		as_pop(ctx->as, reg(csr_ptr[i]));
 	
 	// Return nothing if the called func has no output argument
-	raa_t result_allocation = ra_empty();
+	raa_t a = ra_empty();
 	// But if it has we allocate the requested register and put the out arg in there
 	if (out_arg_reg != -1) {
-		result_allocation = ra_alloc_reg(ctx->ra, ctx->as, req_reg);
-		as_mov(ctx->as, reg(result_allocation.reg_index), reg(out_arg_reg));
+		uint8_t bits = node_expr_bits(target->func.out.ptr[0]);
+		a = ra_alloc_reg(ctx->ra, ctx->as, req_reg, bits);
+		as_mov(ctx->as, regx(a.reg_index, bits), regx(out_arg_reg, bits));
 	}
 	
-	return result_allocation;
+	return a;
 }
 
 raa_t compile_syscall(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
@@ -833,9 +834,9 @@ raa_t compile_syscall(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 	
 	// Allocate scratch registers
 	for(size_t i = node->call.args.len; i < 7; i++)
-		arg_allocs[i] = ra_alloc_reg(ctx->ra, ctx->as, arg_regs[i]);
-	raa_t a1 = ra_alloc_reg(ctx->ra, ctx->as, R10.reg);
-	raa_t a2 = ra_alloc_reg(ctx->ra, ctx->as, R11.reg);
+		arg_allocs[i] = ra_alloc_reg(ctx->ra, ctx->as, arg_regs[i], 64);
+	raa_t a1 = ra_alloc_reg(ctx->ra, ctx->as, R10.reg, 64);
+	raa_t a2 = ra_alloc_reg(ctx->ra, ctx->as, R11.reg, 64);
 	
 	as_syscall(ctx->as);
 	
@@ -847,11 +848,14 @@ raa_t compile_syscall(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 		ra_free_reg(ctx->ra, ctx->as, arg_allocs[i]);
 	
 	// If the result is requested in RAX or it doesn't matter where we're done
-	if (req_reg == RAX.reg || req_reg == -1)
+	// But set the return type to 64 bits
+	if (req_reg == RAX.reg || req_reg == -1) {
+		arg_allocs[0].bits = 64;
 		return arg_allocs[0];
+	}
 	
 	// Otherwise move it to the target register
-	raa_t a = ra_alloc_reg(ctx->ra, ctx->as, req_reg);
+	raa_t a = ra_alloc_reg(ctx->ra, ctx->as, req_reg, 64);
 	as_mov(ctx->as, reg(req_reg), RAX);
 	ra_free_reg(ctx->ra, ctx->as, arg_allocs[0]);
 	return a;
@@ -992,7 +996,8 @@ raa_t compile_op(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 			// Reserve RDX since MUL and DIV overwrite it
 			// For MUL it's the upper 64 bits of the result
 			// For DIV it's the remainder of the division
-			raa_t arg_up_rem = ra_alloc_reg(ctx->ra, ctx->as, RDX.reg);
+			uint8_t bits = node_expr_bits(node);
+			raa_t arg_up_rem = ra_alloc_reg(ctx->ra, ctx->as, RDX.reg, bits);
 			
 			switch(op) {
 				case OP_MUL:
@@ -1025,11 +1030,12 @@ raa_t compile_op(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 				// Caller either doesn't care in which register the result is
 				// returned or he wants it in the one it's alread in. Either way
 				// we're done.
+				arg_dest.bits = bits;
 				return arg_dest;
 			} else {
 				// Caller wants the result in a differen register. Allocate it
 				// and move the result there.
-				raa_t target_reg = ra_alloc_reg(ctx->ra, ctx->as, req_reg);
+				raa_t target_reg = ra_alloc_reg(ctx->ra, ctx->as, req_reg, bits);
 				as_mov(ctx->as, reg(req_reg), reg(arg_dest.reg_index));
 				ra_free_reg(ctx->ra, ctx->as, arg_dest);
 				return target_reg;
@@ -1093,14 +1099,16 @@ raa_t compile_op(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 }
 
 raa_t compile_intl(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
-	raa_t a = ra_alloc_reg(ctx->ra, ctx->as, req_reg);
+	uint8_t bits = node_expr_bits(node);
+	raa_t a = ra_alloc_reg(ctx->ra, ctx->as, req_reg, bits);
 	as_mov(ctx->as, reg(a.reg_index), imm(node->intl.value));
 	return a;
 }
 
 raa_t compile_strl(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 	size_t str_vaddr = as_data(ctx->as, node->strl.value.ptr, node->strl.value.len);
-	raa_t a = ra_alloc_reg(ctx->ra, ctx->as, req_reg);
+	uint8_t bits = node_expr_bits(node);
+	raa_t a = ra_alloc_reg(ctx->ra, ctx->as, req_reg, bits);
 	as_mov(ctx->as, reg(a.reg_index), imm(str_vaddr));
 	return a;
 }
@@ -1109,7 +1117,8 @@ raa_t compile_id(node_p node, compiler_ctx_p ctx, int8_t req_reg) {
 	node_p target = ns_lookup(node, node->id.name);
 	int32_t stack_offset = get_var_frame_displ(target);
 	
-	raa_t a = ra_alloc_reg(ctx->ra, ctx->as, req_reg);
+	uint8_t bits = node_expr_bits(node);
+	raa_t a = ra_alloc_reg(ctx->ra, ctx->as, req_reg, bits);
 	as_mov(ctx->as, reg(a.reg_index), memrd(RBP, stack_offset));
 	
 	return a;

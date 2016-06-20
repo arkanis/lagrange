@@ -1,28 +1,25 @@
 # ToDo
 
 - Add 8 bit data type
-	- To assambler as operand (8 bit registers)
-	- To compiler via tracking of variable and expression types (type info in
-	  returned raa_t).
-		OK add to raa_t struct
-		OK create ast nodes for ulong and ubyte
-		OK add type nodes to var and arg
-		OK extend the parser to add them
-		 - use ns_lookup to get the bits when allocating registers
-		   helper function that aborts when name doesn't resolve to a type node
-	- Write type pass
-		- Create a type struct: name, bitwidth
-		- Add type members to all expr nodes (nodes that generate output that can be stored)
-		- Add builtin types: ulong, ubyte
-	
-	OK Update parser to add NULL types
-	- Write type pass to insert ulong as type for everything
-	- Fix member specs (wrong offsets)!!!
-	- Rewrite compiler to use type size for reg allocation
+	X To assambler as operand (8 bit registers)
+	X Create a type struct: name, bitwidth
+	X Add type members to all expr nodes (nodes that generate output that can be stored)
+	X Update parser to add NULL types
+	X Write type pass to insert ulong as type for everything
+	X Fix member specs (wrong offsets)!!!
+	X Rewrite compiler to use type size for reg allocation
 	- Add ubyte type
 	- Add type name to var statement?
 	- Update type pass to set type based on type_expr of node
 	- Extract compiler code into operator and load/store functions of type
+	- Go through the compiler functions and promote reg allocation bit width to the result width for all operations
+	- Change register allocator and assembler to use bytes instead of bits for type width
+	- reg alloc:
+		- make allocator return reg() structure with index and width instead of
+		  just the index. So it can be used directly as args for asm functions.
+		- Change spilling information in allocation to a chain. Otherwise it
+		  breaks as soon as the same register is spilled more than once in a
+		  row.
 - Create builtins and convert syscall to one
 - Refactor compiler stuff into compiler.c
 - Proper error reporting in parser
