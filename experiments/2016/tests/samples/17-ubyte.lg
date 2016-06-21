@@ -1,0 +1,11 @@
+// status: 5
+
+func main {
+	// Upper 16 bits should be chopped of by function
+	var result = chop(65280 + 20) / 4
+	syscall(60, result)
+}
+
+func chop in(ulong n) out(ubyte) {
+	return n
+}
