@@ -1,6 +1,0 @@
-node
-node_modules
-debug/ast.svg
-debug/ast.xml
-debug/jast.svg
-debug/llvm_translator_trace.html
