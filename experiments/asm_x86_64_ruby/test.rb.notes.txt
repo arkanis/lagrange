@@ -1,0 +1,292 @@
+# Global attributes
+
+source: source code representation of value
+
+
+# Literals
+
+value: data value in bytes
+
+id       x                   <id name="x">
+int      41                  <int value="41">
+float    1.5                 <float value="1.5">
+string   "hello"             <string value="hello">
+array    [1, 2, 3]           <array>
+                               <int value="1">
+                               <int value="2">
+                               <int value="3">
+                             </array>
+hash     ["a": 1, x: 2]      <hash>
+                               <entry>
+                                 <string value="a">
+                                 <int value="1">
+                               </entry>
+                               <entry>
+                                 <id name="x">
+                                 <int value="1">
+                               </entry>
+                             </hash>
+
+# Types (just expressions)
+
+word     <id name="word">
+string   <id name="string">
+
+# Structures
+
+function func in(word a, word b) out(word x, word y) { ... }
+<function name="func">
+	<::in>
+		<arg>
+			<::type> <id name="word"> </::type>
+			<id name="a">
+		</arg>
+		<arg>
+			<::type> <id name="word"> </::type>
+			<id name="b">
+		</arg>
+	</::in>
+	<::out>
+		<arg>
+			<::type> <id name="word"> </::type>
+			<id name="x">
+		</arg>
+		<arg>
+			<::type> <id name="word"> </::type>
+			<id name="y">
+		</arg>
+	</::out>
+</function>
+
+
+
+
+
+
+
+
+
+
+
+
+function main in(word argc, word argv)  out(word, word) {
+	word x = 17 + 3 * 9;
+	word y = "Hello World!";
+	syscall 17, y;
+}
+
+function calc in(word x) out(word) {
+	return x + 1;
+}
+
+<function name="main">
+	<::in>
+		<arg name="argc" type="word" />
+		<arg name="argv" type="word" />
+	</::in>
+	<::out>
+		<type type="word" />
+		<type type="word" />
+	</::out>
+	
+	<var_decl name="x" type="word">
+		<add>
+			<value type="word">17</value>
+			<mul>
+				<value type="word">3</value>
+				<value type="word">9</value>
+			</mul>
+		</add>
+	</var_decl>
+	
+	<var_decl name="y" type="word">
+		<value type="str">Hello World!</value>
+	</var_decl>
+	
+	<syscall>
+		<value type="word">17</value>
+		<ref>y</ref>
+	</syscall>
+</function>
+
+
+function[name=main]::in > arg
+
+
+word x = 27, y = 13
+<var>
+	<::type>
+		<type id="word">
+	</::type>
+	<int name="x" value="27" />
+	<int name="y" value="13" />
+</var>
+
+word(name: "word", size: 8)
+hash_t.content  # => type(word)
+      .key      # => type(word)
+
+word[word] x = 27
+<var name="x">
+	<::type>
+		<type id="hash">
+			<::content> <type id="word"> </::content>
+			<::key> <type id="word"> </::key>
+		</type>
+	</::type>
+	<int value="27" />
+</var>
+
+
+x = a + 1
+<op type="=">
+	<ref to="x" />
+	<op type="+">
+		<ref to="a" />
+		<int value="1" />
+	</op>
+</op>
+
+return x + 1
+<return>
+	<op type="+">
+		<ref to="x"/>
+		<int value="1">
+	</op>
+</return>
+
+for(uword x = 0; x < 100; x += 1)
+	a += x
+<for>
+	<::init>
+		<var name="x">
+			<type name="uword" />
+			<int value="0" />
+		</var>
+	</::init>
+	<::cond>
+		<op type="<">
+			<ref to="x">
+			<int value="100">
+		</op>
+	</::cond>
+	<::tail>
+		<op type="+=">
+			<ref to="x">
+			<int value="1">
+		</op>
+	</::tail>
+	
+	<op type="+=">
+		<ref to="a">
+		<ref to="x">
+	</op>
+</for>
+
+
+# Register names
+
+r0 = rax = reg(0, 64)
+r1 = rcx = reg(1, 64)
+r2 = rdx = reg(2, 64)
+r3 = rbx = reg(3, 64)
+r4 = rsp = reg(4, 64)
+r5 = rbp = reg(5, 64)
+r6 = rsi = reg(6, 64)
+r7 = rdi = reg(7, 64)
+r8       = reg(8, 64)
+r9       = reg(9, 64)
+r10      = reg(10, 64)
+r11      = reg(11, 64)
+r12      = reg(12, 64)
+r13      = reg(13, 64)
+r14      = reg(14, 64)
+r15      = reg(15, 64)
+
+r0d = eax = reg(0, 32)
+r1d = ecx = reg(1, 32)
+r2d = edx = reg(2, 32)
+r3d = ebx = reg(3, 32)
+r4d = esp = reg(4, 32)
+r5d = ebp = reg(5, 32)
+r6d = esi = reg(6, 32)
+r7d = edi = reg(7, 32)
+r8d       = reg(8, 32)
+r9d       = reg(9, 32)
+r10d      = reg(10, 32)
+r11d      = reg(11, 32)
+r12d      = reg(12, 32)
+r13d      = reg(13, 32)
+r14d      = reg(14, 32)
+r15d      = reg(15, 32)
+
+r0w = ax  = reg(0, 16)
+r1w = cx  = reg(1, 16)
+r2w = dx  = reg(2, 16)
+r3w = bx  = reg(3, 16)
+r4w = sp  = reg(4, 16)
+r5w = bp  = reg(5, 16)
+r6w = si  = reg(6, 16)
+r7w = di  = reg(7, 16)
+r8w       = reg(8, 16)
+r9w       = reg(9, 16)
+r10w      = reg(10, 16)
+r11w      = reg(11, 16)
+r12w      = reg(12, 16)
+r13w      = reg(13, 16)
+r14w      = reg(14, 16)
+r15w      = reg(15, 16)
+
+r0b = al  = reg(0, 8)
+r1b = cl  = reg(1, 8)
+r2b = dl  = reg(2, 8)
+r3b = bl  = reg(3, 8)
+r4b = spl = reg(4, 8)
+r5b = bpl = reg(5, 8)
+r6b = sil = reg(6, 8)
+r7b = dil = reg(7, 8)
+r8b       = reg(8, 8)
+r9b       = reg(9, 8)
+r10b      = reg(10, 8)
+r11b      = reg(11, 8)
+r12b      = reg(12, 8)
+r13b      = reg(13, 8)
+r14b      = reg(14, 8)
+r15b      = reg(15, 8)
+
+
+# Error handling
+
+scope(exit) with returended error codes!
+
+word fd = open("foo.txt", READ | WRITE)
+scope(exit) close(fd)
+
+scope(exit) block | expr
+	adds block or expr to each flow control path that leads out of the scope.
+	just before the return.
+
+
+combine with compiler aware error type (like in Go)
+
+auto fd, error = open("foo.txt", READ | WRITE)
+scope(exit) close(fd)
+
+if (error == EAGAIN)
+	// handled in code here ...
+else
+	return error
+
+Unhandled errors automatically result in "return error". That "throws" the error up to the caller.
+	Thanks to the scope statement the appropriate cleanup statements are executed before the function returns.
+	scope(exit) => code added before each return
+	scope(error) => code added before each "return error" that the compiler automatically added for unhandled errors
+
+word fd = open("foo.txt", READ | WRITE)
+scope(error) println("failed to open file!")
+scope(exit) close(fd)
+
+
+How to handle call stacks?
+	DURING DEVELOPMENT: when an error bubbles up you want to know where it came from
+	DURING PRODUCTION: you want to recover from an error. without handler: no-go. otherwise just die quickly to not obfuscate the error by triggering strange behaviour else where.
