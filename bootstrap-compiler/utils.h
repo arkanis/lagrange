@@ -51,10 +51,10 @@ typedef struct {
 	char* ptr;
 } str_t, *str_p;
 
-static inline str_t str_new(char* ptr, int len) { return (str_t){ len, ptr }; }
 static inline str_t str_empty() { return (str_t){ 0, NULL }; }
-str_t               str_from_c(char* zero_terminated_string);
-void                str_free(str_p str);
+static inline str_t str_from_mem(char* ptr, int len) { return (str_t){ len, ptr }; }
+              str_t str_from_c(char* zero_terminated_string);
+              void  str_free(str_p str);
 
 void str_putc(str_p str, char c);
 bool str_eq(const str_p a, const str_p b);
