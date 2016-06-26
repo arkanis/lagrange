@@ -9,6 +9,9 @@
 #include "asm.h"
 
 
+//
+// Basic management functions
+//
 
 void as_free(asm_p as) {
 	free(as->code_ptr);
@@ -181,6 +184,18 @@ void as_save_elf(asm_p as, size_t code_vaddr, size_t data_vaddr, const char* fil
 
 
 //
+// Functions to put stuff into the data segment
+//
+
+size_t as_data(asm_p as, const void* ptr, size_t size) {
+	as->data_len += size;
+	as->data_ptr = realloc(as->data_ptr, as->data_len);
+	memcpy(as->data_ptr + as->data_len - size, ptr, size);
+	return as->data_len - size;
+}
+
+
+//
 // Binary printf() like helper functions
 //
 
@@ -330,171 +345,34 @@ void as_write_with_vars(asm_p as, const char* format, asm_var_t vars[]) {
 
 
 //
-// Functions to put stuff into the data segment
+// Backpatching support
 //
 
-size_t as_data(asm_p as, const void* ptr, size_t size) {
-	as->data_len += size;
-	as->data_ptr = realloc(as->data_ptr, as->data_len);
-	memcpy(as->data_ptr + as->data_len - size, ptr, size);
-	return as->data_len - size;
+asm_slot_t as_slot_for_last_instr(asm_p as, uint8_t bytes, asm_arg_type_t value_type) {
+	return (asm_slot_t) {
+		.bytes = bytes,
+		.value_offset = as->code_len - bytes,
+		.value_type = value_type,
+		.next_instruction_offset = as->code_len
+	};
 }
-
-#if 0
 
 
 //
 // ModRM stuff
 //
 
-/**
+// The instruction has a defined fixed operand size. So don't add and 66H prefix
+// and nither set REX.W or w bits.
+#define WMRM_FIXED_OP_SIZE (1 << 0)
+// Instruction needs a REX prefix, even if it's empty and unused. For example to
+// address 8 bit areas of some registers.
+#define WMRM_FORCE_REX     (1 << 1)
 
-# Format
-
-	66H : REX : opcode : mod reg r/m : SIB : disp : imm
-
-# Operand size (relevant for all addressing modes)
-
-	encoded via two bits and one prefix:
-	
-	w      operand size bit, part of opcode
-	       w = 0 use 8 bit operand size, w = 1 use full operand size (16, 32 or 64 bits)
-	W      64 Bit Operand Size bit
-	       W = 0 default operand size (16 or 32 bits), W = 1 64 bit operand size
-	66H    prefixing instruction with this byte changes default size to 16 bit
-	       set = 16 bit op size, not set = 32 bit (ignored when w or W bit is set)
-	
-	operand size   w bit           REX.W bit          66H prefix
-	8 bit          0 (byte size)   ignored            ignored
-	16 bit         1 (full size)   0 (default size)   yes (16 bit size)
-	32 bit         1 (full size)   0 (default size)   no (default size)
-	64 bit         1 (full size)   1 (64 bit size)    ignored
-	
-	See Volume 2A - Instruction Set Reference, A-L - 2.2.1.2 More on REX Prefix Fields - page 35
-
-# Argument combinations
-
-Usually encoded on instruction basis:
-- reg      BSWAP RAX
-- reg imm  MOV   RAX, 17
-
-Encoded by ModR/M stuff:
-- (reg|op) reg               ADD R0, R1
-                             DIV RDX → op(110), RDX
-                             JMP RDX → op(100), RDX
-- (reg|op) memd(addr)        ADD R0, [0xaabbccdd]
-                             JMP [0xaabbccdd] → op(100) memd(addr)
-- (reg|op) reld(addr)        ADD R0, [RIP + 0xaabbccdd]
-                             JMP [RIP + 0xaabbccdd] → op(100) reld(addr)
-- (reg|op) memrd(reg, addr)  ADD R0, [R1 + 0xaabbccdd]
-
-
-- reg       
-- reg imm   MOV   RAX, 17
-- reg reg   ADD   R0, R1
-- reg mem(addr)  [0x...]
-- reg mem(reg)   [RAX]
-- reg mem(rel)   [RIP + rel]
-- reg mem(reg, imm)            [reg + imm]
-- reg mem(reg, reg, imm)       [reg + reg + imm]
-- reg mem(reg, reg, imm, imm)  [reg + reg*imm + imm]
-
-
-# reg - just one register
-
-	Actually not something for the as_write_modrm() function! Just use as_write() in the
-	instruction function directly.
-
-	REX         opcode      ModRM
-	0100 W00B : opcode    : 11 opc bbb
-	0100 100B : 0000 1111 : 11 001 bbb  (BSWAP - Byte Swap, Volume 2C - Instruction Set Reference, p92)
-	
-	B    Register bit 3
-	bbb  Register bits 2..0
-
-# reg imm - immediate to register
-
-	Again, not something for as_write_modrm().
-	
-	immediate to register 
-	
-	REX
-	0100 W00B : 1100 011w : 11 000 bbb : imm32   (MOV, immediate32 to qwordregister (zero extend), Volume 2C - Instruction Set Reference, p97)
-	0100 100B : 1011 1bbb : imm64   (immediate64 to qwordregister (alternate encoding), bbb was prefixed by 000 but that would make the instruction 3 bits to long. fixed it)
-	
-	B    Register bit 3
-	bbb  Register bits 2..0
-
-# reg reg - register to register
-
-	REX                 ModRM
-	0100WR0B : opcode : 11 rrr bbb
-	
-	Register 1: REX.R + rrr
-	Register 2: REX.B + bbb
-	
-	d  direction bit, might be part of opcode, d = 0 reg1 to reg2, d = 1 reg2 to reg1
-	   best always set d = 1, matches intel syntax (dest = src)
-	   not marked in instructions, bit 1 in primary opcode byte (the bit left to the w bit)
-
-# reg mem(addr) - direct address
-
-	REX                 ModRM        disp32
-	0100WR00 : opcode : 00 rrr 101 : imm32
-	
-	Would usually express reg mem(EBP). But exception repurposed for this case.
-	See Volume 2A - Instruction Set Reference, A-L, p33.
-
-# reg mem(reg) - register indirect
-
-	ModRM
-	00 rrr bbb
-	
-	
-
-// Volume 2C - Instruction Set Reference, p93 (B.2.1 General Purpose Instruction Formats and Encodings for 64-Bit Mode)
-as_call(as, addr(0x11223344));
-as_call(as, addr_reg(RAX));
-as_call(as, addr_mem(0x11223344));
-
-
-
-
-
-[:reg]
-	bbb    bits[0..2] of register _1_ (reg)
-	B      bit[3] of register _1_ in REX prefix
-	w      operand size bit
-	       w = 0 use 8 bit operand size, w = 1 use full operand size (16, 32 or 64 bits)
-	W      64 Bit Operand Size bit
-	       W = 0 default operand size (16 or 32 bits), W = 1 64 bit operand size
-	66H    set to 66H prefix op size should be 16 bit
-
-[:reg, :mem]
-	# memory to register 0100 0RXB : 0001 001w : mod reg r/m
-	rrr    bits[0..2] of register (reg)
-	R      bit[3] of register
-	X      ?
-	B      ?
-	w      operand size bit
-	
-	mod    address mode
-	r/m    address mode
-	SIB    scale-index-base byte
-	
-	[:reg, :mem (:reg) ]               # register indirect
-	[:reg, :mem (:reg, :imm) ]         # register indirect + displacement
-	[:reg, :mem (:reg, :reg, :imm) ]   # register indirect (base) + register indirect (index) + displacement
-	  
-**/
-
-#define WMRM_NO_REX_W_BIT (1 << 0)
-#define WMRM_FORCE_REX    (1 << 1)
-
-bool as_write_modrm(asm_p as, uint32_t flags, const char* format, asm_arg_t dest, asm_arg_t src, asm_var_t vars[]) {
+bool as_write_modrm(asm_p as, uint32_t flags, const char* format, asm_arg_t dest, asm_arg_t src, asm_slot_p slot, asm_var_t vars[]) {
 	// Variables for parts of the opcode format:
 	// 66H : REX : opcode : mod reg r/m : SIB : disp : imm
-	// We use -1 for invalid values
+	// The value -1 represents invalid values
 	bool prefix_66h, sib;
 	int8_t rex_W, rex_R, rex_X, rex_B;
 	int8_t op_d, op_w;
@@ -502,35 +380,98 @@ bool as_write_modrm(asm_p as, uint32_t flags, const char* format, asm_arg_t dest
 	int16_t scale, index, base;
 	int32_t* displacement_ptr = NULL;
 	
+	// Map dest and src to the reg and r/m arguments and set the d bit accordingly
+	// ASM_ARG_REG
+	//   -> can be both
+	// ASM_ARG_IMM
+	// ASM_ARG_DISP
+	//   -> can't be handled by as_write_modrm(), return false
+	// ASM_ARG_OP_CODE
+	//   -> can on be reg argument, only valid as dest parameter
+	// ASM_ARG_MEM_REL_DISP
+	// ASM_ARG_MEM_REG
+	// ASM_ARG_MEM_DISP
+	// ASM_ARG_MEM_REG_DISP
+	//   -> can only be reg argument
+	
+	// Notify caller of invalid arguments or a wrong op_code argument
+	asm_arg_type_t dt = dest.type, st = src.type;
+	if (dt == ASM_ARG_IMM || dt == ASM_ARG_DISP || st == ASM_ARG_IMM || st == ASM_ARG_DISP) {
+		// as_write_modrm() can't handle these argument types
+		return false;
+	} else if (st == ASM_ARG_OP_CODE) {
+		fprintf(stderr, "as_write_modrm(): only dest can be an as_op_code() argument!\n");
+		abort();
+	}
+	
+	// Figure out what is the reg and r/m argument based on the dest parameter
+	asm_arg_t reg_arg, r_m_arg;
+	if (dt == ASM_ARG_OP_CODE) {
+		// In the one operand form the reg argument bits are reused as opcode
+		// bits. So the op_code argument has to be the reg argument.
+		reg_arg = dest;
+		r_m_arg = src;
+		// No valid direction bit for just one argument
+		op_d = -1;
+	} else if (dt == ASM_ARG_MEM_REL_DISP || dt == ASM_ARG_MEM_REG || dt == ASM_ARG_MEM_DISP || dt == ASM_ARG_MEM_REG_DISP) {
+		// If dest parameter is a memory reference it has to be the r/m argument.
+		// In all other cases it can be the reg argument.
+		// reg to r/m, reg is source, so d = 0
+		// Table B-11. Encoding of Operation Direction (d) Bit, p78, Volume 2C
+		op_d = 0;
+		reg_arg = src;
+		r_m_arg = dest;
+	} else {
+		// r/m to register, r/m is source, so d = 1
+		// Table B-11. Encoding of Operation Direction (d) Bit, p78, Volume 2C
+		op_d = 1;
+		reg_arg = dest;
+		r_m_arg = src;
+	}
+	
 	// Figure out the operand size
-	uint8_t bits = 0;
-	if ( dest.bits == 0 && src.bits > 0 )
-		bits = src.bits;
-	else if ( dest.bits > 0 && src.bits == 0 )
-		bits = dest.bits;
-	else if ( dest.bits == src.bits && dest.bits > 0 )
-		bits = dest.bits;
+	uint8_t bytes = 0;
+	if ( dest.bytes == src.bytes && dest.bytes > 0 ) {
+		bytes = dest.bytes;
+	} else if ( dest.bytes > 0 ) {
+		bytes = dest.bytes;
+	} else if ( src.bytes > 0 ) {
+		bytes = src.bytes;
+	} else {
+		fprintf(stderr, "as_write_modrm(): dest and src have an unknown size!\n");
+		abort();
+	}
 	
 	// operand size   w bit           REX.W bit          66H prefix
 	// 8 bit          0 (byte size)   ignored            ignored
 	// 16 bit         1 (full size)   0 (default size)   yes (16 bit size)
 	// 32 bit         1 (full size)   0 (default size)   no (default size)
 	// 64 bit         1 (full size)   1 (64 bit size)    ignored
-	switch(bits) {
-		case 8:
-			prefix_66h = false;
+	switch(bytes) {
+		case 1:
 			op_w = 0;
 			rex_W = 0;
+			prefix_66h = false;
 			// The byte versions of RSI, RDI, RBP and RSP (SIL, DIL, BPL, SPL) can only
 			// be encoded by an empty REX byte. We we omit this we get AH, BH, CH and DH.
 			// So for now we force the precense of a REX byte with a flag.
 			// TODO: Only needed for RSI, RDI, RBP and RSP registers, don't set for the rest.
 			flags |= WMRM_FORCE_REX;
 			break;
-		case 64:
+		case 2:
+			op_w = 1;
+			rex_W = 0;
+			prefix_66h = true;
+			break;
+		case 4:
+			op_w = 1;
+			rex_W = 0;
 			prefix_66h = false;
+			break;
+		case 8:
 			op_w = 1;
 			rex_W = 1;
+			prefix_66h = false;
 			break;
 		default:
 			fprintf(stderr, "as_write_modrm(): unsupported bit sizes of operands!\n");
@@ -538,38 +479,21 @@ bool as_write_modrm(asm_p as, uint32_t flags, const char* format, asm_arg_t dest
 	}
 	
 	// If the operand size is fixed for this instruct (e.g. JMP, SETcc) we don't
-	// need to set the REX.W bit.
-	if (flags & WMRM_NO_REX_W_BIT)
+	// need to set the REX.W bit or add the 66H prefix.
+	if (flags & WMRM_FIXED_OP_SIZE) {
+		op_w = -1;
 		rex_W = 0;
-	
-	asm_arg_t reg_arg, r_m_arg;
-	asm_arg_type_t dt = dest.type, st = src.type;
-	if (dt == ASM_T_OP) {
-		op_d = -1;
-		reg_arg = dest;
-		r_m_arg = src;
-	} else if (dt == ASM_T_REG) {
-		// r/m to register, Table B-11. Encoding of Operation Direction (d) Bit, p78, Volume 2C
-		op_d = 1;
-		reg_arg = dest;
-		r_m_arg = src;
-	} else if (st == ASM_T_REG) {
-		// register to r/m, Table B-11. Encoding of Operation Direction (d) Bit, p78, Volume 2C
-		op_d = 0;
-		reg_arg = src;
-		r_m_arg = dest;
-	} else {
-		// Not a ModR/M combination
-		return false;
+		prefix_66h = false;
 	}
 	
+	
 	// Handle register argument
-	if (reg_arg.type == ASM_T_REG) {
-		// ModR/M reg field contains register operand, REX.R bit extends it
+	if (reg_arg.type == ASM_ARG_REG) {
+		// ModR/M byte reg field contains register operand, REX.R bit extends it
 		reg = reg_arg.reg;
 		rex_R = reg_arg.reg >> 3;
-	} else if (reg_arg.type == ASM_T_OP) {
-		// ModR/M reg field used as opcode extention, REX.R bit unused, see:
+	} else if (reg_arg.type == ASM_ARG_OP_CODE) {
+		// ModR/M byte reg field used as opcode extention, REX.R bit unused, see:
 		// 
 		// 2.2.1.2 More on REX Prefix Fields, p35: REX.R modifies the ModR/M reg
 		// field when that field encodes a GPR, SSE, control or debug register.
@@ -585,7 +509,6 @@ bool as_write_modrm(asm_p as, uint32_t flags, const char* format, asm_arg_t dest
 		reg = reg_arg.op_code;
 		rex_R = 0;
 	} else {
-		// Should never happen
 		fprintf(stderr, "as_write_modrm(): unsupported reg operand!\n");
 		abort();
 	}
@@ -594,7 +517,7 @@ bool as_write_modrm(asm_p as, uint32_t flags, const char* format, asm_arg_t dest
 	// it is treated as a register. So we can operate as if the reg argument
 	// always is a register.
 	switch(r_m_arg.type) {
-		case ASM_T_REG:
+		case ASM_ARG_REG:
 			// register to register
 			mod = 0b11;
 			r_m = r_m_arg.reg;
@@ -604,7 +527,7 @@ bool as_write_modrm(asm_p as, uint32_t flags, const char* format, asm_arg_t dest
 			sib = false;
 			rex_X = 0;
 			break;
-		case ASM_T_MEM_DISP:
+		case ASM_ARG_MEM_DISP:
 			// mod = 00 and R/M = 100 is a special case that signals just a following
 			// SIB byte (Volume 2A, p33). Within the SIB byte base = 101 is a special
 			// case that when used with mod = 00 signals [scaled index] + disp32. We
@@ -619,9 +542,9 @@ bool as_write_modrm(asm_p as, uint32_t flags, const char* format, asm_arg_t dest
 			rex_X = 0;      // index doesn't represent a register, so REX.X is not used
 			scale = 0b00;   // unused in this case (bits don't matter)
 			
-			displacement_ptr = &r_m_arg.mem_disp;
+			displacement_ptr = &r_m_arg.mem.disp;
 			break;
-		case ASM_T_MEM_REL_DISP:
+		case ASM_ARG_MEM_REL_DISP:
 			// Volume 2A, p39, 2.2.1.6 RIP-Relative Addressing
 			// mod = 00 and R/M = 101 is a special case that signals RIP + disp32
 			mod = 0b00;
@@ -632,13 +555,13 @@ bool as_write_modrm(asm_p as, uint32_t flags, const char* format, asm_arg_t dest
 			sib = false;
 			rex_X = 0;
 			
-			displacement_ptr = &r_m_arg.mem_disp;
+			displacement_ptr = &r_m_arg.mem.disp;
 			break;
-		case ASM_T_MEM_REG_DISP:
+		case ASM_ARG_MEM_REG_DISP:
 			// mod == 10 signals [reg] + disp32 addressing mode, Volume 2A, p33
 			mod = 0b10; 
-			r_m = r_m_arg.mem_reg & 0b111;
-			rex_B = r_m_arg.mem_reg >> 3;
+			r_m = r_m_arg.mem.base & 0b111;
+			rex_B = r_m_arg.mem.base >> 3;
 			
 			// normally no SIB byte used
 			sib = false;
@@ -652,10 +575,10 @@ bool as_write_modrm(asm_p as, uint32_t flags, const char* format, asm_arg_t dest
 				sib = true;
 				scale = 0b00;
 				index = 0b100;
-				base = r_m_arg.mem_reg;
+				base = r_m_arg.mem.base;
 			}
 			
-			displacement_ptr = &r_m_arg.mem_disp;
+			displacement_ptr = &r_m_arg.mem.disp;
 			break;
 		default:
 			fprintf(stderr, "as_write_modrm(): unsupported memory operand!\n");
@@ -669,9 +592,11 @@ bool as_write_modrm(asm_p as, uint32_t flags, const char* format, asm_arg_t dest
 		user_supplied_var_count++;
 	asm_var_t all_vars[user_supplied_var_count + 2];
 	memcpy(all_vars, vars, user_supplied_var_count * sizeof(asm_var_t));
-	all_vars[user_supplied_var_count + 0] = (asm_var_t){ "d", op_d };
-	all_vars[user_supplied_var_count + 1] = (asm_var_t){ "w", op_w };
-	all_vars[user_supplied_var_count + 2] = (asm_var_t){ NULL, 0 };
+	if (op_d != -1)
+		all_vars[user_supplied_var_count++] = (asm_var_t){ "d", op_d };
+	if (op_w != -1)
+		all_vars[user_supplied_var_count++] = (asm_var_t){ "w", op_w };
+	all_vars[user_supplied_var_count++] = (asm_var_t){ NULL, 0 };
 	
 	// Write encoded instruction
 	
@@ -691,26 +616,81 @@ bool as_write_modrm(asm_p as, uint32_t flags, const char* format, asm_arg_t dest
 	if (sib)
 		as_write(as, "ss xxx bbb", scale, index, base);
 	// Displacement (if used)
-	if (displacement_ptr != NULL)
+	if (displacement_ptr != NULL) {
 		as_write(as, "%32d", *displacement_ptr);
+		if (slot) *slot = as_slot_for_last_instr(as, 4, ASM_ARG_DISP);
+	} else {
+		if (slot) *slot = as_invalid_slot();
+	}
+	
 	
 	return true;
 }
 
 
 //
-// Instructions
+// Data Transfer Instructions
 //
 
-void as_syscall(asm_p as) {
-	// Volume 2C - Instruction Set Reference, p107 (B.2.1 General Purpose Instruction Formats and Encodings for 64-Bit Mode)
-	as_write(as, "0000 1111 : 0000 0101");
+asm_slot_t as_mov(asm_p as, asm_arg_t dest, asm_arg_t src) {
+	if (dest.type == ASM_ARG_REG && src.type == ASM_ARG_IMM) {
+		// Volume 2C - Instruction Set Reference, p97 (B.2.1 General Purpose Instruction Formats and Encodings for 64-Bit Mode)
+		if (dest.bytes != 8) {
+			fprintf(stderr, "as_mov(): Only 8 byte immediates supported for now!\n");
+			abort();
+		}
+		as_write(as, "0100 100B : 1011 1bbb : %64d", dest.reg >> 3, dest.reg, src.imm);
+		return as_slot_for_last_instr(as, 8, ASM_ARG_IMM);
+	} else if ( as_write_modrm(as, 0, "1000 10dw", dest, src, NULL, NULL) ) {
+		// memory to reg 0100 0RXB : 1000 101w : mod reg r/m
+		// reg to memory 0100 0RXB : 1000 100w : mod reg r/m
+		return as_invalid_slot();
+	}
+	
+	fprintf(stderr, "as_mov(): unsupported arg combination!\n");
+	abort();
+	return as_invalid_slot();
+}
+/*
+void as_push(asm_p as, asm_arg_t source) {
+	// Volume 2C - Instruction Set Reference, p100
+	if (source.type == ASM_ARG_IMM) {
+		as_write(as, "0110 1000 : %32d", source.imm);
+		return;
+	} else if ( as_write_modrm(as, WMRM_NO_REX_W_BIT, "1111 1111", op(0b110), source, NULL) ) {
+		if ( source.bits == 8 ) {
+			fprintf(stderr, "as_push(): source can't be 8 bit, sorry.\n");
+			abort();
+		}
+		return;
+	}
+	
+	fprintf(stderr, "as_push(): unsupported arg type!\n");
+	abort();
 }
 
+void as_pop(asm_p as, asm_arg_t dest) {
+	// Volume 2C - Instruction Set Reference, p100
+	if ( dest.bits == 8 ) {
+		fprintf(stderr, "as_push(): source can't be 8 bit, sorry.\n");
+		abort();
+	}
+	if ( as_write_modrm(as, WMRM_NO_REX_W_BIT, "1000 1111", op(0b000), dest, NULL) )
+		return;
+	
+	fprintf(stderr, "as_pop(): unsupported arg type!\n");
+	abort();
+}
+*/
 
-ssize_t as_add(asm_p as, asm_arg_t dest, asm_arg_t src) {
+
+//
+// Binary Arithmetic Instructions
+//
+
+asm_slot_t as_add(asm_p as, asm_arg_t dest, asm_arg_t src) {
 	// Volume 2C - Instruction Set Reference, p90
-	if (src.type == ASM_T_IMM) {
+	if (src.type == ASM_ARG_IMM) {
 		// 1000 00sw : mm 000, but for now we set s = 0 since we only have unsigned regs
 		// Presence of REX.W forces sign extention to 64 bits... (Combined Volumes, p1348)
 		// Without it it's written into the 32 bit registers which zeros out the upper 32
@@ -720,24 +700,25 @@ ssize_t as_add(asm_p as, asm_arg_t dest, asm_arg_t src) {
 			fprintf(stderr, "as_add(): can't encode unsigned immediates larget than 31 bits!\n");
 			abort();
 		}
-		if (dest.bits < 32) {
+		if (dest.bytes < 2) {
 			fprintf(stderr, "as_add(): can't put immediates into smaller register!\n");
 			abort();
 		}
-		as_write_modrm(as, 0, "1000 000w", op(0b000), dest, NULL);
+		as_write_modrm(as, 0, "1000 000w", as_op_code(0b000), dest, NULL, NULL);
 		as_write(as, "%32d", src.imm);
-		return as_target(as) - 4;
-	} else if ( as_write_modrm(as, 0, "0000 00dw", dest, src, NULL) ) {
-		return -1;
+		return as_slot_for_last_instr(as, 4, ASM_ARG_IMM);
+	} else if ( as_write_modrm(as, 0, "0000 00dw", dest, src, NULL, NULL) ) {
+		return as_invalid_slot();
 	}
 	
 	fprintf(stderr, "as_add(): unsupported arg combination!\n");
 	abort();
+	return as_invalid_slot();
 }
 
-ssize_t as_sub(asm_p as, asm_arg_t dest, asm_arg_t src) {
+asm_slot_t as_sub(asm_p as, asm_arg_t dest, asm_arg_t src) {
 	// Volume 2C - Instruction Set Reference, p106
-	if (src.type == ASM_T_IMM) {
+	if (src.type == ASM_ARG_IMM) {
 		// 1000 00sw : mm 101, but for now we set s = 0 since we only have unsigned regs
 		// Presence of REX.W forces sign extention to 64 bits... (Combined Volumes, p1348)
 		// Without it it's written into the 32 bit registers which zeros out the upper 32
@@ -747,24 +728,25 @@ ssize_t as_sub(asm_p as, asm_arg_t dest, asm_arg_t src) {
 			fprintf(stderr, "as_sub(): can't encode unsigned immediates larget than 31 bits!\n");
 			abort();
 		}
-		if (dest.bits < 32) {
+		if (dest.bytes < 2) {
 			fprintf(stderr, "as_sub(): can't put immediates into smaller register!\n");
 			abort();
 		}
-		as_write_modrm(as, 0, "1000 000w", op(0b101), dest, NULL);
+		as_write_modrm(as, 0, "1000 000w", as_op_code(0b101), dest, NULL, NULL);
 		as_write(as, "%32d", src.imm);
-		return as_target(as) - 4;
-	} else if ( as_write_modrm(as, 0, "0010 10dw", dest, src, NULL) ) {
-		return -1;
+		return as_slot_for_last_instr(as, 4, ASM_ARG_IMM);
+	} else if ( as_write_modrm(as, 0, "0010 10dw", dest, src, NULL, NULL) ) {
+		return as_invalid_slot();
 	}
 	
 	fprintf(stderr, "as_sub(): unsupported arg combination!\n");
 	abort();
+	return as_invalid_slot();
 }
 
 void as_mul(asm_p as, asm_arg_t src) {
 	// Volume 2C - Instruction Set Reference, p99
-	if ( as_write_modrm(as, 0, "1111 011w", op(0b100), src, NULL) )
+	if ( as_write_modrm(as, 0, "1111 011w", as_op_code(0b100), src, NULL, NULL) )
 		return;
 	
 	fprintf(stderr, "as_mul(): unsupported arg combination!\n");
@@ -775,31 +757,36 @@ void as_div(asm_p as, asm_arg_t src) {
 	// Volume 2C - Instruction Set Reference, p94
 	// Divide RDX:RAX by qwordregister  0100 100B : 1111 0111 : 11  110 qwordreg
 	// Divide RDX:RAX by memory64       0100 10XB : 1111 0111 : mod 110 r/m
-	if ( as_write_modrm(as, 0, "1111 011w", op(0b110), src, NULL) )
+	if ( as_write_modrm(as, 0, "1111 011w", as_op_code(0b110), src, NULL, NULL) )
 		return;
 	
 	fprintf(stderr, "as_div(): unsupported arg combination!\n");
 	abort();
 }
 
-void as_mov(asm_p as, asm_arg_t dest, asm_arg_t src) {
-	if (dest.type == ASM_T_REG && src.type == ASM_T_IMM) {
-		// Volume 2C - Instruction Set Reference, p97 (B.2.1 General Purpose Instruction Formats and Encodings for 64-Bit Mode)
-		if (dest.bits < 64) {
-			fprintf(stderr, "as_mov(): can't put immediates into smaller register!\n");
-			abort();
-		}
-		as_write(as, "0100 100B : 1011 1bbb : %64d", dest.reg >> 3, dest.reg, src.imm);
-		return;
-	} else if ( as_write_modrm(as, 0, "1000 10dw", dest, src, NULL) ) {
-		// memory to reg 0100 0RXB : 1000 101w : mod reg r/m
-		// reg to memory 0100 0RXB : 1000 100w : mod reg r/m
-		return;
-	}
-	
-	fprintf(stderr, "as_mov(): unsupported arg combination!\n");
-	abort();
+
+
+//
+// Misc instructions
+//
+
+void as_syscall(asm_p as) {
+	// Volume 2C - Instruction Set Reference, p107 (B.2.1 General Purpose Instruction Formats and Encodings for 64-Bit Mode)
+	as_write(as, "0000 1111 : 0000 0101");
 }
+
+
+
+#if 0
+
+//
+// Instructions
+//
+
+
+
+
+
 
 
 void as_cmp(asm_p as, asm_arg_t arg1, asm_arg_t arg2) {
@@ -932,35 +919,5 @@ void as_leave(asm_p as) {
 	as_write(as, "1100 1001");
 }
 
-
-void as_push(asm_p as, asm_arg_t source) {
-	// Volume 2C - Instruction Set Reference, p100
-	if (source.type == ASM_T_IMM) {
-		as_write(as, "0110 1000 : %32d", source.imm);
-		return;
-	} else if ( as_write_modrm(as, WMRM_NO_REX_W_BIT, "1111 1111", op(0b110), source, NULL) ) {
-		if ( source.bits == 8 ) {
-			fprintf(stderr, "as_push(): source can't be 8 bit, sorry.\n");
-			abort();
-		}
-		return;
-	}
-	
-	fprintf(stderr, "as_push(): unsupported arg type!\n");
-	abort();
-}
-
-void as_pop(asm_p as, asm_arg_t dest) {
-	// Volume 2C - Instruction Set Reference, p100
-	if ( dest.bits == 8 ) {
-		fprintf(stderr, "as_push(): source can't be 8 bit, sorry.\n");
-		abort();
-	}
-	if ( as_write_modrm(as, WMRM_NO_REX_W_BIT, "1000 1111", op(0b000), dest, NULL) )
-		return;
-	
-	fprintf(stderr, "as_pop(): unsupported arg type!\n");
-	abort();
-}
 
 #endif

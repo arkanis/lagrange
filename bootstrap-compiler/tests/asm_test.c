@@ -151,11 +151,9 @@ void test_write_elf() {
 	free(output);
 }
 
-/*
 void test_basic_instructions() {
 	asm_p as = &(asm_t){ 0 };
 	char* disassembly = NULL;
-	as_new(as);
 	
 	as_free(as);
 		as_syscall(as);
@@ -166,7 +164,7 @@ void test_basic_instructions() {
 	
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_mov(as, reg(i), imm(0x1122334455667788));
+			as_mov(as, as_reg(i, 8), as_imm(0x1122334455667788, 8));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"movabs rax,0x1122334455667788\n"
@@ -193,13 +191,12 @@ void test_basic_instructions() {
 void test_arithmetic_instructions() {
 	asm_p as = &(asm_t){ 0 };
 	char* disassembly = NULL;
-	as_new(as);
 	
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_add(as, reg(i), reg(i));
+			as_add(as, as_reg(i, 8), as_reg(i, 8));
 		for(size_t i = 0; i < 16; i++)
-			as_add(as, reg(i), imm(0x7abbccdd));
+			as_add(as, as_reg(i, 8), as_imm(0x7abbccdd, 4));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"add    rax,rax\n"
@@ -238,9 +235,9 @@ void test_arithmetic_instructions() {
 	
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_sub(as, reg(i), reg(i));
+			as_sub(as, as_reg(i, 8), as_reg(i, 8));
 		for(size_t i = 0; i < 16; i++)
-			as_sub(as, reg(i), imm(0x7abbccdd));
+			as_sub(as, as_reg(i, 8), as_imm(0x7abbccdd, 4));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"sub    rax,rax\n"
@@ -279,9 +276,9 @@ void test_arithmetic_instructions() {
 	
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_mul(as, reg(i));
+			as_mul(as, as_reg(i, 8));
 		for(size_t i = 0; i < 16; i++)
-			as_mul(as, memrd(reg(i), 0xbeba));
+			as_mul(as, as_mem_rd(as_reg(i, 8), 0xbeba));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"mul    rax\n"
@@ -320,9 +317,9 @@ void test_arithmetic_instructions() {
 	
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_div(as, reg(i));
+			as_div(as, as_reg(i, 8));
 		for(size_t i = 0; i < 16; i++)
-			as_div(as, memrd(reg(i), 0xbeba));
+			as_div(as, as_mem_rd(as_reg(i, 8), 0xbeba));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"div    rax\n"
@@ -359,9 +356,11 @@ void test_arithmetic_instructions() {
 		"div    QWORD PTR [r15+0xbeba]\n"
 	);
 	
+	as_free(as);
 	free(disassembly);
 }
 
+/*
 void test_addressing_modes() {
 	asm_p as = &(asm_t){ 0 };
 	char* disassembly = NULL;
@@ -1015,9 +1014,9 @@ int main() {
 	st_run(test_write);
 	st_run(test_write_with_vars);
 	st_run(test_write_elf);
-	/*
 	st_run(test_basic_instructions);
-	st_run(test_arithmetic_instructions);
+	//st_run(test_arithmetic_instructions);
+	/*
 	st_run(test_addressing_modes);
 	st_run(test_compare_instructions);
 	st_run(test_jump_instructions);

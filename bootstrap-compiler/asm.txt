@@ -1,0 +1,109 @@
+# General instruction format
+
+	66H : REX : opcode : mod reg r/m : SIB : disp : imm
+	
+	66H prefix can be added to define operand size
+	REX prefix used to define operand size and address extended registers
+	opcode
+		d bit: direction
+		w bit: force 8 bit operand size
+	mod addressing mode
+	reg lower 3 bits of register operand or opcode extention bits for one
+	    operand instructions
+	r/m lower 3 bits of second register operand or escape code to signal SIB byte
+	SIB   Information for extended memory addressing (address = scale * index + base + disp)
+	disp  signed byte offset to target
+	imm   immidiate value embeded in the instruction (size depends on operand size (and instruction?))
+
+# Operand size (relevant for all addressing modes)
+
+	encoded via two bits and one prefix:
+	
+	w      operand size bit, part of opcode
+	       w = 0 use 8 bit operand size, w = 1 use full operand size (16, 32 or 64 bits)
+	W      64 Bit Operand Size bit
+	       W = 0 default operand size (16 or 32 bits), W = 1 64 bit operand size
+	66H    prefixing instruction with this byte changes default size to 16 bit
+	       set = 16 bit op size, not set = 32 bit (ignored when w or W bit is set)
+	
+	operand size   w bit           REX.W bit          66H prefix
+	8 bit          0 (byte size)   ignored            ignored
+	16 bit         1 (full size)   0 (default size)   yes (16 bit size)
+	32 bit         1 (full size)   0 (default size)   no (default size)
+	64 bit         1 (full size)   1 (64 bit size)    ignored
+	
+	See Volume 2A - Instruction Set Reference, A-L - 2.2.1.2 More on REX Prefix Fields - page 35
+
+# Argument combinations
+
+	For 2 operand instructions:
+		reg argument: reg
+		r/m argument: reg, mem
+		
+		Direction bit (d) of opcode decides which argument is the source and
+		which is the destination:
+		
+		d = 0: reg argument is source
+		d = 1: r/m argument is source
+		
+		reg reg      ADD R0, R1
+		reg mem_rel  ADD R0, [RIP + 0xaabbccdd]
+		reg mem_r    ADD R0, [R1]
+		reg mem_d    ADD R0, [0xaabbccdd]
+		reg mem_rd   ADD R0, [R1 + 0xaabbccdd]
+	
+	For 1 operand instructions:
+		reg argument: op_code
+		r/m argument: reg, mem
+		
+		DIV RDX → op(110), RDX
+        JMP RDX → op(100), RDX
+        JMP [RAX]              → op(100) mem_r(RAX)
+        JMP [0xaabbccdd]       → op(100) mem_d(0xaabbccdd)
+        JMP [RIP + 0xaabbccdd] → op(100) mem_rel(0xaabbccdd)
+
+
+# Example: reg - just one register
+
+	REX         opcode      ModRM
+	0100 W00B : opcode    : 11 opc bbb
+	0100 100B : 0000 1111 : 11 001 bbb  (BSWAP - Byte Swap, Volume 2C - Instruction Set Reference, p92)
+	
+	B    Register bit 3
+	bbb  Register bits 2..0
+
+# r/m imm - immediate to register/memory operand
+
+	Usually different opcodes that also use the reg operand as opcode extention
+	bits (at least ADD does it this way). So instructions have to use different
+	opcodes for reg r/m and r/m imm versions.
+	
+	REX         opcode      mod reg r/m
+	0100 W00B : 1100 011w : 11 000 bbb : imm32   (MOV, immediate32 to qwordregister (zero extend), Volume 2C - Instruction Set Reference, p97)
+	0100 100B : 1011 1bbb : imm64   (immediate64 to qwordregister (alternate encoding), bbb was prefixed by 000 but that would make the instruction 3 bits to long. fixed it)
+
+
+# reg reg - register to register
+
+	REX                 ModRM
+	0100WR0B : opcode : 11 rrr bbb
+	
+	Register 1: REX.R + rrr
+	Register 2: REX.B + bbb
+	
+	d  direction bit, might be part of opcode, d = 0 reg1 to reg2, d = 1 reg2 to reg1
+	   best always set d = 1, matches intel syntax (dest = src)
+	   not marked in instructions, bit 1 in primary opcode byte (the bit left to the w bit)
+
+# reg mem_d(addr) - direct address
+
+	REX                 ModRM        disp32
+	0100WR00 : opcode : 00 rrr 101 : imm32
+	
+	Would usually express reg mem(EBP). But exception repurposed for this case.
+	See Volume 2A - Instruction Set Reference, A-L, p33.
+
+# reg mem(reg) - register indirect
+
+	ModRM
+	00 rrr bbb

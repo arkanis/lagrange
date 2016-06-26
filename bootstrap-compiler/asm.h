@@ -221,6 +221,9 @@ typedef struct {
 	size_t  next_instruction_offset;  // For RIP relative addressing
 } asm_slot_t, *asm_slot_p;
 
+static inline asm_slot_t as_invalid_slot() { return (asm_slot_t){ 0 }; }
+              asm_slot_t as_slot_for_last_instr(asm_p as, uint8_t bytes, asm_arg_type_t value_type);
+
 size_t as_next_instr_offset(asm_p as);
 void   as_patch_slot(asm_p as, asm_slot_t slot, size_t target_offset);
 
@@ -237,8 +240,8 @@ asm_slot_t as_pop (asm_p as, asm_arg_t dest);
 // Binary Arithmetic Instructions
 asm_slot_t as_add(asm_p as, asm_arg_t dest, asm_arg_t src);
 asm_slot_t as_sub(asm_p as, asm_arg_t dest, asm_arg_t src);
-asm_slot_t as_mul(asm_p as, asm_arg_t src);
-asm_slot_t as_div(asm_p as, asm_arg_t src);
+void       as_mul(asm_p as, asm_arg_t src);
+void       as_div(asm_p as, asm_arg_t src);
 
 asm_slot_t as_cmp(asm_p as, asm_arg_t arg1, asm_arg_t arg2);
 
