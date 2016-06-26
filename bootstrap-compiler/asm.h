@@ -108,17 +108,17 @@ static inline asm_arg_t as_disp(int32_t displacement)                   { return
 static inline asm_arg_t as_op_code(uint8_t opcode_extention_bits)       { return (asm_arg_t){ .type = ASM_ARG_OP_CODE, .op_code = opcode_extention_bits }; }
 
 // RIP relative memory addressing
-static inline asm_arg_t as_mem_rel(int32_t displacement)                { return (asm_arg_t){ .type = ASM_ARG_MEM_REL_DISP, .mem = { .disp = displacement } }; }
+static inline asm_arg_t as_mem_rel(uint8_t target_bytes, int32_t displacement)                { return (asm_arg_t){ .type = ASM_ARG_MEM_REL_DISP, .bytes = target_bytes, .mem = { .disp = displacement } }; }
 
 // Absolute memory addressing
 // All operands fit this scheme, where some parts might be set to 0:
 // address = scale * index + base + disp
-static inline asm_arg_t as_mem_r(asm_arg_t reg)                         { if(reg.type != ASM_ARG_REG) abort(); return (asm_arg_t){ .type = ASM_ARG_MEM_REG,      .mem = { .base = reg.reg } }; }
-static inline asm_arg_t as_mem_d(int32_t displacement)                  {                                      return (asm_arg_t){ .type = ASM_ARG_MEM_DISP,     .mem = { .disp = displacement } }; }
-static inline asm_arg_t as_mem_rd(asm_arg_t reg, int32_t displacement)  { if(reg.type != ASM_ARG_REG) abort(); return (asm_arg_t){ .type = ASM_ARG_MEM_REG_DISP, .mem = { .base = reg.reg, .disp = displacement } }; }
+static inline asm_arg_t as_mem_r(uint8_t target_bytes, asm_arg_t reg)                         { if(reg.type != ASM_ARG_REG) abort(); return (asm_arg_t){ .type = ASM_ARG_MEM_REG,      .bytes = target_bytes, .mem = { .base = reg.reg } }; }
+static inline asm_arg_t as_mem_d(uint8_t target_bytes, int32_t displacement)                  {                                      return (asm_arg_t){ .type = ASM_ARG_MEM_DISP,     .bytes = target_bytes, .mem = { .disp = displacement } }; }
+static inline asm_arg_t as_mem_rd(uint8_t target_bytes, asm_arg_t reg, int32_t displacement)  { if(reg.type != ASM_ARG_REG) abort(); return (asm_arg_t){ .type = ASM_ARG_MEM_REG_DISP, .bytes = target_bytes, .mem = { .base = reg.reg, .disp = displacement } }; }
 // Implemented when needed
-//static inline asm_arg_t as_mem_rrd(asm_arg_t index, asm_arg_t base, int32_t displacement);
-//static inline asm_arg_t as_mem_srrd(uint8_t scale, asm_arg_t index, asm_arg_t base, int32_t displacement);
+//static inline asm_arg_t as_mem_rrd(uint8_t target_bytes, asm_arg_t index, asm_arg_t base, int32_t displacement);
+//static inline asm_arg_t as_mem_srrd(uint8_t target_bytes, uint8_t scale, asm_arg_t index, asm_arg_t base, int32_t displacement);
 
 
 //

@@ -278,7 +278,7 @@ void test_arithmetic_instructions() {
 		for(size_t i = 0; i < 16; i++)
 			as_mul(as, as_reg(i, 8));
 		for(size_t i = 0; i < 16; i++)
-			as_mul(as, as_mem_rd(as_reg(i, 8), 0xbeba));
+			as_mul(as, as_mem_rd(8, as_reg(i, 8), 0xbeba));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"mul    rax\n"
@@ -319,7 +319,7 @@ void test_arithmetic_instructions() {
 		for(size_t i = 0; i < 16; i++)
 			as_div(as, as_reg(i, 8));
 		for(size_t i = 0; i < 16; i++)
-			as_div(as, as_mem_rd(as_reg(i, 8), 0xbeba));
+			as_div(as, as_mem_rd(8, as_reg(i, 8), 0xbeba));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"div    rax\n"

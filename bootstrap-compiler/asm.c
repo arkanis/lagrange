@@ -429,16 +429,19 @@ bool as_write_modrm(asm_p as, uint32_t flags, const char* format, asm_arg_t dest
 		r_m_arg = src;
 	}
 	
-	// Figure out the operand size
+	// Figure out the operand size. If one operand has an undefined size the
+	// other one is used. If both operands have a size it has to match.
+	// TODO: Add a flag to ignore match, meaning using the max of both. This
+	// will be the case for instructions that zero- or sign-extend the source.
 	uint8_t bytes = 0;
-	if ( dest.bytes == src.bytes && dest.bytes > 0 ) {
-		bytes = dest.bytes;
-	} else if ( dest.bytes > 0 ) {
-		bytes = dest.bytes;
-	} else if ( src.bytes > 0 ) {
+	if ( dest.bytes == 0 && src.bytes > 0 ) {
 		bytes = src.bytes;
+	} else if ( src.bytes == 0 && dest.bytes > 0 ) {
+		bytes = dest.bytes;
+	} else if ( dest.bytes == src.bytes && dest.bytes > 0 ) {
+		bytes = dest.bytes;
 	} else {
-		fprintf(stderr, "as_write_modrm(): dest and src have an unknown size!\n");
+		fprintf(stderr, "as_write_modrm(): dest and src have an unknown or not matching size! dest %d, src %d\n", dest.bytes, src.bytes);
 		abort();
 	}
 	
