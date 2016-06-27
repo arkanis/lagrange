@@ -767,6 +767,33 @@ void as_div(asm_p as, asm_arg_t src) {
 	abort();
 }
 
+asm_slot_t as_cmp(asm_p as, asm_arg_t arg1, asm_arg_t arg2) {
+	// Volume 2C - Instruction Set Reference, p93 (B.2.1 General Purpose Instruction Formats and Encodings for 64-Bit Mode)
+	if (arg2.type == ASM_ARG_IMM) {
+		if (arg1.bytes < 2) {
+			fprintf(stderr, "as_cmp(): can't compare immediates with smaller register!\n");
+			abort();
+		}
+		// 0100 00XB 1000 00sw : mod 111 r/m : imm
+		as_write_modrm(as, 0, "1000 00sw", as_op_code(0b111), arg1, NULL, (asm_var_t[]){
+			{ "s",  0 },  // B.1.4.4 Sign-Extend (s) Bit, Volume 2C p76
+			{ NULL, 0 }
+		});
+		as_write(as, "%32d", arg2.imm);
+		return as_slot_for_last_instr(as, 4, ASM_ARG_IMM);
+	} else if ( as_write_modrm(as, 0, "0011 10dw", arg1, arg2, NULL, NULL) ) {
+		// memory64 with qwordregister  0100 1RXB : 0011 1001  : mod qwordreg r/m
+		// qwordregister with memory64  0100 1RXB : 0011 101w1 : mod qwordreg r/m
+		//                                                   |-- PROBABLY ERROR IN DOCS
+		return as_invalid_slot();
+	}
+	
+	fprintf(stderr, "as_cmp(): unsupported arg combination!\n");
+	abort();
+	return as_invalid_slot();
+}
+
+
 
 
 //
@@ -792,25 +819,6 @@ void as_syscall(asm_p as) {
 
 
 
-void as_cmp(asm_p as, asm_arg_t arg1, asm_arg_t arg2) {
-	// Volume 2C - Instruction Set Reference, p93 (B.2.1 General Purpose Instruction Formats and Encodings for 64-Bit Mode)
-	if (arg1.type == ASM_T_REG && arg2.type == ASM_T_IMM) {
-		if (arg1.bits < 32) {
-			fprintf(stderr, "as_cmp(): can't compare immediates with smaller register!\n");
-			abort();
-		}
-		as_write(as, "0100 100B : 1000 0001 : 11 111 bbb : %32d", arg1.reg >> 3, arg1.reg, arg2.imm);
-		return;
-	} else if ( as_write_modrm(as, 0, "0011 10dw", arg1, arg2, NULL) ) {
-		// memory64 with qwordregister  0100 1RXB : 0011 1001  : mod qwordreg r/m
-		// qwordregister with memory64  0100 1RXB : 0011 101w1 : mod qwordreg r/m
-		//                                                   |-- PROBABLY ERROR IN DOCS
-		return;
-	} else 
-	
-	fprintf(stderr, "as_cmp(): unsupported arg combination!\n");
-	abort();
-}
 
 void as_set_cc(asm_p as, uint8_t condition_code, asm_arg_t dest) {
 	// Volume 2C - Instruction Set Reference, p104
