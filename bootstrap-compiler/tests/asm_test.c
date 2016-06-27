@@ -4,6 +4,7 @@
 #include "../asm.h"
 
 #define SLIM_TEST_IMPLEMENTATION
+#define ST_MAX_MESSAGE_SIZE 1024*4
 #include "slim_test.h"
 
 
@@ -164,7 +165,7 @@ void test_basic_instructions() {
 	
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_mov(as, as_reg(i, 8), as_imm(0x1122334455667788, 8));
+			as_mov(as, as_reg(8, i), as_imm(8, 0x1122334455667788));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"movabs rax,0x1122334455667788\n"
@@ -194,9 +195,9 @@ void test_arithmetic_instructions() {
 	
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_add(as, as_reg(i, 8), as_reg(i, 8));
+			as_add(as, as_reg(8, i), as_reg(8, i));
 		for(size_t i = 0; i < 16; i++)
-			as_add(as, as_reg(i, 8), as_imm(0x7abbccdd, 4));
+			as_add(as, as_reg(8, i), as_imm(4, 0x7abbccdd));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"add    rax,rax\n"
@@ -235,9 +236,9 @@ void test_arithmetic_instructions() {
 	
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_sub(as, as_reg(i, 8), as_reg(i, 8));
+			as_sub(as, as_reg(8, i), as_reg(8, i));
 		for(size_t i = 0; i < 16; i++)
-			as_sub(as, as_reg(i, 8), as_imm(0x7abbccdd, 4));
+			as_sub(as, as_reg(8, i), as_imm(4, 0x7abbccdd));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"sub    rax,rax\n"
@@ -276,9 +277,9 @@ void test_arithmetic_instructions() {
 	
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_mul(as, as_reg(i, 8));
+			as_mul(as, as_reg(8, i));
 		for(size_t i = 0; i < 16; i++)
-			as_mul(as, as_mem_rd(8, as_reg(i, 8), 0xbeba));
+			as_mul(as, as_mem_rd(8, as_reg(8, i), 0xbeba));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"mul    rax\n"
@@ -317,9 +318,9 @@ void test_arithmetic_instructions() {
 	
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_div(as, as_reg(i, 8));
+			as_div(as, as_reg(8, i));
 		for(size_t i = 0; i < 16; i++)
-			as_div(as, as_mem_rd(8, as_reg(i, 8), 0xbeba));
+			as_div(as, as_mem_rd(8, as_reg(8, i), 0xbeba));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"div    rax\n"
@@ -360,16 +361,14 @@ void test_arithmetic_instructions() {
 	free(disassembly);
 }
 
-/*
 void test_addressing_modes() {
 	asm_p as = &(asm_t){ 0 };
 	char* disassembly = NULL;
-	as_new(as);
 	
 	// reg reg
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_mov(as, reg(i), reg(i));
+			as_mov(as, as_reg(8, i), as_reg(8, i));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"mov    rax,rax\n"
@@ -393,7 +392,7 @@ void test_addressing_modes() {
 	// reg [RIP + displ]
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_mov(as, reg(i), reld(0xbeba));
+			as_mov(as, as_reg(8, i), as_mem_rel(8, 0xbeba));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"mov    rax,QWORD PTR [rip+0xbeba]        # 0x40bec1\n"
@@ -417,7 +416,7 @@ void test_addressing_modes() {
 	// reg [displ]
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_mov(as, reg(i), memd(0xbeba));
+			as_mov(as, as_reg(8, i), as_mem_d(8, 0xbeba));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		// Funny syntax when disassembling with intel syntax. Looks normal with
@@ -443,7 +442,7 @@ void test_addressing_modes() {
 	// reg [reg + displ]
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_mov(as, reg(i), memrd(reg(i), 0xbeba));
+			as_mov(as, as_reg(8, i), as_mem_rd(8, as_reg(8, i), 0xbeba));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"mov    rax,QWORD PTR [rax+0xbeba]\n"
@@ -464,17 +463,17 @@ void test_addressing_modes() {
 		"mov    r15,QWORD PTR [r15+0xbeba]\n"
 	);
 	
+	as_free(as);
 	free(disassembly);
 }
 
 void test_compare_instructions() {
 	asm_p as = &(asm_t){ 0 };
 	char* disassembly = NULL;
-	as_new(as);
 	
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_cmp(as, reg(i), reg(i));
+			as_cmp(as, as_reg(8, i), as_reg(8, i));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"cmp    rax,rax\n"
@@ -497,7 +496,7 @@ void test_compare_instructions() {
 	
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_cmp(as, reg(i), memrd(reg(i), 0xbeba));
+			as_cmp(as, as_reg(8, i), as_mem_rd(8, as_reg(8, i), 0xbeba));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"cmp    rax,QWORD PTR [rax+0xbeba]\n"
@@ -520,7 +519,7 @@ void test_compare_instructions() {
 	
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_cmp(as, reg(i), imm(0x11223344));
+			as_cmp(as, as_reg(8, i), as_imm(4, 0x11223344));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"cmp    rax,0x11223344\n"
@@ -544,6 +543,7 @@ void test_compare_instructions() {
 	free(disassembly);
 }
 
+/*
 void test_jump_instructions() {
 	asm_p as = &(asm_t){ 0 };
 	char* disassembly = NULL;
@@ -833,16 +833,16 @@ void test_instructions_for_call() {
 	
 	free(disassembly);
 }
+*/
 
 void test_byte_registers() {
 	asm_p as = &(asm_t){ 0 };
 	char* disassembly = NULL;
-	as_new(as);
 	
 	// reg reg
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_mov(as, regb(i), regb(i));
+			as_mov(as, as_reg(1, i), as_reg(1, i));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"mov    al,al\n"
@@ -863,11 +863,10 @@ void test_byte_registers() {
 		"mov    r15b,r15b\n"
 	);
 	
-	
 	// reg [RIP + displ]
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_mov(as, regb(i), reldb(0x7abbccdd));
+			as_mov(as, as_reg(1, i), as_mem_rel(1, 0x7abbccdd));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"mov    al,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcce4\n"
@@ -891,7 +890,7 @@ void test_byte_registers() {
 	// reg [displ]
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_mov(as, regb(i), memdb(0x7abbccdd));
+			as_mov(as, as_reg(1, i), as_mem_d(1, 0x7abbccdd));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"mov    al,BYTE PTR ds:0x7abbccdd\n"
@@ -915,7 +914,7 @@ void test_byte_registers() {
 	// reg [reg + displ]
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_mov(as, regb(i), memrdb(reg(i), 0x7abbccdd));
+			as_mov(as, as_reg(1, i), as_mem_rd(1, as_reg(8, i), 0x7abbccdd));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"mov    al,BYTE PTR [rax+0x7abbccdd]\n"
@@ -938,7 +937,7 @@ void test_byte_registers() {
 	
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_mul(as, regb(i));
+			as_mul(as, as_reg(1, i));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"mul    al\n"
@@ -961,7 +960,7 @@ void test_byte_registers() {
 	
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_cmp(as, regb(i), regb(i));
+			as_cmp(as, as_reg(1, i), as_reg(1, i));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"cmp    al,al\n"
@@ -984,7 +983,7 @@ void test_byte_registers() {
 	
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_cmp(as, regb(i), reldb(0x7abbccdd));
+			as_cmp(as, as_reg(1, i), as_mem_rel(1, 0x7abbccdd));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"cmp    al,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcce4\n"
@@ -1005,9 +1004,263 @@ void test_byte_registers() {
 		"cmp    r15b,BYTE PTR [rip+0x7abbccdd]        # 0x7afbcd4d\n"
 	);
 	
+	as_free(as);
 	free(disassembly);
 }
-*/
+
+void test_16bit_registers() {
+	asm_p as = &(asm_t){ 0 };
+	char* disassembly = NULL;
+	
+	// reg reg
+	as_free(as);
+		for(size_t i = 0; i < 16; i++)
+			as_mov(as, as_reg(2, i), as_reg(2, i));
+	disassembly = disassemble(as);
+	st_check_str(disassembly,
+		"mov    ax,ax\n"
+		"mov    cx,cx\n"
+		"mov    dx,dx\n"
+		"mov    bx,bx\n"
+		"mov    sp,sp\n"
+		"mov    bp,bp\n"
+		"mov    si,si\n"
+		"mov    di,di\n"
+		"mov    r8w,r8w\n"
+		"mov    r9w,r9w\n"
+		"mov    r10w,r10w\n"
+		"mov    r11w,r11w\n"
+		"mov    r12w,r12w\n"
+		"mov    r13w,r13w\n"
+		"mov    r14w,r14w\n"
+		"mov    r15w,r15w\n"
+	);
+	
+	// reg [RIP + displ]
+	as_free(as);
+		for(size_t i = 0; i < 16; i++)
+			as_mov(as, as_reg(2, i), as_mem_rel(2, 0x7abbccdd));
+	disassembly = disassemble(as);
+	st_check_str(disassembly,
+		"mov    ax,WORD PTR [rip+0x7abbccdd]        # 0x7afbcce4\n"
+		"mov    cx,WORD PTR [rip+0x7abbccdd]        # 0x7afbcceb\n"
+		"mov    dx,WORD PTR [rip+0x7abbccdd]        # 0x7afbccf2\n"
+		"mov    bx,WORD PTR [rip+0x7abbccdd]        # 0x7afbccf9\n"
+		"mov    sp,WORD PTR [rip+0x7abbccdd]        # 0x7afbcd00\n"
+		"mov    bp,WORD PTR [rip+0x7abbccdd]        # 0x7afbcd07\n"
+		"mov    si,WORD PTR [rip+0x7abbccdd]        # 0x7afbcd0e\n"
+		"mov    di,WORD PTR [rip+0x7abbccdd]        # 0x7afbcd15\n"
+		"mov    r8w,WORD PTR [rip+0x7abbccdd]        # 0x7afbcd1d\n"
+		"mov    r9w,WORD PTR [rip+0x7abbccdd]        # 0x7afbcd25\n"
+		"mov    r10w,WORD PTR [rip+0x7abbccdd]        # 0x7afbcd2d\n"
+		"mov    r11w,WORD PTR [rip+0x7abbccdd]        # 0x7afbcd35\n"
+		"mov    r12w,WORD PTR [rip+0x7abbccdd]        # 0x7afbcd3d\n"
+		"mov    r13w,WORD PTR [rip+0x7abbccdd]        # 0x7afbcd45\n"
+		"mov    r14w,WORD PTR [rip+0x7abbccdd]        # 0x7afbcd4d\n"
+		"mov    r15w,WORD PTR [rip+0x7abbccdd]        # 0x7afbcd55\n"
+	);
+	
+	// reg [displ]
+	as_free(as);
+		for(size_t i = 0; i < 16; i++)
+			as_mov(as, as_reg(2, i), as_mem_d(2, 0x7abbccdd));
+	disassembly = disassemble(as);
+	st_check_str(disassembly,
+		"mov    ax,WORD PTR ds:0x7abbccdd\n"
+		"mov    cx,WORD PTR ds:0x7abbccdd\n"
+		"mov    dx,WORD PTR ds:0x7abbccdd\n"
+		"mov    bx,WORD PTR ds:0x7abbccdd\n"
+		"mov    sp,WORD PTR ds:0x7abbccdd\n"
+		"mov    bp,WORD PTR ds:0x7abbccdd\n"
+		"mov    si,WORD PTR ds:0x7abbccdd\n"
+		"mov    di,WORD PTR ds:0x7abbccdd\n"
+		"mov    r8w,WORD PTR ds:0x7abbccdd\n"
+		"mov    r9w,WORD PTR ds:0x7abbccdd\n"
+		"mov    r10w,WORD PTR ds:0x7abbccdd\n"
+		"mov    r11w,WORD PTR ds:0x7abbccdd\n"
+		"mov    r12w,WORD PTR ds:0x7abbccdd\n"
+		"mov    r13w,WORD PTR ds:0x7abbccdd\n"
+		"mov    r14w,WORD PTR ds:0x7abbccdd\n"
+		"mov    r15w,WORD PTR ds:0x7abbccdd\n"
+	);
+	
+	// reg [reg + displ]
+	as_free(as);
+		for(size_t i = 0; i < 16; i++)
+			as_mov(as, as_reg(2, i), as_mem_rd(2, as_reg(8, i), 0x7abbccdd));
+	disassembly = disassemble(as);
+	st_check_str(disassembly,
+		"mov    ax,WORD PTR [rax+0x7abbccdd]\n"
+		"mov    cx,WORD PTR [rcx+0x7abbccdd]\n"
+		"mov    dx,WORD PTR [rdx+0x7abbccdd]\n"
+		"mov    bx,WORD PTR [rbx+0x7abbccdd]\n"
+		"mov    sp,WORD PTR [rsp+0x7abbccdd]\n"
+		"mov    bp,WORD PTR [rbp+0x7abbccdd]\n"
+		"mov    si,WORD PTR [rsi+0x7abbccdd]\n"
+		"mov    di,WORD PTR [rdi+0x7abbccdd]\n"
+		"mov    r8w,WORD PTR [r8+0x7abbccdd]\n"
+		"mov    r9w,WORD PTR [r9+0x7abbccdd]\n"
+		"mov    r10w,WORD PTR [r10+0x7abbccdd]\n"
+		"mov    r11w,WORD PTR [r11+0x7abbccdd]\n"
+		"mov    r12w,WORD PTR [r12+0x7abbccdd]\n"
+		"mov    r13w,WORD PTR [r13+0x7abbccdd]\n"
+		"mov    r14w,WORD PTR [r14+0x7abbccdd]\n"
+		"mov    r15w,WORD PTR [r15+0x7abbccdd]\n"
+	);
+	
+	as_free(as);
+		for(size_t i = 0; i < 16; i++)
+			as_mul(as, as_reg(2, i));
+	disassembly = disassemble(as);
+	st_check_str(disassembly,
+		"mul    ax\n"
+		"mul    cx\n"
+		"mul    dx\n"
+		"mul    bx\n"
+		"mul    sp\n"
+		"mul    bp\n"
+		"mul    si\n"
+		"mul    di\n"
+		"mul    r8w\n"
+		"mul    r9w\n"
+		"mul    r10w\n"
+		"mul    r11w\n"
+		"mul    r12w\n"
+		"mul    r13w\n"
+		"mul    r14w\n"
+		"mul    r15w\n"
+	);
+		
+	as_free(as);
+	free(disassembly);
+}
+
+void test_32bit_registers() {
+	asm_p as = &(asm_t){ 0 };
+	char* disassembly = NULL;
+	
+	// reg reg
+	as_free(as);
+		for(size_t i = 0; i < 16; i++)
+			as_mov(as, as_reg(4, i), as_reg(4, i));
+	disassembly = disassemble(as);
+	st_check_str(disassembly,
+		"mov    eax,eax\n"
+		"mov    ecx,ecx\n"
+		"mov    edx,edx\n"
+		"mov    ebx,ebx\n"
+		"mov    esp,esp\n"
+		"mov    ebp,ebp\n"
+		"mov    esi,esi\n"
+		"mov    edi,edi\n"
+		"mov    r8d,r8d\n"
+		"mov    r9d,r9d\n"
+		"mov    r10d,r10d\n"
+		"mov    r11d,r11d\n"
+		"mov    r12d,r12d\n"
+		"mov    r13d,r13d\n"
+		"mov    r14d,r14d\n"
+		"mov    r15d,r15d\n"
+	);
+	
+	// reg [RIP + displ]
+	as_free(as);
+		for(size_t i = 0; i < 16; i++)
+			as_mov(as, as_reg(4, i), as_mem_rel(4, 0x7abbccdd));
+	disassembly = disassemble(as);
+	st_check_str(disassembly,
+		"mov    eax,DWORD PTR [rip+0x7abbccdd]        # 0x7afbcce3\n"
+		"mov    ecx,DWORD PTR [rip+0x7abbccdd]        # 0x7afbcce9\n"
+		"mov    edx,DWORD PTR [rip+0x7abbccdd]        # 0x7afbccef\n"
+		"mov    ebx,DWORD PTR [rip+0x7abbccdd]        # 0x7afbccf5\n"
+		"mov    esp,DWORD PTR [rip+0x7abbccdd]        # 0x7afbccfb\n"
+		"mov    ebp,DWORD PTR [rip+0x7abbccdd]        # 0x7afbcd01\n"
+		"mov    esi,DWORD PTR [rip+0x7abbccdd]        # 0x7afbcd07\n"
+		"mov    edi,DWORD PTR [rip+0x7abbccdd]        # 0x7afbcd0d\n"
+		"mov    r8d,DWORD PTR [rip+0x7abbccdd]        # 0x7afbcd14\n"
+		"mov    r9d,DWORD PTR [rip+0x7abbccdd]        # 0x7afbcd1b\n"
+		"mov    r10d,DWORD PTR [rip+0x7abbccdd]        # 0x7afbcd22\n"
+		"mov    r11d,DWORD PTR [rip+0x7abbccdd]        # 0x7afbcd29\n"
+		"mov    r12d,DWORD PTR [rip+0x7abbccdd]        # 0x7afbcd30\n"
+		"mov    r13d,DWORD PTR [rip+0x7abbccdd]        # 0x7afbcd37\n"
+		"mov    r14d,DWORD PTR [rip+0x7abbccdd]        # 0x7afbcd3e\n"
+		"mov    r15d,DWORD PTR [rip+0x7abbccdd]        # 0x7afbcd45\n"
+	);
+	
+	// reg [displ]
+	as_free(as);
+		for(size_t i = 0; i < 16; i++)
+			as_mov(as, as_reg(4, i), as_mem_d(4, 0x7abbccdd));
+	disassembly = disassemble(as);
+	st_check_str(disassembly,
+		"mov    eax,DWORD PTR ds:0x7abbccdd\n"
+		"mov    ecx,DWORD PTR ds:0x7abbccdd\n"
+		"mov    edx,DWORD PTR ds:0x7abbccdd\n"
+		"mov    ebx,DWORD PTR ds:0x7abbccdd\n"
+		"mov    esp,DWORD PTR ds:0x7abbccdd\n"
+		"mov    ebp,DWORD PTR ds:0x7abbccdd\n"
+		"mov    esi,DWORD PTR ds:0x7abbccdd\n"
+		"mov    edi,DWORD PTR ds:0x7abbccdd\n"
+		"mov    r8d,DWORD PTR ds:0x7abbccdd\n"
+		"mov    r9d,DWORD PTR ds:0x7abbccdd\n"
+		"mov    r10d,DWORD PTR ds:0x7abbccdd\n"
+		"mov    r11d,DWORD PTR ds:0x7abbccdd\n"
+		"mov    r12d,DWORD PTR ds:0x7abbccdd\n"
+		"mov    r13d,DWORD PTR ds:0x7abbccdd\n"
+		"mov    r14d,DWORD PTR ds:0x7abbccdd\n"
+		"mov    r15d,DWORD PTR ds:0x7abbccdd\n"
+	);
+	
+	// reg [reg + displ]
+	as_free(as);
+		for(size_t i = 0; i < 16; i++)
+			as_mov(as, as_reg(4, i), as_mem_rd(4, as_reg(8, i), 0x7abbccdd));
+	disassembly = disassemble(as);
+	st_check_str(disassembly,
+		"mov    eax,DWORD PTR [rax+0x7abbccdd]\n"
+		"mov    ecx,DWORD PTR [rcx+0x7abbccdd]\n"
+		"mov    edx,DWORD PTR [rdx+0x7abbccdd]\n"
+		"mov    ebx,DWORD PTR [rbx+0x7abbccdd]\n"
+		"mov    esp,DWORD PTR [rsp+0x7abbccdd]\n"
+		"mov    ebp,DWORD PTR [rbp+0x7abbccdd]\n"
+		"mov    esi,DWORD PTR [rsi+0x7abbccdd]\n"
+		"mov    edi,DWORD PTR [rdi+0x7abbccdd]\n"
+		"mov    r8d,DWORD PTR [r8+0x7abbccdd]\n"
+		"mov    r9d,DWORD PTR [r9+0x7abbccdd]\n"
+		"mov    r10d,DWORD PTR [r10+0x7abbccdd]\n"
+		"mov    r11d,DWORD PTR [r11+0x7abbccdd]\n"
+		"mov    r12d,DWORD PTR [r12+0x7abbccdd]\n"
+		"mov    r13d,DWORD PTR [r13+0x7abbccdd]\n"
+		"mov    r14d,DWORD PTR [r14+0x7abbccdd]\n"
+		"mov    r15d,DWORD PTR [r15+0x7abbccdd]\n"
+	);
+	
+	as_free(as);
+		for(size_t i = 0; i < 16; i++)
+			as_mul(as, as_reg(4, i));
+	disassembly = disassemble(as);
+	st_check_str(disassembly,
+		"mul    eax\n"
+		"mul    ecx\n"
+		"mul    edx\n"
+		"mul    ebx\n"
+		"mul    esp\n"
+		"mul    ebp\n"
+		"mul    esi\n"
+		"mul    edi\n"
+		"mul    r8d\n"
+		"mul    r9d\n"
+		"mul    r10d\n"
+		"mul    r11d\n"
+		"mul    r12d\n"
+		"mul    r13d\n"
+		"mul    r14d\n"
+		"mul    r15d\n"
+	);
+		
+	as_free(as);
+	free(disassembly);
+}
 
 int main() {
 	st_run(test_empty_and_free);
@@ -1015,16 +1268,18 @@ int main() {
 	st_run(test_write_with_vars);
 	st_run(test_write_elf);
 	st_run(test_basic_instructions);
-	//st_run(test_arithmetic_instructions);
-	/*
+	st_run(test_arithmetic_instructions);
 	st_run(test_addressing_modes);
 	st_run(test_compare_instructions);
+	/*
 	st_run(test_jump_instructions);
 	st_run(test_conditional_instructions);
 	st_run(test_stack_instructions);
 	st_run(test_instructions_for_if);
 	st_run(test_instructions_for_call);
-	st_run(test_byte_registers);
 	*/
+	st_run(test_byte_registers);
+	st_run(test_16bit_registers);
+	st_run(test_32bit_registers);
 	return st_show_report();
 }
