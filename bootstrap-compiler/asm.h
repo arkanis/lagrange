@@ -131,22 +131,22 @@ static inline asm_arg_t as_mem_rd(uint8_t target_bytes, asm_arg_t reg, int32_t d
 // 64 bit = RAX  = R0
 //
 
-#define R0  as_reg( 0, 8)
-#define R1  as_reg( 1, 8)
-#define R2  as_reg( 2, 8)
-#define R3  as_reg( 3, 8)
-#define R4  as_reg( 4, 8)
-#define R5  as_reg( 5, 8)
-#define R6  as_reg( 6, 8)
-#define R7  as_reg( 7, 8)
-#define R8  as_reg( 8, 8)
-#define R9  as_reg( 9, 8)
-#define R10 as_reg(10, 8)
-#define R11 as_reg(11, 8)
-#define R12 as_reg(12, 8)
-#define R13 as_reg(13, 8)
-#define R14 as_reg(14, 8)
-#define R15 as_reg(15, 8)
+#define R0  as_reg(8,  0)
+#define R1  as_reg(8,  1)
+#define R2  as_reg(8,  2)
+#define R3  as_reg(8,  3)
+#define R4  as_reg(8,  4)
+#define R5  as_reg(8,  5)
+#define R6  as_reg(8,  6)
+#define R7  as_reg(8,  7)
+#define R8  as_reg(8,  8)
+#define R9  as_reg(8,  9)
+#define R10 as_reg(8, 10)
+#define R11 as_reg(8, 11)
+#define R12 as_reg(8, 12)
+#define R13 as_reg(8, 13)
+#define R14 as_reg(8, 14)
+#define R15 as_reg(8, 15)
 
 #define RAX R0
 #define RCX R1
@@ -157,22 +157,22 @@ static inline asm_arg_t as_mem_rd(uint8_t target_bytes, asm_arg_t reg, int32_t d
 #define RSI R6
 #define RDI R7
 
-#define R0b  as_reg( 0, 1)
-#define R1b  as_reg( 1, 1)
-#define R2b  as_reg( 2, 1)
-#define R3b  as_reg( 3, 1)
-#define R4b  as_reg( 4, 1)
-#define R5b  as_reg( 5, 1)
-#define R6b  as_reg( 6, 1)
-#define R7b  as_reg( 7, 1)
-#define R8b  as_reg( 8, 1)
-#define R9b  as_reg( 9, 1)
-#define R10b as_reg(10, 1)
-#define R11b as_reg(11, 1)
-#define R12b as_reg(12, 1)
-#define R13b as_reg(13, 1)
-#define R14b as_reg(14, 1)
-#define R15b as_reg(15, 1)
+#define R0b  as_reg(1,  0)
+#define R1b  as_reg(1,  1)
+#define R2b  as_reg(1,  2)
+#define R3b  as_reg(1,  3)
+#define R4b  as_reg(1,  4)
+#define R5b  as_reg(1,  5)
+#define R6b  as_reg(1,  6)
+#define R7b  as_reg(1,  7)
+#define R8b  as_reg(1,  8)
+#define R9b  as_reg(1,  9)
+#define R10b as_reg(1, 10)
+#define R11b as_reg(1, 11)
+#define R12b as_reg(1, 12)
+#define R13b as_reg(1, 13)
+#define R14b as_reg(1, 14)
+#define R15b as_reg(1, 15)
 
 #define RAXb R0b
 #define RCXb R1b
@@ -250,11 +250,11 @@ void       as_set_cc(asm_p as, asm_cond_t condition, asm_arg_t dest);
 
 // Control Transfer Instructions
 asm_slot_t as_jmp(asm_p as, asm_arg_t target);
-asm_slot_t as_jmp_cc(asm_p as, asm_cond_t condition, int32_t displacement);
+asm_slot_t as_jmp_cc(asm_p as, asm_cond_t condition, asm_arg_t displacement);
 
 // Function call instructions
 asm_slot_t as_call(asm_p as, asm_arg_t target);
-void       as_ret(asm_p as, int16_t stack_size_to_pop);
+asm_slot_t as_ret(asm_p as, int16_t stack_size_to_pop);
 
 void as_enter(asm_p as, int16_t stack_size, int8_t level);
 void as_leave(asm_p as);

@@ -616,7 +616,7 @@ void test_conditional_instructions() {
 	
 	as_free(as);
 		for(size_t i = 0; i < sizeof(condition_codes) / sizeof(condition_codes[0]); i++)
-			as_jmp_cc(as, condition_codes[i], 0x11223344);
+			as_jmp_cc(as, condition_codes[i], as_disp(0x11223344));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"jo     0x1162334a\n"
@@ -764,45 +764,47 @@ void test_stack_instructions() {
 	as_free(as);
 	free(disassembly);
 }
-/*
-void test_instructions_for_if() {
-	asm_p as = &(asm_t){ 0 };
-	
-	asm_jump_slot_t to_false_case, to_end;
-	
-	as_mov(as, RAX, imm(0));
-	as_cmp(as, RAX, imm(0));
-	to_false_case = as_jmp_cc(as, CC_NOT_EQUAL, 0);
-		as_mov(as, R15, imm(43));
-		to_end = as_jmp(as, reld(0));
-	as_mark_jmp_slot_target(as, to_false_case);
-		as_mov(as, R15, imm(17));
-	as_mark_jmp_slot_target(as, to_end);
-	as_mov(as, RAX, imm(60));
-	as_mov(as, RDI, R15);
-	as_syscall(as);
-	
-	as_save_elf(as, "test_instructions_for_if_true.elf");
-	as_free(as);
-	
-	as_mov(as, RAX, imm(5));
-	as_cmp(as, RAX, imm(0));
-	to_false_case = as_jmp_cc(as, CC_NOT_EQUAL, 0);
-		as_mov(as, R15, imm(43));
-		to_end = as_jmp(as, reld(0));
-	as_mark_jmp_slot_target(as, to_false_case);
-		as_mov(as, R15, imm(17));
-	as_mark_jmp_slot_target(as, to_end);
-	as_mov(as, RAX, imm(60));
-	as_mov(as, RDI, R15);
-	as_syscall(as);
-	
-	as_save_elf(as, "test_instructions_for_if_false.elf");
-	as_free(as);
-	
+
+void test_instructions_for_if_and_backpatching() {
 	int status_code;
+	asm_p as = &(asm_t){ 0 };
+	asm_slot_t to_false_case, to_end;
+	
+	as_mov(as, RAX, as_imm(8, 0));
+	as_cmp(as, RAX, as_imm(8, 0));
+	to_false_case = as_jmp_cc(as, CC_NOT_EQUAL, as_disp(0));
+		as_mov(as, R15, as_imm(8, 43));
+		to_end = as_jmp(as, as_disp(0));
+	as_patch_slot(as, to_false_case, as_next_instr_offset(as));
+		as_mov(as, R15, as_imm(8, 17));
+	as_patch_slot(as, to_end, as_next_instr_offset(as));
+	
+	as_mov(as, RAX, as_imm(8, 60));
+	as_mov(as, RDI, R15);
+	as_syscall(as);
+	
+	as_save_elf(as, 4 * 1024 * 1024, 512 * 1024 * 1024, "test_instructions_for_if_true.elf");
+	as_free(as);
+	
 	status_code = run_and_delete("test_instructions_for_if_true.elf", "./test_instructions_for_if_true.elf", NULL);
 	st_check_int(status_code, 43);
+	
+	as_mov(as, RAX, as_imm(8, 5));
+	as_cmp(as, RAX, as_imm(8, 0));
+	to_false_case = as_jmp_cc(as, CC_NOT_EQUAL, as_disp(0));
+		as_mov(as, R15, as_imm(8, 43));
+		to_end = as_jmp(as, as_disp(0));
+	as_patch_slot(as, to_false_case, as_next_instr_offset(as));
+		as_mov(as, R15, as_imm(8, 17));
+	as_patch_slot(as, to_end, as_next_instr_offset(as));
+	
+	as_mov(as, RAX, as_imm(8, 60));
+	as_mov(as, RDI, R15);
+	as_syscall(as);
+	
+	as_save_elf(as, 4 * 1024 * 1024, 512 * 1024 * 1024, "test_instructions_for_if_false.elf");
+	as_free(as);
+	
 	status_code = run_and_delete("test_instructions_for_if_false.elf", "./test_instructions_for_if_false.elf", NULL);
 	st_check_int(status_code, 17);
 }
@@ -840,7 +842,6 @@ void test_instructions_for_call() {
 	as_free(as);
 	free(disassembly);
 }
-*/
 
 void test_byte_registers() {
 	asm_p as = &(asm_t){ 0 };
@@ -1281,10 +1282,8 @@ int main() {
 	st_run(test_jump_instructions);
 	st_run(test_conditional_instructions);
 	st_run(test_stack_instructions);
-	/*
-	st_run(test_instructions_for_if);
+	st_run(test_instructions_for_if_and_backpatching);
 	st_run(test_instructions_for_call);
-	*/
 	st_run(test_byte_registers);
 	st_run(test_16bit_registers);
 	st_run(test_32bit_registers);

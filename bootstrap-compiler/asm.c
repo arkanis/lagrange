@@ -351,10 +351,32 @@ void as_write_with_vars(asm_p as, const char* format, asm_var_t vars[]) {
 asm_slot_t as_slot_for_last_instr(asm_p as, uint8_t bytes, asm_arg_type_t value_type) {
 	return (asm_slot_t) {
 		.bytes = bytes,
-		.value_offset = as->code_len - bytes,
+		.value_offset = as_next_instr_offset(as) - bytes,
 		.value_type = value_type,
-		.next_instruction_offset = as->code_len
+		.next_instruction_offset = as_next_instr_offset(as)
 	};
+}
+
+size_t as_next_instr_offset(asm_p as) {
+	return as->code_len;
+}
+
+void as_patch_slot(asm_p as, asm_slot_t slot, size_t target_offset) {
+	if (slot.value_type != ASM_ARG_DISP) {
+		fprintf(stderr, "as_patch_slot(): Got a slot that isn't a displacement!\n");
+		abort();
+	}
+	
+	int64_t disp_value = (int64_t)target_offset - (int64_t)slot.next_instruction_offset;
+	int64_t max = (1LL << (slot.bytes*8 - 1));
+	int64_t min = -max - 1;
+	if (disp_value < min || disp_value > max) {
+		fprintf(stderr, "as_patch_slot(): Calculated displacement is to large for slot!\n");
+		abort();
+	}
+	
+	// ATTENTION: Only works for little endian system (like x86)
+	memcpy(as->code_ptr + slot.value_offset, &disp_value, slot.bytes);
 }
 
 
@@ -862,86 +884,44 @@ asm_slot_t as_jmp(asm_p as, asm_arg_t target) {
 	return as_invalid_slot();
 }
 
-asm_slot_t as_jmp_cc(asm_p as, asm_cond_t condition_code, int32_t displacement) {
-	as_write(as, "0000 1111 : 1000 tttt : %32d", condition_code, displacement);
+asm_slot_t as_jmp_cc(asm_p as, asm_cond_t condition_code, asm_arg_t displacement) {
+	if (displacement.type != ASM_ARG_DISP) {
+		fprintf(stderr, "as_jmp_cc(): Arg has to be an as_disp()!\n");
+		abort();
+	}
+	
+	as_write(as, "0000 1111 : 1000 tttt : %32d", condition_code, displacement.disp);
 	return as_slot_for_last_instr(as, 4, ASM_ARG_DISP);
 }
 
 
-
-
 //
-// Misc instructions
+// Function call instructions
 //
 
-void as_syscall(asm_p as) {
-	// Volume 2C - Instruction Set Reference, p107 (B.2.1 General Purpose Instruction Formats and Encodings for 64-Bit Mode)
-	as_write(as, "0000 1111 : 0000 0101");
-}
-
-
-
-#if 0
-
-//
-// Instructions
-//
-
-
-
-
-
-
-
-
-
-
-
-void as_mark_jmp_slot_target(asm_p as, asm_jump_slot_t jump_slot) {
-	int32_t displacement = as->code_len - (ssize_t)jump_slot.base;
-	int32_t* instr_disp_ptr = (int32_t*)(as->code_ptr + jump_slot.disp_offset);
-	*instr_disp_ptr = displacement;
-}
-
-size_t as_target(asm_p as) {
-	return as->code_len;
-}
-
-void as_set_jmp_slot_target(asm_p as, asm_jump_slot_t jump_slot, size_t target) {
-	int32_t displacement = (ssize_t)target - (ssize_t)jump_slot.base;
-	int32_t* instr_disp_ptr = (int32_t*)(as->code_ptr + jump_slot.disp_offset);
-	*instr_disp_ptr = displacement;
-}
-
-
-size_t as_code_vaddr(asm_p as) {
-	return as->code_vaddr + as->code_len;
-}
-
-ssize_t as_call(asm_p as, asm_arg_t target) {
+asm_slot_t as_call(asm_p as, asm_arg_t target) {
 	// Volume 2C - Instruction Set Reference, p93
-	if (target.type == ASM_T_MEM_REL_DISP) {
-		as_write(as, "1110 1000 : %32d", target.mem_disp);
-		return as_target(as) - 4;
-	} else if ( as_write_modrm(as, WMRM_NO_REX_W_BIT, "1111 1111", op(0b010), target, NULL) ) {
-		if ( target.bits != 64 ) {
-			fprintf(stderr, "as_call(): target has to be 64 bit for now!\n");
-			abort();
-		}
-		return -1;
+	if (target.type == ASM_ARG_DISP) {
+		as_write(as, "1110 1000 : %32d", target.disp);
+		return as_slot_for_last_instr(as, 4, ASM_ARG_DISP);
+	} else if ( target.bytes == 8 && as_write_modrm(as, WMRM_FIXED_OP_SIZE, "1111 1111", as_op_code(0b010), target, NULL, NULL) ) {
+		return as_invalid_slot();
 	}
 	
 	fprintf(stderr, "as_call(): unsupported arg type!\n");
 	abort();
+	return as_invalid_slot();
 }
 
-void as_ret(asm_p as, int16_t stack_size_to_pop) {
+asm_slot_t as_ret(asm_p as, int16_t stack_size_to_pop) {
 	// Volume 2C - Instruction Set Reference, p102
 	if (stack_size_to_pop == 0) {
 		as_write(as, "1100 0011");
-	} else {
-		as_write(as, "1100 0010 : %16d", stack_size_to_pop);
+		return as_invalid_slot();
 	}
+	
+	as_write(as, "1100 0010 : %16d", stack_size_to_pop);
+	return as_slot_for_last_instr(as, 2, ASM_ARG_IMM);
 }
 
 void as_enter(asm_p as, int16_t stack_size, int8_t level) {
@@ -955,4 +935,11 @@ void as_leave(asm_p as) {
 }
 
 
-#endif
+//
+// Misc instructions
+//
+
+void as_syscall(asm_p as) {
+	// Volume 2C - Instruction Set Reference, p107 (B.2.1 General Purpose Instruction Formats and Encodings for 64-Bit Mode)
+	as_write(as, "0000 1111 : 0000 0101");
+}
