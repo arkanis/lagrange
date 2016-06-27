@@ -543,16 +543,14 @@ void test_compare_instructions() {
 	free(disassembly);
 }
 
-/*
 void test_jump_instructions() {
 	asm_p as = &(asm_t){ 0 };
 	char* disassembly = NULL;
-	as_new(as);
 	
 	as_free(as);
-		as_jmp(as, reld(0x11223344));
+		as_jmp(as, as_disp(0x11223344));
 		for(size_t i = 0; i < 16; i++)
-			as_jmp(as, reg(i));
+			as_jmp(as, as_reg(8, i));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"jmp    0x11623349\n"
@@ -576,7 +574,7 @@ void test_jump_instructions() {
 	
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_jmp(as, memrd(reg(i), 0xbeba));
+			as_jmp(as, as_mem_rd(8, as_reg(8, i), 0xbeba));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"jmp    QWORD PTR [rax+0xbeba]\n"
@@ -597,13 +595,13 @@ void test_jump_instructions() {
 		"jmp    QWORD PTR [r15+0xbeba]\n"
 	);
 	
+	as_free(as);
 	free(disassembly);
 }
 
 void test_conditional_instructions() {
 	asm_p as = &(asm_t){ 0 };
 	char* disassembly = NULL;
-	as_new(as);
 	
 	int condition_codes[] = {
 		CC_OVERFLOW, CC_NO_OVERFLOW,
@@ -641,7 +639,7 @@ void test_conditional_instructions() {
 	
 	as_free(as);
 		for(size_t i = 0; i < sizeof(condition_codes) / sizeof(condition_codes[0]); i++)
-			as_set_cc(as, condition_codes[i], regb(i));
+			as_set_cc(as, condition_codes[i], as_reg(1, i));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"seto   al\n"
@@ -662,23 +660,32 @@ void test_conditional_instructions() {
 		"setg   r15b\n"
 	);
 	
+	as_free(as);
 	free(disassembly);
 }
 
 void test_stack_instructions() {
 	asm_p as = &(asm_t){ 0 };
 	char* disassembly = NULL;
-	as_new(as);
 	
 	as_free(as);
-		as_push(as, imm(0x11223344));
-		for(size_t i = 0; i < 16; i++)
-			as_push(as, reg(i));
-		for(size_t i = 0; i < 16; i++)
-			as_push(as, memrd(reg(i), 0xbeba));
+		as_push(as, as_imm(1, 0x7a));
+		as_push(as, as_imm(2, 0x1122));
+		as_push(as, as_imm(4, 0x1122334455667788));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
-		"push   0x11223344\n"
+		"push   0x7a\n"
+		"pushw  0x1122\n"
+		"push   0x55667788\n"
+	);
+	
+	as_free(as);
+		for(size_t i = 0; i < 16; i++)
+			as_push(as, as_reg(8, i));
+		for(size_t i = 0; i < 16; i++)
+			as_push(as, as_mem_rd(8, as_reg(8, i), 0xbeba));
+	disassembly = disassemble(as);
+	st_check_str(disassembly,
 		"push   rax\n"
 		"push   rcx\n"
 		"push   rdx\n"
@@ -715,9 +722,9 @@ void test_stack_instructions() {
 	
 	as_free(as);
 		for(size_t i = 0; i < 16; i++)
-			as_pop(as, reg(i));
+			as_pop(as, as_reg(8, i));
 		for(size_t i = 0; i < 16; i++)
-			as_pop(as, memrd(reg(i), 0xbeba));
+			as_pop(as, as_mem_rd(8, as_reg(8, i), 0xbeba));
 	disassembly = disassemble(as);
 	st_check_str(disassembly,
 		"pop    rax\n"
@@ -754,12 +761,12 @@ void test_stack_instructions() {
 		"pop    QWORD PTR [r15+0xbeba]\n"
 	);
 	
+	as_free(as);
 	free(disassembly);
 }
-
+/*
 void test_instructions_for_if() {
 	asm_p as = &(asm_t){ 0 };
-	as_new(as);
 	
 	asm_jump_slot_t to_false_case, to_end;
 	
@@ -803,10 +810,9 @@ void test_instructions_for_if() {
 void test_instructions_for_call() {
 	asm_p as = &(asm_t){ 0 };
 	char* disassembly = NULL;
-	as_new(as);
 	
 	as_free(as);
-		as_call(as, reld(0x7abbccdd));
+		as_call(as, as_disp(0x7abbccdd));
 		as_call(as, RAX);
 		as_ret(as, 0);
 		as_ret(as, 16);
@@ -831,6 +837,7 @@ void test_instructions_for_call() {
 		"leave  \n"
 	);
 	
+	as_free(as);
 	free(disassembly);
 }
 */
@@ -1271,10 +1278,10 @@ int main() {
 	st_run(test_arithmetic_instructions);
 	st_run(test_addressing_modes);
 	st_run(test_compare_instructions);
-	/*
 	st_run(test_jump_instructions);
 	st_run(test_conditional_instructions);
 	st_run(test_stack_instructions);
+	/*
 	st_run(test_instructions_for_if);
 	st_run(test_instructions_for_call);
 	*/

@@ -235,7 +235,7 @@ void   as_patch_slot(asm_p as, asm_slot_t slot, size_t target_offset);
 // Data Transfer Instructions
 asm_slot_t as_mov (asm_p as, asm_arg_t dest, asm_arg_t src);
 asm_slot_t as_push(asm_p as, asm_arg_t src);
-asm_slot_t as_pop (asm_p as, asm_arg_t dest);
+void       as_pop (asm_p as, asm_arg_t dest);
 
 // Binary Arithmetic Instructions
 asm_slot_t as_add(asm_p as, asm_arg_t dest, asm_arg_t src);
@@ -246,11 +246,11 @@ void       as_div(asm_p as, asm_arg_t src);
 asm_slot_t as_cmp(asm_p as, asm_arg_t arg1, asm_arg_t arg2);
 
 // Bit and Byte Instructions
-asm_slot_t as_set_cc(asm_p as, asm_cond_t condition, asm_arg_t dest);
+void       as_set_cc(asm_p as, asm_cond_t condition, asm_arg_t dest);
 
 // Control Transfer Instructions
 asm_slot_t as_jmp(asm_p as, asm_arg_t target);
-asm_slot_t as_jmp_cc(asm_p as, asm_cond_t condition, asm_arg_t target);
+asm_slot_t as_jmp_cc(asm_p as, asm_cond_t condition, int32_t displacement);
 
 // Function call instructions
 asm_slot_t as_call(asm_p as, asm_arg_t target);

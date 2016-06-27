@@ -654,37 +654,51 @@ asm_slot_t as_mov(asm_p as, asm_arg_t dest, asm_arg_t src) {
 	abort();
 	return as_invalid_slot();
 }
-/*
-void as_push(asm_p as, asm_arg_t source) {
+
+asm_slot_t as_push(asm_p as, asm_arg_t src) {
 	// Volume 2C - Instruction Set Reference, p100
-	if (source.type == ASM_ARG_IMM) {
-		as_write(as, "0110 1000 : %32d", source.imm);
-		return;
-	} else if ( as_write_modrm(as, WMRM_NO_REX_W_BIT, "1111 1111", op(0b110), source, NULL) ) {
-		if ( source.bits == 8 ) {
-			fprintf(stderr, "as_push(): source can't be 8 bit, sorry.\n");
-			abort();
+	if (src.type == ASM_ARG_IMM) {
+		switch(src.bytes) {
+			case 1:
+				as_write(as, "0110 1010 : %8d", src.imm);
+				break;
+			case 2:
+				// PUSH immediate16  0101 0101 : 0110 1000 : imm16
+				// 55H (address size) prefix probably error in the docs!
+				// 66H (operand size) prefix works.
+				as_write(as, "0110 0110 : 0110 1000 : %16d", src.imm);
+				break;
+			case 4:
+				as_write(as, "0110 1000 : %32d", src.imm);
+				break;
+			default:
+				fprintf(stderr, "as_push(): Immediate can only be 1, 2 or 4 bytes, sorry.\n");
+				abort();
 		}
-		return;
+		return as_slot_for_last_instr(as, src.bytes, ASM_ARG_IMM);
+	} else if ( src.bytes == 8 && as_write_modrm(as, WMRM_FIXED_OP_SIZE, "1111 1111", as_op_code(0b110), src, NULL, NULL) ) {
+		// wordregister  0101 0101 : 0100 000B : 1111 1111 : 11  110 reg16
+		// qwordregister             0100 W00B : 1111 1111 : 11  110 reg64
+		// memory16      0101 0101 : 0100 000B : 1111 1111 : mod 110 r/m
+		// memory64                  0100 W00B : 1111 1111 : mod 110 r/m
+		return as_invalid_slot();
 	}
 	
 	fprintf(stderr, "as_push(): unsupported arg type!\n");
 	abort();
+	return as_invalid_slot();
 }
 
 void as_pop(asm_p as, asm_arg_t dest) {
 	// Volume 2C - Instruction Set Reference, p100
-	if ( dest.bits == 8 ) {
-		fprintf(stderr, "as_push(): source can't be 8 bit, sorry.\n");
-		abort();
-	}
-	if ( as_write_modrm(as, WMRM_NO_REX_W_BIT, "1000 1111", op(0b000), dest, NULL) )
+	// POP only supports 2 and 8 byte arguments (just like PUSH without immediates)
+	if ( dest.bytes == 8 && as_write_modrm(as, WMRM_FIXED_OP_SIZE, "1000 1111", as_op_code(0b000), dest, NULL, NULL) )
 		return;
 	
 	fprintf(stderr, "as_pop(): unsupported arg type!\n");
 	abort();
 }
-*/
+
 
 
 //
@@ -794,6 +808,66 @@ asm_slot_t as_cmp(asm_p as, asm_arg_t arg1, asm_arg_t arg2) {
 }
 
 
+//
+// Bit and Byte Instructions
+//
+
+void as_set_cc(asm_p as, asm_cond_t condition_code, asm_arg_t dest) {
+	// Volume 2C - Instruction Set Reference, p104
+	// 
+	// Combined Volumes 1, 2ABC, 3ABC, p1308
+	// In IA-64 mode, the operand size is fixed at 8 bits. Use of REX prefix enable uniform addressing to additional byte
+	// registers. Otherwise, this instruction’s operation is the same as in legacy mode and compatibility mode.
+	// 
+	// The byte versions of RSI, RDI, RBP and RSP (SIL, DIL, BPL, SPL) can only
+	// be encoded by an empty REX byte. We we omit this we get AH, BH, CH and DH.
+	// So for now we force the precense of a REX byte with a flag.
+	if ( dest.bytes != 1 ) {
+		fprintf(stderr, "as_set_cc(): target has to be an byte (8 bit) r/m!\n");
+		abort();
+	}
+	bool result = as_write_modrm(as, WMRM_FIXED_OP_SIZE, "0000 1111 : 1001 tttt", as_op_code(0b000), dest, NULL, (asm_var_t[]){
+		{ "tttt", condition_code },
+		{ NULL, 0 }
+	});
+	if (result)
+		return;
+	
+	fprintf(stderr, "as_set_cc(): unsupported arg combination!\n");
+	abort();
+}
+
+
+//
+// Control Transfer Instructions
+//
+
+asm_slot_t as_jmp(asm_p as, asm_arg_t target) {
+	if (target.type == ASM_ARG_DISP) {
+		as_write(as, "1110 1001 : %32d", target.disp);
+		return as_slot_for_last_instr(as, 4, ASM_ARG_DISP);
+	} else if ( target.bytes == 8 && as_write_modrm(as, WMRM_FIXED_OP_SIZE, "1111 1111", as_op_code(0b100), target, NULL, NULL) ) {
+		// Combined Volumes 1, 2ABC, 3ABC, p856:
+		// In 64-Bit Mode — The instruction’s operation size is fixed at 64 bits. If a selector points to a gate, then RIP equals
+		// the 64-bit displacement taken from gate; else RIP equals the zero-extended offset from the far pointer referenced
+		// in the instruction.
+		// 
+		// register indirect  0100 W00B : 1111 1111 : 11  100 reg
+		// memory indirect    0100 W0XB : 1111 1111 : mod 100 r/m
+		return as_invalid_slot();
+	}
+	
+	fprintf(stderr, "as_jmp(): unsupported arg type!\n");
+	abort();
+	return as_invalid_slot();
+}
+
+asm_slot_t as_jmp_cc(asm_p as, asm_cond_t condition_code, int32_t displacement) {
+	as_write(as, "0000 1111 : 1000 tttt : %32d", condition_code, displacement);
+	return as_slot_for_last_instr(as, 4, ASM_ARG_DISP);
+}
+
+
 
 
 //
@@ -820,58 +894,8 @@ void as_syscall(asm_p as) {
 
 
 
-void as_set_cc(asm_p as, uint8_t condition_code, asm_arg_t dest) {
-	// Volume 2C - Instruction Set Reference, p104
-	// 
-	// Combined Volumes 1, 2ABC, 3ABC, p1308
-	// In IA-64 mode, the operand size is fixed at 8 bits. Use of REX prefix enable uniform addressing to additional byte
-	// registers. Otherwise, this instruction’s operation is the same as in legacy mode and compatibility mode.
-	// 
-	// The byte versions of RSI, RDI, RBP and RSP (SIL, DIL, BPL, SPL) can only
-	// be encoded by an empty REX byte. We we omit this we get AH, BH, CH and DH.
-	// So for now we force the precense of a REX byte with a flag.
-	if ( dest.bits != 8 ) {
-		fprintf(stderr, "as_set_cc(): target has to be an 8 bit r/m!\n");
-		abort();
-	}
-	bool result = as_write_modrm(as, WMRM_NO_REX_W_BIT | WMRM_FORCE_REX, "0000 1111 : 1001 tttt", op(0b000), dest, (asm_var_t[]){
-		{ "tttt", condition_code },
-		{ NULL, 0 }
-	});
-	if (result)
-		return;
-	
-	fprintf(stderr, "as_set_cc(): unsupported arg combination!\n");
-	abort();
-}
 
-asm_jump_slot_t as_jmp(asm_p as, asm_arg_t target) {
-	if (target.type == ASM_T_MEM_REL_DISP) {
-		as_write(as, "1110 1001 : %32d", target.mem_disp);
-		return (asm_jump_slot_t){ .base = as->code_len, .disp_offset = as->code_len - 4 };
-	} else if ( as_write_modrm(as, WMRM_NO_REX_W_BIT, "1111 1111", op(0b100), target, NULL) ) {
-		// Combined Volumes 1, 2ABC, 3ABC, p856:
-		// In 64-Bit Mode — The instruction’s operation size is fixed at 64 bits. If a selector points to a gate, then RIP equals
-		// the 64-bit displacement taken from gate; else RIP equals the zero-extended offset from the far pointer referenced
-		// in the instruction.
-		// 
-		// register indirect  0100 W00B : 1111 1111 : 11  100 reg
-		// memory indirect    0100 W0XB : 1111 1111 : mod 100 r/m
-		if ( target.bits != 64 ) {
-			fprintf(stderr, "as_jmp(): jump target has to be 64 bits!\n");
-			abort();
-		}
-		return (asm_jump_slot_t){ .base = as->code_len, .disp_offset = as->code_len - 4 };
-	}
-	
-	fprintf(stderr, "as_jmp(): unsupported arg type!\n");
-	abort();
-}
 
-asm_jump_slot_t as_jmp_cc(asm_p as, uint8_t condition_code, int32_t displacement) {
-	as_write(as, "0000 1111 : 1000 tttt : %32d", condition_code, displacement);
-	return (asm_jump_slot_t){ .base = as->code_len, .disp_offset = as->code_len - 4 };
-}
 
 void as_mark_jmp_slot_target(asm_p as, asm_jump_slot_t jump_slot) {
 	int32_t displacement = as->code_len - (ssize_t)jump_slot.base;
