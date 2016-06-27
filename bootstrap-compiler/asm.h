@@ -102,8 +102,8 @@ typedef struct {
 	};
 } asm_arg_t, asm_arg_p;
 
-static inline asm_arg_t as_reg(uint8_t reg_index, uint8_t bytes)        { return (asm_arg_t){ .type = ASM_ARG_REG,     .bytes = bytes, .reg = reg_index }; }
-static inline asm_arg_t as_imm(uint64_t value, uint8_t bytes)           { return (asm_arg_t){ .type = ASM_ARG_IMM,     .bytes = bytes, .imm = value     }; }
+static inline asm_arg_t as_reg(uint8_t bytes, uint8_t reg_index)        { return (asm_arg_t){ .type = ASM_ARG_REG,     .bytes = bytes, .reg = reg_index }; }
+static inline asm_arg_t as_imm(uint8_t bytes, uint64_t value)           { return (asm_arg_t){ .type = ASM_ARG_IMM,     .bytes = bytes, .imm = value     }; }
 static inline asm_arg_t as_disp(int32_t displacement)                   { return (asm_arg_t){ .type = ASM_ARG_DISP,    .disp = displacement             }; }
 static inline asm_arg_t as_op_code(uint8_t opcode_extention_bits)       { return (asm_arg_t){ .type = ASM_ARG_OP_CODE, .op_code = opcode_extention_bits }; }
 
