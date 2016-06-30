@@ -65,7 +65,7 @@ struct token_s {
 	};
 };
 
-token_list_t tokenize(str_t source, FILE* errors);
+size_t tokenize(str_t source, token_list_p tokens, FILE* error_stream);
 
 void token_free(token_p token);
 int  token_line(module_p module, token_p token);
