@@ -49,7 +49,7 @@ typedef struct {
 // Tokenizer
 //
 
-#define TOKEN(id, free_expr) id,
+#define TOKEN(id, keyword, free_expr) id,
 typedef enum {
 	#include "token_spec.h"
 } token_type_t;

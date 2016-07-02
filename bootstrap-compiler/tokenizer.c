@@ -1,3 +1,5 @@
+#include <ctype.h>
+#include <string.h>
 #include "common.h"
 
 
@@ -10,13 +12,24 @@ typedef struct {
 } tokenizer_ctx_t, *tokenizer_ctx_p;
 
 
+//
+// Keyword to token type mapping
+//
+static struct { const char* keyword; token_type_t type; } keywords[] = {
+	#define _ NULL
+	#define TOKEN(id, keyword, free_expr) { keyword, id },
+	#include "token_spec.h"
+	#undef TOKEN
+	#undef _
+};
+
 
 //
 // Private tokenizer support functions
 //
 
 static int peek_at_offset(tokenizer_ctx_p ctx, size_t offset) {
-	if ((ssize_t)ctx->pos + offset >= ctx->source.len)
+	if (ctx->pos + offset >= (size_t)ctx->source.len)
 		return EOF;
 	return ctx->source.ptr[ctx->pos + offset];
 }
@@ -34,7 +47,7 @@ static int peek3(tokenizer_ctx_p ctx) {
 }
 
 static token_t new_token(tokenizer_ctx_p ctx, token_type_t type, int chars_to_consume) {
-	if ((ssize_t)ctx->pos + chars_to_consume > ctx->source.len) {
+	if (ctx->pos + chars_to_consume > (size_t)ctx->source.len) {
 		fprintf(ctx->error_stream, "Tried to consume a char beyond EOF!\n");
 		abort();
 	}
@@ -48,7 +61,7 @@ static token_t new_token(tokenizer_ctx_p ctx, token_type_t type, int chars_to_co
 }
 
 static void consume_into_token(tokenizer_ctx_p ctx, token_p token, int chars_to_consume) {
-	if ((ssize_t)ctx->pos + chars_to_consume > ctx->source.len) {
+	if (ctx->pos + chars_to_consume > (size_t)ctx->source.len) {
 		fprintf(ctx->error_stream, "Tried to consume a char beyond EOF!\n");
 		abort();
 	} else if (ctx->source.ptr + ctx->pos != token->source.ptr + token->source.len) {
@@ -61,18 +74,16 @@ static void consume_into_token(tokenizer_ctx_p ctx, token_p token, int chars_to_
 }
 
 static void append_token(tokenizer_ctx_p ctx, token_t token) {
-	list_append(&ctx->tokens, token);
+	list_append(ctx->tokens, token);
 }
-
-// append_token_str, replace with str_putc(&token->str_val, c);
 
 static void make_into_error_token(token_p token, char* message) {
 	token->type = T_ERROR;
 	token->str_val = str_from_c(message);
 }
 
-static void new_error_token(tokenizer_ctx_p ctx, ssize_t start_offset, size_t length, char* message) {
-	if ( (ssize_t)ctx->pos + start_offset < 0 || (ssize_t)ctx->pos + start_offset + length > ctx->source.len ) {
+static token_t new_error_token(tokenizer_ctx_p ctx, ssize_t start_offset, size_t length, char* message) {
+	if ( (ssize_t)ctx->pos + start_offset < 0 || ctx->pos + start_offset + length > (size_t)ctx->source.len ) {
 		fprintf(ctx->error_stream, "The error token contains bytes outside of the source string!\n");
 		abort();
 	}
@@ -113,92 +124,92 @@ static bool next_token(tokenizer_ctx_p ctx) {
 	int c2 = peek2(ctx);
 	int c3 = peek3(ctx);
 	switch(c) {
-		case EOF:  append_token(ctx, new_token(ctx, T_EOF, 0));     return;
-		case '{':  append_token(ctx, new_token(ctx, T_CBO, 1));     return;
-		case '}':  append_token(ctx, new_token(ctx, T_CBC, 1));     return;
-		case '(':  append_token(ctx, new_token(ctx, T_RBO, 1));     return;
-		case ')':  append_token(ctx, new_token(ctx, T_RBC, 1));     return;
-		case ',':  append_token(ctx, new_token(ctx, T_COMMA, 1));   return;
-		case '.':  append_token(ctx, new_token(ctx, T_PERIOD, 1));  return;
-		case '~':  append_token(ctx, new_token(ctx, T_COMPL, 1));   return;
-		case '"':  tokenize_string(ctx);  return;
+		case EOF:  append_token(ctx, new_token(ctx, T_EOF, 0));     return false;
+		case '{':  append_token(ctx, new_token(ctx, T_CBO, 1));     return true;
+		case '}':  append_token(ctx, new_token(ctx, T_CBC, 1));     return true;
+		case '(':  append_token(ctx, new_token(ctx, T_RBO, 1));     return true;
+		case ')':  append_token(ctx, new_token(ctx, T_RBC, 1));     return true;
+		case ',':  append_token(ctx, new_token(ctx, T_COMMA, 1));   return true;
+		case '.':  append_token(ctx, new_token(ctx, T_PERIOD, 1));  return true;
+		case '~':  append_token(ctx, new_token(ctx, T_COMPL, 1));   return true;
+		case '"':  tokenize_string(ctx);  return true;
 		
 		case '+':
 			switch(c2) {
-				case '=':  append_token(ctx, new_token(ctx, T_ADD_ASSIGN, 2));  return;
-				default:   append_token(ctx, new_token(ctx, T_ADD, 1));         return;
+				case '=':  append_token(ctx, new_token(ctx, T_ADD_ASSIGN, 2));  return true;
+				default:   append_token(ctx, new_token(ctx, T_ADD, 1));         return true;
 			}
 		case '-':
 			switch(c2) {
-				case '=':  append_token(ctx, new_token(ctx, T_SUB_ASSIGN, 2));  return;
-				default:   append_token(ctx, new_token(ctx, T_SUB, 1));         return;
+				case '=':  append_token(ctx, new_token(ctx, T_SUB_ASSIGN, 2));  return true;
+				default:   append_token(ctx, new_token(ctx, T_SUB, 1));         return true;
 			}
 		case '*':
 			switch(c2) {
-				case '=':  append_token(ctx, new_token(ctx, T_MUL_ASSIGN, 2));  return;
-				default:   append_token(ctx, new_token(ctx, T_MUL, 1));         return;
+				case '=':  append_token(ctx, new_token(ctx, T_MUL_ASSIGN, 2));  return true;
+				default:   append_token(ctx, new_token(ctx, T_MUL, 1));         return true;
 			}
 		case '/':
 			switch(c2) {
-				case '/':  tokenize_one_line_comment(ctx);                      return;
-				case '*':  tokenize_nested_multiline_comment(ctx);              return;
-				case '=':  append_token(ctx, new_token(ctx, T_DIV_ASSIGN, 2));  return;
-				default:   append_token(ctx, new_token(ctx, T_DIV, 1));         return;
+				case '/':  tokenize_one_line_comment(ctx);                      return true;
+				case '*':  tokenize_nested_multiline_comment(ctx);              return true;
+				case '=':  append_token(ctx, new_token(ctx, T_DIV_ASSIGN, 2));  return true;
+				default:   append_token(ctx, new_token(ctx, T_DIV, 1));         return true;
 			}
 		case '%':
 			switch(c2) {
-				case '=':  append_token(ctx, new_token(ctx, T_MOD_ASSIGN, 2);   return;
-				default:   append_token(ctx, new_token(ctx, T_MOD, 1);          return;
+				case '=':  append_token(ctx, new_token(ctx, T_MOD_ASSIGN, 2));  return true;
+				default:   append_token(ctx, new_token(ctx, T_MOD, 1));         return true;
 			}
 		
 		case '<':
 			switch(c2) {
 				case '<':
 					switch(c3) {
-						case '=':  append_token(ctx, new_token(ctx, T_SL_ASSIGN, 3));  return;
-						default:   append_token(ctx, new_token(ctx, T_SL, 2));         return;
+						case '=':  append_token(ctx, new_token(ctx, T_SL_ASSIGN, 3));  return true;
+						default:   append_token(ctx, new_token(ctx, T_SL, 2));         return true;
 					}
-				case '=':  append_token(ctx, new_token(ctx, T_LE, 2));  return;
-				default:   append_token(ctx, new_token(ctx, T_LT, 1));  return;
+				case '=':  append_token(ctx, new_token(ctx, T_LE, 2));  return true;
+				default:   append_token(ctx, new_token(ctx, T_LT, 1));  return true;
 			}
 		case '>':
 			switch(c2) {
 				case '>':
 					switch(c3) {
-						case '=':  append_token(ctx, new_token(ctx, T_SR_ASSIGN, 3));  return;
-						default:   append_token(ctx, new_token(ctx, T_SR, 2));         return;
+						case '=':  append_token(ctx, new_token(ctx, T_SR_ASSIGN, 3));  return true;
+						default:   append_token(ctx, new_token(ctx, T_SR, 2));         return true;
 					}
-				case '=':  append_token(ctx, new_token(ctx, T_GE, 2));  return;
-				default:   append_token(ctx, new_token(ctx, T_GT, 1));  return;
+				case '=':  append_token(ctx, new_token(ctx, T_GE, 2));  return true;
+				default:   append_token(ctx, new_token(ctx, T_GT, 1));  return true;
 			}
 		
 		case '&':
 			switch(c2) {
-				case '&':  append_token(ctx, new_token(ctx, T_AND, 2));             return;
-				case '=':  append_token(ctx, new_token(ctx, T_BIN_AND_ASSIGN, 2));  return;
-				default:   append_token(ctx, new_token(ctx, T_BIN_AND, 1));         return;
+				case '&':  append_token(ctx, new_token(ctx, T_AND, 2));             return true;
+				case '=':  append_token(ctx, new_token(ctx, T_BIN_AND_ASSIGN, 2));  return true;
+				default:   append_token(ctx, new_token(ctx, T_BIN_AND, 1));         return true;
 			}
 		case '|':
 			switch(c2) {
-				case '|':  append_token(ctx, new_token(ctx, T_OR, 2));             return;
-				case '=':  append_token(ctx, new_token(ctx, T_BIN_OR_ASSIGN, 2));  return;
-				default:   append_token(ctx, new_token(ctx, T_BIN_OR, 1));         return;
+				case '|':  append_token(ctx, new_token(ctx, T_OR, 2));             return true;
+				case '=':  append_token(ctx, new_token(ctx, T_BIN_OR_ASSIGN, 2));  return true;
+				default:   append_token(ctx, new_token(ctx, T_BIN_OR, 1));         return true;
 			}
 		case '^':
 			switch(c2) {
-				case '=':  append_token(ctx, new_token(ctx, T_BIN_XOR_ASSIGN, 2));  return;
-				default:   append_token(ctx, new_token(ctx, T_BIN_XOR, 1));         return;
+				case '=':  append_token(ctx, new_token(ctx, T_BIN_XOR_ASSIGN, 2));  return true;
+				default:   append_token(ctx, new_token(ctx, T_BIN_XOR, 1));         return true;
 			}
 		
 		case '=':
 			switch(c2) {
-				case '=':  append_token(ctx, new_token(ctx, T_EQ, 2));      return;
-				default:   append_token(ctx, new_token(ctx, T_ASSIGN, 1));  return;
+				case '=':  append_token(ctx, new_token(ctx, T_EQ, 2));      return true;
+				default:   append_token(ctx, new_token(ctx, T_ASSIGN, 1));  return true;
 			}
 		case '!':
 			switch(c2) {
-				case '=':  append_token(ctx, new_token(ctx, T_NEQ, 2));  return;
-				default:   append_token(ctx, new_token(ctx, T_NOT, 1));  return;
+				case '=':  append_token(ctx, new_token(ctx, T_NEQ, 2));  return true;
+				default:   append_token(ctx, new_token(ctx, T_NOT, 1));  return true;
 			}
 	}
 	
@@ -213,7 +224,7 @@ static bool next_token(tokenizer_ctx_p ctx) {
 		}
 		
 		append_token(ctx, t);
-		return;
+		return true;
 	}
 	
 	// TODO: Handle numbers starting with a "0" prefix (e.g. 0b... 0o... 0x...)
@@ -229,7 +240,7 @@ static bool next_token(tokenizer_ctx_p ctx) {
 		
 		t.int_val = value;
 		append_token(ctx, t);
-		return;
+		return true;
 	}
 	
 	if ( isalpha(c) || c == '_' ) {
@@ -239,21 +250,25 @@ static bool next_token(tokenizer_ctx_p ctx) {
 			consume_into_token(ctx, &t, 1);
 		
 		for(size_t i = 0; i < sizeof(keywords) / sizeof(keywords[0]); i++) {
-			if ( strncmp(t.src.ptr, keywords[i].keyword, t.src.len) == 0 && (int)strlen(keywords[i].keyword) == t.src.len ) {
+			if (
+				keywords[i].keyword != NULL &&
+				strncmp(t.source.ptr, keywords[i].keyword, t.source.len) == 0 &&
+				(int)strlen(keywords[i].keyword) == t.source.len
+			) {
 				t.type = keywords[i].type;
 				break;
 			}
 		}
 		
 		append_token(ctx, t);
-		return;
+		return true;
 	}
 	
 	// Abort on any unknown char. Ignoring them will just get us surprised...
 	token_t t = new_token(ctx, T_ERROR, 1);
 	make_into_error_token(&t, "stray character in source code");
 	append_token(ctx, t);
-	return;
+	return true;
 }
 
 // Function is called when "//" was peeked. So it's safe to consume 2 chars
@@ -301,14 +316,15 @@ static void tokenize_string(tokenizer_ctx_p ctx) {
 	
 	while (true) {
 		int c = peek1(ctx);
-		consume_into_token(ctx, &t, 1);
+		if (c != EOF)
+			consume_into_token(ctx, &t, 1);
 		
 		switch(c) {
 			case '"':
 				append_token(ctx, t);
 				return;
 			default:
-				str_putc(&t->str_val, c);
+				str_putc(&t.str_val, c);
 				break;
 				
 			case EOF:
@@ -317,23 +333,25 @@ static void tokenize_string(tokenizer_ctx_p ctx) {
 				return;
 			case '\\':
 				c = peek1(ctx);
-				consume_into_token(ctx, &t, 1);
+				if (c != EOF)
+					consume_into_token(ctx, &t, 1);
+				
 				switch(c) {
 					case EOF:
 						make_into_error_token(&t, "unterminated escape code in string");
 						append_token(ctx, t);
 						return;
 					case '\\':
-						str_putc(&t->str_val, '\\');
+						str_putc(&t.str_val, '\\');
 						break;
 					case '"':
-						str_putc(&t->str_val, '"');
+						str_putc(&t.str_val, '"');
 						break;
 					case 'n':
-						str_putc(&t->str_val, '\n');
+						str_putc(&t.str_val, '\n');
 						break;
 					case 't':
-						str_putc(&t->str_val, '\t');
+						str_putc(&t.str_val, '\t');
 						break;
 					default:
 						// Just report the invalid escape code as error token
@@ -355,7 +373,7 @@ void token_free(token_p token) {
 	token_p t = token;
 	switch(token->type) {
 		#define _
-		#define TOKEN(id, free_expr) case id: free_expr; break;
+		#define TOKEN(id, keyword, free_expr) case id: free_expr; break;
 		#include "token_spec.h"
 		#undef TOKEN
 		#undef _
