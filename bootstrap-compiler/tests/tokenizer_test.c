@@ -133,12 +133,11 @@ struct { char* code; size_t tokens_len; token_p tokens_ptr; } samples[] = {
 		{ .type = T_ERROR, .source = { 3, "\"x\\"  } },
 		{ .type = T_EOF,   .source = { 0, ""       } }
 	} },
-	/*
-	{ "\"foo\\hbar\"", 2, (token_t[]){
-		{ .type = T_ERROR, .source = { x, "\"foo\\hbar\"",  .source.len = 9, .str_len = 29, .str_val = "unknown escape code in string" },
-		{ .type = T_EOF,   .source = { x, "",              .source.len = 0 }
+	{ "\"foo\\hbar\"", 3, (token_t[]){
+		{ .type = T_ERROR, .source = {  2, "\\h"           } },
+		{ .type = T_STR,   .source = { 10, "\"foo\\hbar\"" }, .str_val = { 6, "foobar" } },
+		{ .type = T_EOF,   .source = {  0, ""              } }
 	} },
-	*/
 	
 	// IDs
 	{ "foo", 2, (token_t[]){

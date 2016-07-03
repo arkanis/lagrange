@@ -89,8 +89,9 @@ static token_t new_error_token(tokenizer_ctx_p ctx, ssize_t start_offset, size_t
 	}
 	
 	return (token_t){
-		.type   = T_ERROR,
-		.source = str_from_mem(ctx->source.ptr + ctx->pos + start_offset, length)
+		.type    = T_ERROR,
+		.source  = str_from_mem(ctx->source.ptr + ctx->pos + start_offset, length),
+		.str_val = str_from_c(message)
 	};
 }
 
