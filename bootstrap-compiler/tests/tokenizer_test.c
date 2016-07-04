@@ -1,3 +1,6 @@
+// For open_memstream
+#define _GNU_SOURCE
+
 #include <string.h>
 #include "../common.h"
 
@@ -228,8 +231,38 @@ void test_samples() {
 	}
 }
 
+// Don't test printing code to thoroughly because it will change a lot
+void test_print_functions() {
+	char*  output_ptr = NULL;
+	size_t output_len = 0;
+	FILE* output = NULL;
+	
+	module_p module = &(module_t){
+		.filename = "tokenizer_test.c/test_print_functions",
+		.source   = str_from_c("x = \n1 + y\n\"next\nline\"")
+	};
+	tokenize(module->source, &module->tokens, stderr);
+	st_check_int(module->tokens.len, 12);
+	
+	output = open_memstream(&output_ptr, &output_len);
+		token_print(output, &module->tokens.ptr[10], TP_SOURCE);
+	fclose(output);
+	st_check_str(output_ptr, "\"next\nline\"");
+	
+	output = open_memstream(&output_ptr, &output_len);
+		token_print(output, &module->tokens.ptr[10], TP_DUMP);
+	fclose(output);
+	st_check_not_null( strstr(output_ptr, "\"next\nline\"") );
+	
+	output = open_memstream(&output_ptr, &output_len);
+		token_print(output, &module->tokens.ptr[10], TP_INLINE_DUMP);
+	fclose(output);
+	st_check_not_null( strstr(output_ptr, "\"next\\nline\"") );
+}
+
 
 int main() {
 	st_run(test_samples);
+	st_run(test_print_functions);
 	return st_show_report();
 }

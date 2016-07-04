@@ -17,7 +17,7 @@ typedef struct {
 //
 static struct { const char* keyword; token_type_t type; } keywords[] = {
 	#define _ NULL
-	#define TOKEN(id, keyword, free_expr) { keyword, id },
+	#define TOKEN(id, keyword, ...) { keyword, id },
 	#include "token_spec.h"
 	#undef TOKEN
 	#undef _
@@ -374,7 +374,7 @@ void token_free(token_p token) {
 	token_p t = token;
 	switch(token->type) {
 		#define _
-		#define TOKEN(id, keyword, free_expr) case id: free_expr; break;
+		#define TOKEN(id, keyword, free_expr, ...) case id: free_expr; break;
 		#include "token_spec.h"
 		#undef TOKEN
 		#undef _
@@ -395,4 +395,116 @@ int token_col(module_p module, token_p token) {
 	for(char* c = token->source.ptr; *c != '\n' && c >= module->source.ptr; c--)
 		col++;
 	return col;
+}
+
+
+
+//
+// Token printing functions
+//
+
+static void token_print_escaped_str(FILE* stream, const str_t str) {
+	for(int i = 0; i < str.len && i < 20 && str.ptr[i] != '\0'; i++) {
+		switch(str.ptr[i]) {
+			case '\n':  fprintf(stream, "\\n");    break;
+			case '\t':  fprintf(stream, "\\t");    break;
+			default:    putc(str.ptr[i], stream);  break;
+		}
+	}
+}
+
+void token_print(FILE* stream, token_p token, uint32_t flags) {
+	if (flags & TP_SOURCE) {
+		fprintf(stream, "%.*s", token->source.len, token->source.ptr);
+	} else if ( (flags & TP_DUMP) || (flags & TP_INLINE_DUMP) ) {
+		// Handle tokens with variable content
+		switch(token->type) {
+			case T_COMMENT:
+				fprintf(stream, "comment(");
+				if (flags & TP_DUMP)
+					fprintf(stream, "%.*s", token->source.len, token->source.ptr);
+				else
+					token_print_escaped_str(stream, token->source);
+				fprintf(stream, ")");
+				return;
+			case T_WS:
+				fprintf(stream, "ws(\"");
+				if (flags & TP_DUMP)
+					fprintf(stream, "%.*s", token->source.len, token->source.ptr);
+				else
+					token_print_escaped_str(stream, token->source);
+				fprintf(stream, "\")");
+				return;
+			case T_WSNL:
+				fprintf(stream, "wsnl(\"");
+				if (flags & TP_DUMP)
+					fprintf(stream, "%.*s", token->source.len, token->source.ptr);
+				else
+					token_print_escaped_str(stream, token->source);
+				fprintf(stream, "\")");
+				return;
+			
+			case T_STR:
+				fprintf(stream, "str(\"");
+				if (flags & TP_DUMP)
+					fprintf(stream, "%.*s", token->str_val.len, token->str_val.ptr);
+				else
+					token_print_escaped_str(stream, token->str_val);
+				fprintf(stream, "\")");
+				return;
+			case T_INT:     fprintf(stream, "int(%ld)",    token->int_val);                          return;
+			case T_ID:      fprintf(stream, "id(%.*s)",    token->source.len, token->source.ptr);    return;
+			case T_ERROR:   fprintf(stream, "error(%.*s)", token->str_val.len, token->str_val.ptr);  return;
+			
+			default:
+				break;
+		}
+		
+		// Generate code for tokens that simply print a string
+		switch(token->type) {
+			#define _ NULL
+			// if(desc) fputs(desc, stream) doesn't work because of a compile time check that the first
+			// argument of fputs can't be NULL. Even if the if statement makes sure it isn't.
+			#define TOKEN(id, keyword, free_expr, desc, ...) case id: fputs(desc ? desc : "", stream); return;
+			#include "token_spec.h"
+			#undef TOKEN
+			#undef _
+			default:
+				break;
+		}
+		
+		fprintf(stderr, "token_print(): Unhandled token type! Please update the token spec or add printing code.\n");
+		abort();
+	}
+}
+
+void token_print_line(FILE* stream, module_p module, token_p token) {
+	if (token < module->tokens.ptr || token > module->tokens.ptr + module->tokens.len) {
+		fprintf(stderr, "token_print_line(): Specified token isn't part of the modules token list!\n");
+		abort();
+	}
+	
+	size_t index = token - module->tokens.ptr;
+	token_print_range(stream, module, index, 1);
+}
+
+void token_print_range(FILE* stream, module_p module, size_t token_start_idx, size_t token_count) {
+	token_p start_token = &module->tokens.ptr[token_start_idx];
+	token_p end_token = &module->tokens.ptr[token_start_idx + token_count];
+	
+	char* code_start = start_token->source.ptr;
+	char* code_end = end_token->source.ptr + end_token->source.len;
+	
+	char* line_start = code_start;
+	while (line_start > module->source.ptr && *(line_start-1) != '\n')
+		line_start--;
+	char* line_end = code_end;
+	while (*line_end != '\n' && line_end < module->source.ptr + module->source.len)
+		line_end++;
+	
+	fprintf(stream, "%.*s\e[1;4m%.*s\e[0m%.*s\n",
+		(int)(code_start - line_start), line_start,
+		(int)(code_end - code_start),   code_start,
+		(int)(line_end - code_end),     code_end
+	);
 }

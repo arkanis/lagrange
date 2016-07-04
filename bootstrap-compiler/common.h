@@ -49,7 +49,7 @@ typedef struct {
 // Tokenizer
 //
 
-#define TOKEN(id, keyword, free_expr) id,
+#define TOKEN(id, keyword, free_expr, desc) id,
 typedef enum {
 	#include "token_spec.h"
 } token_type_t;
@@ -74,8 +74,11 @@ int  token_col(module_p module, token_p token);
 #define TP_SOURCE      (1 << 0)  // print only source
 #define TP_DUMP        (1 << 1)  // print type and source
 #define TP_INLINE_DUMP (1 << 2)  // print type and escaped and shorted source to avoid line breaks in the output
-void token_print(FILE* stream, module_p module, token_p token, uint32_t flags);
+void token_print(FILE* stream, token_p token, uint32_t flags);
+
 void token_print_line(FILE* stream, module_p module, token_p token);
+void token_print_range(FILE* stream, module_p module, size_t token_start_idx, size_t token_count);
+
 
 /*
 
