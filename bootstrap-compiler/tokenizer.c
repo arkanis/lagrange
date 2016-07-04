@@ -77,7 +77,9 @@ static void append_token(tokenizer_ctx_p ctx, token_t token) {
 	list_append(ctx->tokens, token);
 }
 
-static void make_into_error_token(token_p token, char* message) {
+static void make_into_error_token(tokenizer_ctx_p ctx, token_p token, char* message) {
+	ctx->error_count++;
+	
 	token->type = T_ERROR;
 	token->str_val = str_from_c(message);
 }
@@ -87,6 +89,8 @@ static token_t new_error_token(tokenizer_ctx_p ctx, ssize_t start_offset, size_t
 		fprintf(ctx->error_stream, "The error token contains bytes outside of the source string!\n");
 		abort();
 	}
+	
+	ctx->error_count++;
 	
 	return (token_t){
 		.type    = T_ERROR,
@@ -267,7 +271,7 @@ static bool next_token(tokenizer_ctx_p ctx) {
 	
 	// Abort on any unknown char. Ignoring them will just get us surprised...
 	token_t t = new_token(ctx, T_ERROR, 1);
-	make_into_error_token(&t, "stray character in source code");
+	make_into_error_token(ctx, &t, "stray character in source code");
 	append_token(ctx, t);
 	return true;
 }
@@ -299,7 +303,7 @@ static void tokenize_nested_multiline_comment(tokenizer_ctx_p ctx) {
 			nesting_level++;
 			consume_into_token(ctx, &t, 2);
 		} else if ( peek1(ctx) == EOF ) {
-			make_into_error_token(&t, "unterminated multiline comment");
+			make_into_error_token(ctx, &t, "unterminated multiline comment");
 			break;
 		} else {
 			consume_into_token(ctx, &t, 1);
@@ -329,7 +333,7 @@ static void tokenize_string(tokenizer_ctx_p ctx) {
 				break;
 				
 			case EOF:
-				make_into_error_token(&t, "unterminated string");
+				make_into_error_token(ctx, &t, "unterminated string");
 				append_token(ctx, t);
 				return;
 			case '\\':
@@ -339,7 +343,7 @@ static void tokenize_string(tokenizer_ctx_p ctx) {
 				
 				switch(c) {
 					case EOF:
-						make_into_error_token(&t, "unterminated escape code in string");
+						make_into_error_token(ctx, &t, "unterminated escape code in string");
 						append_token(ctx, t);
 						return;
 					case '\\':
@@ -490,7 +494,7 @@ void token_print_line(FILE* stream, module_p module, token_p token) {
 
 void token_print_range(FILE* stream, module_p module, size_t token_start_idx, size_t token_count) {
 	token_p start_token = &module->tokens.ptr[token_start_idx];
-	token_p end_token = &module->tokens.ptr[token_start_idx + token_count];
+	token_p end_token = &module->tokens.ptr[token_start_idx + token_count - 1];
 	
 	char* code_start = start_token->source.ptr;
 	char* code_end = end_token->source.ptr + end_token->source.len;
