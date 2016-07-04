@@ -1,3 +1,4 @@
+lgc
 *.o
 tests/*_test
 tests/*.o

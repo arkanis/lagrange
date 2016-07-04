@@ -1,5 +1,7 @@
 CFLAGS = -std=c99 -g -Werror -Wall -Wextra -Wno-unused-parameter -Wno-unused-function
 
+lgc: utils.o tokenizer.o
+
 tests/utils_test: tests/utils_test.c utils.o
 tests/asm_test: tests/asm_test.c asm.o tests/disassembler_utils.o
 tests/tokenizer_test: tests/tokenizer_test.c tokenizer.o utils.o
