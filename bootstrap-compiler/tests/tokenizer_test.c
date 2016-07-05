@@ -260,9 +260,16 @@ void test_print_functions() {
 	st_check_not_null( strstr(output_ptr, "\"next\\nline\"") );
 }
 
+void test_token_type_name() {
+	st_check_str( token_type_name(T_COMMENT), "T_COMMENT" );
+	st_check_str( token_type_name(T_SL_ASSIGN), "T_SL_ASSIGN" );
+	st_check_str( token_type_name(T_EOF), "T_EOF" );
+}
+
 
 int main() {
 	st_run(test_samples);
 	st_run(test_print_functions);
+	st_run(test_token_type_name);
 	return st_show_report();
 }

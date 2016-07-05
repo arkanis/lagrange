@@ -512,3 +512,14 @@ void token_print_range(FILE* stream, module_p module, size_t token_start_idx, si
 		(int)(line_end - code_end),     code_end
 	);
 }
+
+
+char* token_type_names[] = {
+	#define TOKEN(id, keyword, free_expr, desc) #id,
+	#include "token_spec.h"
+	#undef TOKEN
+};
+
+char* token_type_name(token_type_t type) {
+	return token_type_names[type];
+}
