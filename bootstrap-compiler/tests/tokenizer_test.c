@@ -197,7 +197,7 @@ struct { char* code; size_t tokens_len; token_p tokens_ptr; } samples[] = {
 void test_samples() {
 	for(size_t i = 0; i < sizeof(samples) / sizeof(samples[0]); i++) {
 		char* code = samples[i].code;
-		printf("test: %s\n", code);
+		//printf("test: %s\n", code);
 		
 		token_list_t tokens = { 0 };
 		tokenize(str_from_c(code), &tokens, stderr);

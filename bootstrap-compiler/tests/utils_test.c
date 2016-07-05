@@ -94,10 +94,10 @@ void test_list_shift() {
 // Not zero-terminated strings
 //
 
-void test_str_new_and_free() {
+void test_str_from_mem_and_free() {
 	char* s = "xyz";
 	
-	str_t str = str_new(s, 3);
+	str_t str = str_from_mem(s, 3);
 	st_check_int(str.len, 3);
 	st_check(str.ptr == s);
 	
@@ -113,7 +113,7 @@ void test_str_new_and_free() {
 	s[0] = 'a';
 	s[1] = 'b';
 	
-	str = str_new(s, 2);
+	str = str_from_mem(s, 2);
 	st_check_int(str.len, 2);
 	st_check(str.ptr == s);
 	
@@ -193,7 +193,7 @@ int main() {
 	st_run(test_list_resize);
 	st_run(test_list_append);
 	st_run(test_list_shift);
-	st_run(test_str_new_and_free);
+	st_run(test_str_from_mem_and_free);
 	st_run(test_str_putc);
 	st_run(test_str_eq_and_eqc);
 	st_run(test_str_fload);

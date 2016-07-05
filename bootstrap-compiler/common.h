@@ -31,10 +31,9 @@ compiler: reg allocator
 
 typedef struct token_s  token_t, *token_p;
 typedef list_t(token_t) token_list_t, *token_list_p;
-/*
 typedef struct node_s   node_t, *node_p;
-typedef struct type_s   type_t, *type_p;
-*/
+//typedef struct type_s   type_t, *type_p;
+
 typedef struct {
 	char* filename;
 	str_t source;
@@ -79,8 +78,6 @@ void token_print(FILE* stream, token_p token, uint32_t flags);
 void token_print_line(FILE* stream, module_p module, token_p token);
 void token_print_range(FILE* stream, module_p module, size_t token_start_idx, size_t token_count);
 
-
-/*
 
 //
 // Parsing
@@ -217,8 +214,10 @@ void node_print(node_p node, FILE* output);
 void node_print_inline(node_p node, FILE* output);
 
 
-//for(ast_it_t it = ast_start(node); it != NULL; it = ast_next(node, it))
-//	foo(it.node);
+// Example:
+// 
+// for(ast_it_t it = ast_start(node); it.node != NULL; it = ast_next(node, it))
+//   foo(it.node);
 
 typedef struct {
 	ssize_t member_index;
@@ -228,5 +227,3 @@ typedef struct {
 
 ast_it_t ast_start(node_p node);
 ast_it_t ast_next(node_p node, ast_it_t it);
-
-*/
