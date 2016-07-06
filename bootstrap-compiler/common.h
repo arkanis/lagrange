@@ -78,6 +78,7 @@ void  token_print(FILE* stream, token_p token, uint32_t flags);
 void  token_print_line(FILE* stream, module_p module, token_p token);
 void  token_print_range(FILE* stream, module_p module, size_t token_start_idx, size_t token_count);
 char* token_type_name(token_type_t type);
+char* token_desc(token_type_t type);
 
 
 

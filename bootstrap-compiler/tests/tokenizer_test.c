@@ -266,10 +266,19 @@ void test_token_type_name() {
 	st_check_str( token_type_name(T_EOF), "T_EOF" );
 }
 
+void test_token_desc() {
+	st_check_str( token_desc(T_SL_ASSIGN), "<<="   );
+	st_check_str( token_desc(T_COMMA),     "comma" );
+	st_check_str( token_desc(T_FUNC),      "func"  );
+	st_check_null( token_desc(T_COMMENT) );
+	st_check_null( token_desc(T_ID) );
+}
+
 
 int main() {
 	st_run(test_samples);
 	st_run(test_print_functions);
 	st_run(test_token_type_name);
+	st_run(test_token_desc);
 	return st_show_report();
 }

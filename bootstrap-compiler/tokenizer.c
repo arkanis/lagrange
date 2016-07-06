@@ -523,3 +523,15 @@ char* token_type_names[] = {
 char* token_type_name(token_type_t type) {
 	return token_type_names[type];
 }
+
+char* token_descs[] = {
+	#define _ NULL
+	#define TOKEN(id, keyword, free_expr, desc, ...) desc,
+	#include "token_spec.h"
+	#undef TOKEN
+	#undef _
+};
+
+char* token_desc(token_type_t type) {
+	return token_descs[type];
+}

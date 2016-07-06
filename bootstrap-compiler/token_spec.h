@@ -12,11 +12,11 @@ TOKEN(T_STR,            _,        str_free(&t->str_val), _ )
 TOKEN(T_INT,            _,        _,                     _ )
 TOKEN(T_ID,             _,        _,                     _ )
 
-TOKEN(T_CBO,            _,        _,                     "{" )
-TOKEN(T_CBC,            _,        _,                     "}" )
-TOKEN(T_RBO,            _,        _,                     "(" )
-TOKEN(T_RBC,            _,        _,                     ")" )
-TOKEN(T_COMMA,          _,        _,                     "," )
+TOKEN(T_CBO,            _,        _,                     "{"     )
+TOKEN(T_CBC,            _,        _,                     "}"     )
+TOKEN(T_RBO,            _,        _,                     "("     )
+TOKEN(T_RBC,            _,        _,                     ")"     )
+TOKEN(T_COMMA,          _,        _,                     "comma" )
 	
 // Tokens for unary and binary operators
 TOKEN(T_ADD,            _,        _,                     "+"  )
