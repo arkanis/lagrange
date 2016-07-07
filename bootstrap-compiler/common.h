@@ -89,7 +89,7 @@ char* token_desc(token_type_t type);
 typedef struct parser_s parser_t, *parser_p;
 typedef node_p (*parser_rule_func_t)(parser_p parser);
 
-node_p parse(module_p module, parser_rule_func_t rule);
+node_p parse(module_p module, parser_rule_func_t rule, FILE* error_stream);
 
 node_p parse_module(parser_p parser);
 node_p parse_stmt(parser_p parser);

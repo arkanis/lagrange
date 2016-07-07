@@ -4,7 +4,7 @@ TESTS  = $(patsubst %.c,%,$(wildcard tests/*_test.c))
 all: tests lgc
 
 # Lagrange compiler binary
-lgc: utils.o tokenizer.o
+lgc: utils.o tokenizer.o parser.o
 
 # Tests
 tests: $(TESTS)

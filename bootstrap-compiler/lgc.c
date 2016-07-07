@@ -31,6 +31,7 @@ int main(int argc, char** argv) {
 		goto cleanup_tokenizer;
 	}
 	
+	// Print tokens
 	for(size_t i = 0; i < module->tokens.len; i++) {
 		token_p t = &module->tokens.ptr[i];
 		if (t->type == T_COMMENT || t->type == T_WS) {
@@ -44,6 +45,10 @@ int main(int argc, char** argv) {
 		}
 	}
 	printf("\n");
+	
+	// Step 2 - Parse tokens into an AST
+	node_p node = parse(module, parse_module, stderr);
+	printf("node: %p\n", node);
 	
 	
 	cleanup_tokenizer:
