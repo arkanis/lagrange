@@ -168,7 +168,7 @@ typedef struct {
 // List of module types
 //
 
-#define BEGIN(nn)               NT_##nn,
+#define BEGIN(nn, NN)           NT_##NN,
 #define MEMBER(nn, mn, ct, mt)  
 #define END(nn)                 
 
@@ -185,7 +185,7 @@ typedef enum {
 // Node definitions
 //
 
-#define BEGIN(nn)               struct {
+#define BEGIN(nn, NN)           struct {
 #define MEMBER(nn, mn, ct, mt)  	ct mn;
 #define END(nn)                 } nn;
 

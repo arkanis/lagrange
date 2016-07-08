@@ -4,7 +4,7 @@
 // Node specs
 //
 
-#define BEGIN(nn)               [ NT_##nn ] = &(node_spec_t){  \
+#define BEGIN(nn, NN)           [ NT_##NN ] = &(node_spec_t){  \
                                     #nn, (member_spec_t[]){
 #define MEMBER(nn, mn, ct, mt)  	    { mt, offsetof(node_t, nn.mn), #mn },
 #define END(nn)                         { 0 }  \

@@ -1,9 +1,9 @@
-BEGIN(module)
+BEGIN(module, MODULE)
 	MEMBER(module, defs, node_list_t, MT_NODE_LIST)
 	MEMBER(module, ns,   node_ns_t,   MT_NS)
 END(module)
 
-BEGIN(func)
+BEGIN(func, FUNC)
 	MEMBER(func, name, str_t,       MT_STR)
 	MEMBER(func, in,   node_list_t, MT_NODE_LIST)
 	MEMBER(func, out,  node_list_t, MT_NODE_LIST)
