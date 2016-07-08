@@ -92,7 +92,7 @@ typedef node_p (*parser_rule_func_t)(parser_p parser);
 node_p parse(module_p module, parser_rule_func_t rule, FILE* error_stream);
 
 node_p parse_module(parser_p parser);
-node_p parse_stmt(parser_p parser);
+node_p parse_func_def(parser_p parser);
 node_p parse_expr(parser_p parser);
 
 
@@ -123,10 +123,7 @@ typedef struct {
 // Node list
 //
 
-typedef struct {
-	size_t len;
-	node_p* ptr;
-} node_list_t, *node_list_p;
+typedef list_t(node_p) node_list_t, *node_list_p;
 
 void node_list_append(node_list_p list, node_p node);
 void node_list_replace_n1(node_list_p list, size_t start_idx, size_t hole_len, node_p replacement_node);
@@ -193,6 +190,8 @@ struct node_s {
 	node_type_t type;
 	node_spec_p spec;
 	node_p parent;
+	
+	list_t(token_t) tokens;
 	
 	union {
 		#include "ast_spec.h"

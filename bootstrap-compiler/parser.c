@@ -141,18 +141,90 @@ node_p parse(module_p module, parser_rule_func_t rule, FILE* error_stream) {
 // Parser rules
 //
 
+void parse_stmts(parser_p parser, node_p parent, node_list_p list);
+
+
 node_p parse_module(parser_p parser) {
-	printf("parse_module\n");
-	while ( ! try(parser, T_EOF) ) {
+	node_p node = node_alloc(NT_MODULE);
+	node->tokens = parser->module->tokens;
+	
+	while ( ! try_consume(parser, T_EOF) ) {
+		node_p def = NULL;
+		
 		if ( try(parser, T_FUNC) ) {
-			printf("got func!\n");
-		} else if ( try(parser, T_AND) ) {
-			printf("got and!\n");
+			def = parse_func_def(parser);
 		} else {
-			parser_error(parser, "You can only define functions, types or meta code in a module");
-			return NULL;
+			parser_error(parser, NULL);
+			return node;
 		}
+		
+		node_append(node, &node->module.defs, def);
 	}
 	
-	return NULL;
+	return node;
 }
+
+
+//
+// Definitions
+//
+
+node_p parse_func_def(parser_p parser) {
+	node_p node = node_alloc(NT_FUNC);
+	
+	consume_type(parser, T_FUNC);
+	node->func.name = consume_type(parser, T_ID)->src;
+	
+	token_p t = NULL;
+	if ( (t = try_consume(parser, T_IN)) || (t = try_consume(parser, T_OUT)) ) {
+		node_list_p arg_list = NULL;
+		if ( t->type == T_IN )
+			arg_list = &node->func.in;
+		else if ( t->type == T_OUT )
+			arg_list = &node->func.out;
+		else
+			abort();
+		
+		consume_type(parser, T_RBO);
+		while ( !try(parser, T_RBC) ) {
+			node_p arg = node_alloc(NT_ARG);
+			
+			t = consume_type(parser, T_ID);
+			node_p type_expr = node_alloc_set(NT_ID, arg, &arg->arg.type_expr);
+			type_expr->id.name = t->src;
+			
+			// Set the arg name if we got an ID after the type. Otherwise leave
+			// the arg unnamed (nulled out)
+			if ( try(parser, T_ID) )
+				arg->arg.name = consume_type(parser, T_ID)->src;
+			
+			node_append(node, arg_list, arg);
+			
+			if ( !try_consume(parser, T_COMMA) )
+				break;
+		}
+		consume_type(parser, T_RBC);
+		
+	} else if ( try_consume(parser, T_CBO) ) {
+		parse_stmts(parser, node, &node->func.body);
+		consume_type(parser, T_CBC);
+	} else if ( try_consume(parser, T_DO) ) {
+		parse_stmts(parser, node, &node->func.body);
+		consume_type(parser, T_END);
+	}
+	
+	return node;
+}
+
+void parse_stmts(parser_p parser, node_p parent, node_list_p list) {
+	while ( try_stmt_start(parser) ) {
+		node_p stmt = parse_stmt(parser);
+		node_append(parent, &list, stmt);
+	}
+}
+
+
+//
+// Expressions
+//
+
