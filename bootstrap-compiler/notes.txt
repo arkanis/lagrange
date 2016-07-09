@@ -13,7 +13,7 @@ x Add try(token_type_t) → token_p function to the parser support code:
 	
 	This is what we want to show the user in the error message. :)
 x Rework grammar: stick to basics for now
-- Make sure try() doesn't add the same token twice for the same position	
+x Make sure try() doesn't add the same token twice for the same position	
 - Write down complete grammar
 	- Stick with the var keyword:
 	  "var" type-expr ID ( "=" expr )? [ "," type-expr ID ( "=" expr )? ]

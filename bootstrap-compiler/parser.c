@@ -73,7 +73,16 @@ static void parser_error(parser_p parser, const char* message) {
 }
 
 static token_p try(parser_p parser, token_type_t type) {
-	list_append(&parser->tried_token_types, type);
+	bool already_tried = false;
+	for(size_t i = 0; i < parser->tried_token_types.len; i++) {
+		if (parser->tried_token_types.ptr[i] == type) {
+			already_tried = true;
+			break;
+		}
+	}
+	
+	if (!already_tried)
+		list_append(&parser->tried_token_types, type);
 	
 	token_p token = next_filtered_token(parser);
 	if (token && token->type == type)
