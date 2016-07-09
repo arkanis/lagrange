@@ -1,0 +1,29 @@
+# ToDo
+
+x Add try(token_type_t) → token_p function to the parser support code:
+	
+	Use a try(token_type_t) function in the parser instead of peek_type().
+	When it's possible to use this everywhere the parser can automatically
+	present the user a list of expected tokens at the position the parser
+	failed:
+	
+	- Every time try() is called it remembers the expected token.
+	- When a token is consumed the list is cleared.
+	- When the parser failes the list contains all tried tokens at the current position.
+	
+	This is what we want to show the user in the error message. :)
+x Rework grammar: stick to basics for now
+- Make sure try() doesn't add the same token twice for the same position	
+- Write down complete grammar
+	- Stick with the var keyword:
+	  "var" type-expr ID ( "=" expr )? [ "," type-expr ID ( "=" expr )? ]
+- Port entire grammar
+- Add token range to AST nodes and support functions:
+	- Add token list to AST nodes
+	- Add to AST node creation functions
+	- Create an parser_error() function that prints the tokens we're at
+	- Create a node_error() function that prints the nodes tokens and an error.
+	  Usefull to emit errors in passes.
+- Write a node_error() function thats like parser_error() but for AST processing.
+  It just shows the first line of the AST nodes tokens. Otherwise we would get
+  huge error messages on function nodes and the like.
