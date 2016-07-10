@@ -14,7 +14,11 @@ x Add try(token_type_t) → token_p function to the parser support code:
 	This is what we want to show the user in the error message. :)
 x Rework grammar: stick to basics for now
 x Make sure try() doesn't add the same token twice for the same position	
-- Write down complete grammar (see syntax/2016-07-09.txt)
+x Write down complete grammar (see syntax/2016-07-09.txt)
+x Change eos behaviour of try(): Ignore line breaks unless try(T_WSNL).
+x Change error message format of parser_error(): expected a, b, c after x. This
+  way we don't need to write down what the next token the parser got. Avoids the
+  problem if we should ignore new lines or not when finding the next token.
 - Port entire grammar
 - Add token range to AST nodes and support functions:
 	- Add token list to AST nodes
