@@ -32,7 +32,7 @@ compiler: reg allocator
 typedef struct token_s  token_t, *token_p;
 typedef list_t(token_t) token_list_t, *token_list_p;
 typedef struct node_s   node_t, *node_p;
-//typedef struct type_s   type_t, *type_p;
+typedef struct type_s   type_t, *type_p;
 
 typedef struct {
 	char* filename;
