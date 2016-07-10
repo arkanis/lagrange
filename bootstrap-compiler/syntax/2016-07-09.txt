@@ -1,0 +1,185 @@
+# Changes
+
+- Refactoring of parser and grammar
+- Adding typed variable definitions
+- Adding function calls without paras (since it affects var defs)
+
+Not handled:
+
+- Function calls with blocks (e.g. necessary to handle while statement as
+  function call).
+- General syntax for structure definitions (leading group of IDs, general
+  modifier syntax).
+
+
+# Grammar
+
+module  = [ def ]
+def     = "func" ID [ def-mod ] "{" [ stmt ] "}"
+def-mod = ( "in" | "out" )  "(" ID ID? [ "," ID ID? ] ")"
+
+// cexpr short for chainable expression: expr with known end and no operators
+// To be more exact: No user defined operators that can be an ID.
+cexpr = ID
+        INTL
+        STRL
+        "(" expr ")"
+        unary_op cexpr
+        cexpr "(" ( expr [ "," expr ] )? ")"
+        cexpr "[" ( expr [ "," expr ] )? "]"
+        cexpr "." cexpr
+expr  = cexpr ( expr [ "," expr ] )?
+        cexpr [ binary_op cexpr ]
+
+unary_op  = + - not ~
+binary_op = ID * / %  + - << >> < <= > >= == != & ^ | and or = *= /= %= += -= <<= >>= &= ^= |=
+  // since "while" and "if" are keywords the ID doesn't match the modifier
+  // syntax for the while and if statements.
+
+
+block   = "{"  [ stmt ] "}"
+          "do" [ stmt ] "end"
+
+stmt = block
+       "while" expr "do" [ stmt ] "end"
+                    "{"  [ stmt ] "}"
+                    WSNL [ stmt ] "end"  // check as last alternative, see problem (1)
+       "if" expr "do" [ stmt ]     ( "else"     [ stmt ] )? "end"
+                 "{"  [ stmt ] "}" ( "else" "{" [ stmt ] "}" )?
+                 WSNL [ stmt ]     ( "else"     [ stmt ] )? "end"  // check as last alternative, see problem (1)
+       expr "while" expr
+       expr "if" expr
+       expr eos
+
+eos  = EOF
+       WSNL
+       ";"
+       only-peek: "}"    // because of block and stmt bodies
+       only-peek: "end"  // because of block and stmt bodies
+
+
+Impact on existing grammar:
+
+- syscall statement becomes an expr (function call)
+
+
+# Rationale: Syntax for if and while
+
+Long-term goal is to make while a function call without paras and one block:
+
+  while a < 10 do      while a < 10 {
+    a += 1               a += 1
+  end                  }
+
+PROBLEM: "do" or "{" unnecessary because of line break. But "{" should be there
+for consitency.
+PROBLEM: Syntax doesn't work well for just one statement. Use modifiers instead.
+
+CONSEQUENCE: Abandon long-term goal and keep while statement in grammar. Add
+special rules to make "do" optional. Add modifier syntax for one statement bodies.
+
+  while a < 10         while (a < 10)  // won't work, no way to tell the end of
+    a += 1               a += 1        // the body
+  end                  
+  
+  a += 1 while a < 10
+
+PROBLEM: How to avoid that the C style one statement version that won't work
+screws up the source code without the user noticing?
+
+SOLUTION: Add a compiler pass that checks for this situation and uses the
+indentation to diagnose the error.
+
+
+Applying the same rules to the if statement:
+
+  if a < 10 [ do ]           if a < 10 {
+    a += 1                     a += 1
+  else                       } else {
+    a -= 1                     a -= 1
+  end                        }
+  
+  if a < 10 [ do ]           if a < 10 {
+    a += 1                     a += 1
+  end                        }
+  
+  if a < 10 do a += 1 end    if a < 10 { a += 1 }
+  
+  a += 1 if a < 10
+
+Same rules again for while statement:
+
+  while a < 10 [ do ]           while a < 10 {
+    a += 1                        a += 1
+  end                           }
+  
+  while a < 10 do a += 1 end    while a < 10 { a += 1 }
+  
+  a += 1 while a < 10
+
+PROBLEM (1): When block starts in next line...
+
+  while a < 10
+  {
+  	a += 1
+  }
+
+This must not be parsed as a while statemtn where the first node of the body is
+a new scope and the "end" is missing:
+
+  while a < 10
+    {
+    	a += 1
+    }
+  end  // missing!
+
+CONSEQUENCE: First check for "do" and "{" ignoring new lines. Only when they're
+not found check for an WSNL.
+
+
+# Rationale: Ways to deal with variable definitions
+
+a) Stick with the var keyword
+
+  "var" type-expr ID ( "=" expr )? [ "," type-expr ID ( "=" expr )? ]
+
+b) Alternative: Backtracking or try_rule() function
+
+BUT: Can't differ between simple var definition and function call without paras
+and one arg:
+
+  int x  → var x of type int, pattern: ID ID WSNL
+  foo x  → foo(x),            pattern: ID ID WSNL
+
+Maybe better to get var definitions through sematics: Look for function calls
+with one argument and without paras where the function evals to a type. Then add
+a pass that replaces these patterns with var definition nodes.
+
+BUT: How to handle more complex var definitions?
+
+  ptr(int.le) x = address(a), y = b.address
+  ptr(int.le)(x = address(a), y = b.address)
+
+Matches pattern of function calls without paras where each argument is an
+assignment. Matches quite well actually.
+
+PLAN: Create a call-or-var node when the parser finds that pattern. A later pass
+then resolves these nodes to either var definition nodes or call nodes. Rules
+for var definitions:
+
+- Function slot expression has to resolve to a type. Probably compile time
+  execution of expression. For a start a fixed set of IDs would do the job, too.
+- Arguments can be IDs or op nodes with an assignment operator. But the left
+  side of the op node has to be a single ID. Mismatch results in a compiler error.
+
+
+## Tricky details
+
+a) How do we know if the function slot has to be executed at compile time?
+
+Probably by the normal rules: If compile time stuff is references it needs to be
+run at compile time.
+
+  ptr(int) x  → ptr is a meta function → expression is run a compile time
+  foo x       → foo is a normal function → expression is compiled (runs at run time)
+  int x       → int is a compile time/meta variable → expression is run a compile time
