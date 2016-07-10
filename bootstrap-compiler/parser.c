@@ -137,7 +137,7 @@ node_p parse(module_p module, parser_rule_func_t rule, FILE* error_stream) {
 	return node;
 }
 
-
+/*
 
 //
 // Parser rules
@@ -175,7 +175,7 @@ node_p parse_func_def(parser_p parser) {
 	node_p node = node_alloc(NT_FUNC);
 	
 	consume_type(parser, T_FUNC);
-	node->func.name = consume_type(parser, T_ID)->src;
+	node->func.name = consume_type(parser, T_ID)->source;
 	
 	token_p t = NULL;
 	if ( (t = try_consume(parser, T_IN)) || (t = try_consume(parser, T_OUT)) ) {
@@ -221,12 +221,33 @@ node_p parse_func_def(parser_p parser) {
 void parse_stmts(parser_p parser, node_p parent, node_list_p list) {
 	while ( try_stmt_start(parser) ) {
 		node_p stmt = parse_stmt(parser);
-		node_append(parent, &list, stmt);
+		node_append(parent, list, stmt);
 	}
 }
 
+*/
 
 //
 // Expressions
 //
 
+node_p parse_expr(parser_p parser) {
+	token_p t = NULL;
+	node_p node = NULL;
+	
+	if ( (t = try_consume(parser, T_ID)) ) {
+		node = node_alloc(NT_ID);
+		node->id.name = t->source;
+	} else if ( (t = try_consume(parser, T_INT)) ) {
+		node = node_alloc(NT_INTL);
+		node->intl.value = t->int_val;
+	} else if ( (t = try_consume(parser, T_STR)) ) {
+		node = node_alloc(NT_STRL);
+		node->strl.value = t->str_val;
+	} else {
+		parser_error(parser, NULL);
+		abort();
+	}
+	
+	return node;
+}

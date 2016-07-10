@@ -19,6 +19,10 @@ x Change eos behaviour of try(): Ignore line breaks unless try(T_WSNL).
 x Change error message format of parser_error(): expected a, b, c after x. This
   way we don't need to write down what the next token the parser got. Avoids the
   problem if we should ignore new lines or not when finding the next token.
+- Start of with a simple parser test case
+	x Write very simple version of parse_expr() that parses string and int literals
+	- Refactor AST allocation and printing functions
+	- Write simple automated test case for parsing
 - Port entire grammar
 - Add token range to AST nodes and support functions:
 	- Add token list to AST nodes
