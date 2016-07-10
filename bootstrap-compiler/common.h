@@ -191,7 +191,7 @@ struct node_s {
 	node_spec_p spec;
 	node_p parent;
 	
-	list_t(token_t) tokens;
+	token_list_t tokens;
 	
 	union {
 		#include "ast_spec.h"
