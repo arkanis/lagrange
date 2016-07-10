@@ -8,18 +8,13 @@
 struct parser_s {
 	module_p module;
 	size_t   pos;
-	bool     at_possible_eos;
 	
 	list_t(token_type_t) tried_token_types;
 	FILE* error_stream;
 };
 
 
-static void at_possible_eos(parser_p parser) {
-	parser->at_possible_eos = true;
-}
-
-static token_p next_filtered_token(parser_p parser) {
+static token_p next_filtered_token(parser_p parser, bool ignore_line_breaks) {
 	size_t pos = parser->pos;
 	while (pos < parser->module->tokens.len) {
 		token_p token = &parser->module->tokens.ptr[pos];
@@ -28,9 +23,8 @@ static token_p next_filtered_token(parser_p parser) {
 		// Skip whitespace and comment tokens
 		if ( token->type == T_WS || token->type == T_COMMENT )
 			continue;
-		// Also skip whitespaces with newlines if we're not at a possible end
-		// of statement.
-		if ( token->type == T_WSNL && !parser->at_possible_eos )
+		// Also skip whitespaces with newlines if we're told to do so
+		if ( token->type == T_WSNL && ignore_line_breaks )
 			continue;
 		
 		// Return the first token we didn't skip
@@ -42,7 +36,7 @@ static token_p next_filtered_token(parser_p parser) {
 }
 
 static void parser_error(parser_p parser, const char* message) {
-	token_p token = next_filtered_token(parser);
+	token_p token = &parser->module->tokens.ptr[parser->pos];
 	fprintf(parser->error_stream, "%s:%d:%d: ", parser->module->filename,
 		token_line(parser->module, token),
 		token_col(parser->module, token)
@@ -64,7 +58,7 @@ static void parser_error(parser_p parser, const char* message) {
 			fputs(",", parser->error_stream);
 	}
 	
-	fputs(" got ", parser->error_stream);
+	fputs(" after ", parser->error_stream);
 	token_print(parser->error_stream, token, TP_INLINE_DUMP);
 	fputs("\n", parser->error_stream);
 	
@@ -84,7 +78,7 @@ static token_p try(parser_p parser, token_type_t type) {
 	if (!already_tried)
 		list_append(&parser->tried_token_types, type);
 	
-	token_p token = next_filtered_token(parser);
+	token_p token = next_filtered_token(parser, (type == T_WSNL) ? false : true);
 	if (token && token->type == type)
 		return token;
 	return NULL;
@@ -102,9 +96,8 @@ static token_p consume(parser_p parser, token_p token) {
 		abort();
 	}
 	
-	// Advance parser position and clear eos flag and tried token types
+	// Advance parser position and clear tried token types
 	parser->pos = index + 1;
-	parser->at_possible_eos = false;
 	list_destroy(&parser->tried_token_types);
 	
 	return token;
