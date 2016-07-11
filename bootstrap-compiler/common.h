@@ -125,8 +125,7 @@ typedef struct {
 
 typedef list_t(node_p) node_list_t, *node_list_p;
 
-void node_list_append(node_list_p list, node_p node);
-void node_list_replace_n1(node_list_p list, size_t start_idx, size_t hole_len, node_p replacement_node);
+void node_list_replace_range_with_one(node_list_p list, size_t start_idx, size_t hole_len, node_p replacement_node);
 
 
 //

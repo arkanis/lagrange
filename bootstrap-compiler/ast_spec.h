@@ -62,8 +62,8 @@ BEGIN(if_stmt, IF_STMT)
 END(if_stmt)
 
 BEGIN(while_stmt, WHILE_STMT)
-	MEMBER(if_stmt, cond, node_p, MT_NODE)
-	MEMBER(if_stmt, body, node_p, MT_NODE)
+	MEMBER(while_stmt, cond, node_p, MT_NODE)
+	MEMBER(while_stmt, body, node_p, MT_NODE)
 END(while_stmt)
 
 BEGIN(return_stmt, RETURN_STMT)

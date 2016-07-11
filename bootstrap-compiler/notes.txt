@@ -21,7 +21,7 @@ x Change error message format of parser_error(): expected a, b, c after x. This
   problem if we should ignore new lines or not when finding the next token.
 - Start of with a simple parser test case
 	x Write very simple version of parse_expr() that parses string and int literals
-	- Refactor AST allocation and printing functions
+	x Refactor AST allocation and printing functions
 	- Write simple automated test case for parsing
 - Port entire grammar
 - Add token range to AST nodes and support functions:
@@ -33,3 +33,5 @@ x Change error message format of parser_error(): expected a, b, c after x. This
 - Write a node_error() function thats like parser_error() but for AST processing.
   It just shows the first line of the AST nodes tokens. Otherwise we would get
   huge error messages on function nodes and the like.
+- Reenalble namespaces calls node_alloc(), node_print_recursive()
+- Reenalble type calls in node_print_recursive(), node_print_inline()
