@@ -47,8 +47,8 @@ int main(int argc, char** argv) {
 	printf("\n");
 	
 	// Step 2 - Parse tokens into an AST
-	node_p node = parse(module, parse_module, stderr);
-	printf("node: %p\n", node);
+	node_p node = parse(module, parse_expr, stderr);
+	node_print(node, stdout);
 	
 	
 	cleanup_tokenizer:

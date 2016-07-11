@@ -90,8 +90,10 @@ static token_p consume(parser_p parser, token_p token) {
 		abort();
 	}
 	
+	// Since index is unsigned negative indices will wrap around to very large
+	// indices that are out of bounds, too. So the next if catches them as well.
 	size_t index = token - parser->module->tokens.ptr;
-	if ( index < parser->module->tokens.len ) {
+	if ( index >= parser->module->tokens.len ) {
 		fprintf(stderr, "consume(): Token not part of the currently parsed module!\n");
 		abort();
 	}
