@@ -10,9 +10,10 @@ lgc: utils.o tokenizer.o parser.o ast.o
 tests: $(TESTS)
 	$(foreach test,$(TESTS),$(shell $(test)))
 
-tests/utils_test: tests/utils_test.c utils.o
-tests/asm_test: tests/asm_test.c asm.o tests/disassembler_utils.o
-tests/tokenizer_test: tests/tokenizer_test.c tokenizer.o utils.o
+tests/utils_test: utils.o
+tests/asm_test: asm.o tests/disassembler_utils.o
+tests/tokenizer_test: tokenizer.o utils.o
+tests/parser_test: tokenizer.o parser.o ast.o utils.o
 
 
 # clean target for all directories, ensures that the ignore files are properly maintained.
