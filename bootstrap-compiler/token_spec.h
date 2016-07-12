@@ -16,6 +16,8 @@ TOKEN(T_CBO,            _,        _,                     "{"     )
 TOKEN(T_CBC,            _,        _,                     "}"     )
 TOKEN(T_RBO,            _,        _,                     "("     )
 TOKEN(T_RBC,            _,        _,                     ")"     )
+TOKEN(T_SBO,            _,        _,                     "["     )
+TOKEN(T_SBC,            _,        _,                     "]"     )
 TOKEN(T_COMMA,          _,        _,                     "comma" )
 	
 // Tokens for unary and binary operators
