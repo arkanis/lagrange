@@ -98,7 +98,7 @@
 		s single
 		d double
 		q quad (quadruple)
-		o ??? (octuple)
+		o oct (octuple)
 
 
 # Source code structure
@@ -468,6 +468,17 @@ expr_wto  = ID
 expr      = expr_wto [ binary_op expr_wto ]
 unary_op  = + - not ~
 binary_op = ID . * / %  + - << >> < <= > >= == != & ^ | and or = *= /= %= += -= <<= >>= &= ^= |=
+
+
+## Refactoring
+
+module   = [ def ]
+def      = "function" ID [ modifier ] body
+modifier = ID "(" ( arg_list_def |  ) ")"
+body     = "{"  [ stmt ] "}"
+         = "do" [ stmt ] "end"
+
+arg_list_def = ( ID ID? [ "," ID ID? ] )?
 
 
 
