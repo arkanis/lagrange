@@ -119,9 +119,23 @@ BEGIN(op, OP)
 	MEMBER(op, type,  type_p, MT_TYPE)
 END(op)
 
-BEGIN(call, CALL)
-	MEMBER(call, name, str_t,       MT_STR)
-	MEMBER(call, args, node_list_t, MT_NODE_LIST)
+BEGIN(member, MEMBER)
+	MEMBER(member, aggregate, node_p, MT_NODE)
+	MEMBER(member, member,    str_t,  MT_STR)
 	
-	MEMBER(call, type, type_p,      MT_TYPE)
+	MEMBER(member, type,      type_p, MT_TYPE)
+END(member)
+
+BEGIN(call, CALL)
+	MEMBER(call, target_expr, node_p,      MT_NODE)
+	MEMBER(call, args,        node_list_t, MT_NODE_LIST)
+	
+	MEMBER(call, type,        type_p,      MT_TYPE)
 END(call)
+
+BEGIN(index, INDEX)
+	MEMBER(index, target_expr, node_p,      MT_NODE)
+	MEMBER(index, args,        node_list_t, MT_NODE_LIST)
+	
+	MEMBER(index, type,        type_p,      MT_TYPE)
+END(index)

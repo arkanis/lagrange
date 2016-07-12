@@ -133,6 +133,7 @@ node_p parse(module_p module, parser_rule_func_t rule, FILE* error_stream) {
 	};
 	
 	node_p node = rule(&parser);
+	consume_type(&parser, T_EOF);
 	
 	list_destroy(&parser.tried_token_types);
 	parser.error_stream = NULL;
@@ -250,12 +251,13 @@ node_p parse_cexpr(parser_p parser) {
 		node = parse_expr(parser);
 		consume_type(parser, T_RBC);
 	
-	// Cases for binary operators
+	// cexpr = unary_op cexpr
 	#define UNARY_OP(token, id, name)                     \
 		} else if ( (t = try_consume(parser, token)) ) {  \
 			node = node_alloc(NT_UNARY_OP);               \
 			node->unary_op.index = id;                    \
-			node->unary_op.arg = parse_cexpr(parser);
+			node_p arg = parse_cexpr(parser);             \
+			node_set(node, &node->unary_op.arg, arg);
 	#include "op_spec.h"
 	
 	} else {
@@ -263,9 +265,61 @@ node_p parse_cexpr(parser_p parser) {
 		abort();
 	}
 	
+	// One complete cexpr parsed, now process the trailing stuff.
+	// Since we can chain together any number of cexpr with that trailing stuff
+	// (we're left recursive) we have to do this in a loop here.
+	while (true) {
+		if ( (t = try_consume(parser, T_RBO)) ) {
+			// cexpr = cexpr "(" ( expr [ "," expr ] )? ")"
+			node_p target_expr = node;
+			node = node_alloc(NT_CALL);
+			node_set(node, &node->call.target_expr, target_expr);
+			
+			if ( !try(parser, T_RBC) ) {
+				node_p expr = parse_expr(parser);
+				node_append(node, &node->call.args, expr);
+				
+				while ( try_consume(parser, T_COMMA) ) {
+					expr = parse_expr(parser);
+					node_append(node, &node->call.args, expr);
+				}
+			}
+			
+			consume_type(parser, T_RBC);
+		} else if ( (t = try_consume(parser, T_SBO)) ) {
+			// cexpr "[" ( expr [ "," expr ] )? "]"
+			node_p target_expr = node;
+			node = node_alloc(NT_INDEX);
+			node_set(node, &node->index.target_expr, target_expr);
+			
+			if ( !try(parser, T_SBC) ) {
+				node_p expr = parse_expr(parser);
+				node_append(node, &node->index.args, expr);
+				
+				while ( try_consume(parser, T_COMMA) ) {
+					expr = parse_expr(parser);
+					node_append(node, &node->index.args, expr);
+				}
+			}
+			
+			consume_type(parser, T_SBC);
+		} else if ( (t = try_consume(parser, T_PERIOD)) ) {
+			// cexpr "." ID
+			node_p aggregate = node;
+			node = node_alloc(NT_MEMBER);
+			node_set(node, &node->member.aggregate, aggregate);
+			node->member.member = consume_type(parser, T_ID)->source;
+		} else {
+			break;
+		}
+	}
+	
 	return node;
 }
 
 node_p parse_expr(parser_p parser) {
-	return parse_cexpr(parser);
+	node_p cexpr = parse_cexpr(parser);
+	// expr  = cexpr ( expr [ "," expr ] )?
+	// expr  = cexpr [ binary_op cexpr ]
+	return cexpr;
 }

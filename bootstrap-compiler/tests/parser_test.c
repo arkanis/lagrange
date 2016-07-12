@@ -9,6 +9,9 @@
 
 
 struct { parser_rule_func_t rule; char* code; char* expected_ast_dump; } samples[] = {
+	//
+	// cexpr: literals
+	//
 	{ parse_expr, "foo",
 		"id: \"foo\"\n"
 		"  type: \n"
@@ -32,6 +35,9 @@ struct { parser_rule_func_t rule; char* code; char* expected_ast_dump; } samples
 	},
 	//{ parse_expr, "(17", NULL },
 	
+	//
+	// cexpr: unary operators
+	//
 	{ parse_expr, "+17",
 		"unary_op: 0\n"
 		"  arg: intl: 17\n"
@@ -60,6 +66,99 @@ struct { parser_rule_func_t rule; char* code; char* expected_ast_dump; } samples
 		"unary_op: 3\n"
 		"  arg: id: \"foo\"\n"
 		"    type: \n"
+		"  type: \n"
+	},
+	
+	//
+	// cexpr: function calls with parenthesis
+	//
+	{ parse_expr, "foo(0, \"bar\", x)",
+		"call: \n"
+		"  target_expr: id: \"foo\"\n"
+		"    type: \n"
+		"  args[0]: intl: 0\n"
+		"    type: \n"
+		"  args[1]: strl: \"bar\"\n"
+		"    type: \n"
+		"  args[2]: id: \"x\"\n"
+		"    type: \n"
+		"  type: \n"
+	},
+	{ parse_expr, "foo()",
+		"call: \n"
+		"  target_expr: id: \"foo\"\n"
+		"    type: \n"
+		"  type: \n"
+	},
+	{ parse_expr, "foo(1)(2)",
+		"call: \n"
+		"  target_expr: call: \n"
+		"    target_expr: id: \"foo\"\n"
+		"      type: \n"
+		"    args[0]: intl: 1\n"
+		"      type: \n"
+		"    type: \n"
+		"  args[0]: intl: 2\n"
+		"    type: \n"
+		"  type: \n"
+	},
+	
+	//
+	// Index access
+	//
+	{ parse_expr, "foo[0, \"bar\", x]",
+		"index: \n"
+		"  target_expr: id: \"foo\"\n"
+		"    type: \n"
+		"  args[0]: intl: 0\n"
+		"    type: \n"
+		"  args[1]: strl: \"bar\"\n"
+		"    type: \n"
+		"  args[2]: id: \"x\"\n"
+		"    type: \n"
+		"  type: \n"
+	},
+	{ parse_expr, "foo[]",
+		"index: \n"
+		"  target_expr: id: \"foo\"\n"
+		"    type: \n"
+		"  type: \n"
+	},
+	{ parse_expr, "foo[1](2)",
+		"call: \n"
+		"  target_expr: index: \n"
+		"    target_expr: id: \"foo\"\n"
+		"      type: \n"
+		"    args[0]: intl: 1\n"
+		"      type: \n"
+		"    type: \n"
+		"  args[0]: intl: 2\n"
+		"    type: \n"
+		"  type: \n"
+	},
+	
+	//
+	// Member access
+	//
+	{ parse_expr, "foo.bar",
+		"member: \n"
+		"  aggregate: id: \"foo\"\n"
+		"    type: \n"
+		"  member: \"bar\"\n"
+		"  type: \n"
+	},
+	{ parse_expr, "foo().bar[].x",
+		"member: \n"
+		"  aggregate: index: \n"
+		"    target_expr: member: \n"
+		"      aggregate: call: \n"
+		"        target_expr: id: \"foo\"\n"
+		"          type: \n"
+		"        type: \n"
+		"      member: \"bar\"\n"
+		"      type: \n"
+		"    type: \n"
+		"  member: \"x\"\n"
 		"  type: \n"
 	},
 };
