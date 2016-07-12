@@ -233,3 +233,18 @@ typedef struct {
 
 ast_it_t ast_start(node_p node);
 ast_it_t ast_next(node_p node, ast_it_t it);
+
+
+//
+// Operators
+//
+
+typedef enum {
+	#define UNARY_OP(token, id, name) id,
+	#include "op_spec.h"
+} unary_op_type_t;
+
+typedef enum {
+	#define BINARY_OP(token, id, name) id,
+	#include "op_spec.h"
+} binary_op_type_t;

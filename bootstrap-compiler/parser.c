@@ -233,7 +233,7 @@ void parse_stmts(parser_p parser, node_p parent, node_list_p list) {
 // Expressions
 //
 
-node_p parse_expr(parser_p parser) {
+node_p parse_cexpr(parser_p parser) {
 	token_p t = NULL;
 	node_p node = NULL;
 	
@@ -246,10 +246,26 @@ node_p parse_expr(parser_p parser) {
 	} else if ( (t = try_consume(parser, T_STR)) ) {
 		node = node_alloc(NT_STRL);
 		node->strl.value = t->str_val;
+	} else if ( (t = try_consume(parser, T_RBO)) ) {
+		node = parse_expr(parser);
+		consume_type(parser, T_RBC);
+	
+	// Cases for binary operators
+	#define UNARY_OP(token, id, name)                     \
+		} else if ( (t = try_consume(parser, token)) ) {  \
+			node = node_alloc(NT_UNARY_OP);               \
+			node->unary_op.index = id;                    \
+			node->unary_op.arg = parse_cexpr(parser);
+	#include "op_spec.h"
+	
 	} else {
 		parser_error(parser, NULL);
 		abort();
 	}
 	
 	return node;
+}
+
+node_p parse_expr(parser_p parser) {
+	return parse_cexpr(parser);
 }

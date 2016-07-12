@@ -21,6 +21,47 @@ struct { parser_rule_func_t rule; char* code; char* expected_ast_dump; } samples
 		"strl: \"str\"\n"
 		"  type: \n"
 	},
+	
+	{ parse_expr, "(17)",
+		"intl: 17\n"
+		"  type: \n"
+	},
+	{ parse_expr, " \n ( \n 17 \n ) \n ",
+		"intl: 17\n"
+		"  type: \n"
+	},
+	//{ parse_expr, "(17", NULL },
+	
+	{ parse_expr, "+17",
+		"unary_op: 0\n"
+		"  arg: intl: 17\n"
+		"    type: \n"
+		"  type: \n"
+	},
+	{ parse_expr, "-17",
+		"unary_op: 1\n"
+		"  arg: intl: 17\n"
+		"    type: \n"
+		"  type: \n"
+	},
+	{ parse_expr, "!foo",
+		"unary_op: 2\n"
+		"  arg: id: \"foo\"\n"
+		"    type: \n"
+		"  type: \n"
+	},
+	{ parse_expr, "~foo",
+		"unary_op: 3\n"
+		"  arg: id: \"foo\"\n"
+		"    type: \n"
+		"  type: \n"
+	},
+	{ parse_expr, " \n ~ \n foo \n ",
+		"unary_op: 3\n"
+		"  arg: id: \"foo\"\n"
+		"    type: \n"
+		"  type: \n"
+	},
 };
 
 void test_samples() {
