@@ -39,12 +39,12 @@ TOKEN(T_GE,             _,        _,                     ">="  )
 TOKEN(T_SR,             _,        _,                     ">>"  )
 TOKEN(T_SR_ASSIGN,      _,        _,                     ">>=" )
 
-TOKEN(T_BIN_AND,        _,        _,                     "&"  )
-TOKEN(T_BIN_AND_ASSIGN, _,        _,                     "&=" )  // && becomes T_AND
-TOKEN(T_BIN_OR,         _,        _,                     "|"  )
-TOKEN(T_BIN_OR_ASSIGN,  _,        _,                     "|=" )  // || becomes T_OR
-TOKEN(T_BIN_XOR,        _,        _,                     "^"  )
-TOKEN(T_BIN_XOR_ASSIGN, _,        _,                     "^=" )
+TOKEN(T_BIT_AND,        _,        _,                     "&"  )
+TOKEN(T_BIT_AND_ASSIGN, _,        _,                     "&=" )  // && becomes T_AND
+TOKEN(T_BIT_OR,         _,        _,                     "|"  )
+TOKEN(T_BIT_OR_ASSIGN,  _,        _,                     "|=" )  // || becomes T_OR
+TOKEN(T_BIT_XOR,        _,        _,                     "^"  )
+TOKEN(T_BIT_XOR_ASSIGN, _,        _,                     "^=" )
 
 TOKEN(T_ASSIGN,         _,        _,                     "="  )
 TOKEN(T_EQ,             _,        _,                     "==" )

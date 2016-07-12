@@ -191,19 +191,19 @@ static bool next_token(tokenizer_ctx_p ctx) {
 		case '&':
 			switch(c2) {
 				case '&':  append_token(ctx, new_token(ctx, T_AND, 2));             return true;
-				case '=':  append_token(ctx, new_token(ctx, T_BIN_AND_ASSIGN, 2));  return true;
-				default:   append_token(ctx, new_token(ctx, T_BIN_AND, 1));         return true;
+				case '=':  append_token(ctx, new_token(ctx, T_BIT_AND_ASSIGN, 2));  return true;
+				default:   append_token(ctx, new_token(ctx, T_BIT_AND, 1));         return true;
 			}
 		case '|':
 			switch(c2) {
 				case '|':  append_token(ctx, new_token(ctx, T_OR, 2));             return true;
-				case '=':  append_token(ctx, new_token(ctx, T_BIN_OR_ASSIGN, 2));  return true;
-				default:   append_token(ctx, new_token(ctx, T_BIN_OR, 1));         return true;
+				case '=':  append_token(ctx, new_token(ctx, T_BIT_OR_ASSIGN, 2));  return true;
+				default:   append_token(ctx, new_token(ctx, T_BIT_OR, 1));         return true;
 			}
 		case '^':
 			switch(c2) {
-				case '=':  append_token(ctx, new_token(ctx, T_BIN_XOR_ASSIGN, 2));  return true;
-				default:   append_token(ctx, new_token(ctx, T_BIN_XOR, 1));         return true;
+				case '=':  append_token(ctx, new_token(ctx, T_BIT_XOR_ASSIGN, 2));  return true;
+				default:   append_token(ctx, new_token(ctx, T_BIT_XOR, 1));         return true;
 			}
 		
 		case '=':
