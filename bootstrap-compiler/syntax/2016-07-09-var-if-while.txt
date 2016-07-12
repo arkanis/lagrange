@@ -33,7 +33,7 @@ cexpr = ID
         unary_op cexpr
         cexpr "(" ( expr [ "," expr ] )? ")"
         cexpr "[" ( expr [ "," expr ] )? "]"
-        cexpr "." cexpr
+        cexpr "." ID
 expr  = cexpr ( expr [ "," expr ] )?
         cexpr [ binary_op cexpr ]
 
