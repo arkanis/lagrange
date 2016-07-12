@@ -1,18 +1,24 @@
-# Changes
+Changes
+=======
 
 - Refactoring of parser and grammar
-- Adding typed variable definitions
-- Adding function calls without paras (since it affects var defs)
+- Adding typed variable definitions and function calls without paras.
+  Both become the same node type in the parser. A later pass then decides what
+  it is based on the thing in the first slot (a type or function).
 
 Not handled:
 
-- Function calls with blocks (e.g. necessary to handle while statement as
-  function call).
+- Function calls with blocks.
 - General syntax for structure definitions (leading group of IDs, general
   modifier syntax).
 
+Impact on existing grammar:
 
-# Grammar
+- syscall statement becomes a normal expr (an function call)
+
+
+Grammar
+=======
 
 module  = [ def ]
 def     = "func" ID [ def-mod ] "{" [ stmt ] "}"
@@ -58,12 +64,8 @@ eos  = EOF
        only-peek: "end"  // because of block and stmt bodies
 
 
-Impact on existing grammar:
-
-- syscall statement becomes an expr (function call)
-
-
-# Rationale: Syntax for if and while
+Rationale: Syntax for if and while
+==================================
 
 Long-term goal is to make while a function call without paras and one block:
 
@@ -124,7 +126,7 @@ PROBLEM (1): When block starts in next line...
   	a += 1
   }
 
-This must not be parsed as a while statemtn where the first node of the body is
+This must not be parsed as a while statement where the first node of the body is
 a new scope and the "end" is missing:
 
   while a < 10
@@ -137,13 +139,14 @@ CONSEQUENCE: First check for "do" and "{" ignoring new lines. Only when they're
 not found check for an WSNL.
 
 
-# Rationale: Ways to deal with variable definitions
+Rationale: Ways to deal with variable definitions
+=================================================
 
 a) Stick with the var keyword
 
   "var" type-expr ID ( "=" expr )? [ "," type-expr ID ( "=" expr )? ]
 
-b) Alternative: Backtracking or try_rule() function
+b) Backtracking or try_rule() function
 
 BUT: Can't differ between simple var definition and function call without paras
 and one arg:
@@ -151,9 +154,11 @@ and one arg:
   int x  → var x of type int, pattern: ID ID WSNL
   foo x  → foo(x),            pattern: ID ID WSNL
 
-Maybe better to get var definitions through sematics: Look for function calls
-with one argument and without paras where the function evals to a type. Then add
-a pass that replaces these patterns with var definition nodes.
+c) Get var definitions through type of first slot
+
+Look for function calls with one argument and without paras where the function
+evals to a type. Then add a pass that replaces these patterns with var
+definition nodes.
 
 BUT: How to handle more complex var definitions?
 
@@ -173,11 +178,12 @@ for var definitions:
   side of the op node has to be a single ID. Mismatch results in a compiler error.
 
 
-## Tricky details
+Tricky details
+--------------
 
 a) How do we know if the function slot has to be executed at compile time?
 
-Probably by the normal rules: If compile time stuff is references it needs to be
+Probably by the normal rules: If compile time stuff is referenced it needs to be
 run at compile time.
 
   ptr(int) x  → ptr is a meta function → expression is run a compile time
