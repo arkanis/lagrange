@@ -1,3 +1,12 @@
+# General sources
+
+Eli Bendersky's website
+	http://eli.thegreenplace.net/
+	Pretty deep stuff about language design (expression problem) and low-level stuff (assembler, linux environment, etc.).
+
+
+# Compiler sources
+
 Creating a C-like language parser in C/C++
 	http://ubuntuforums.org/showthread.php?t=1141982
 	Especially the later posts put hand-written parsers into perspective: They're used by almost every compiler.
@@ -27,6 +36,9 @@ Earley Parsing Explained
 	http://loup-vaillant.fr/tutorials/earley-parsing/
 	Easy but very powerful.
 
+Easy to read grammar of C
+	http://www.cs.dartmouth.edu/~mckeeman/cs48/references/c.html
+
 
 # Magic integer division
 
@@ -45,3 +57,73 @@ How can I reverse optimized integer division/modulo by constant operations?
 libdivide
 	http://libdivide.com/
 	Runtime implementation of magic integer division.
+
+
+# Linux runtime environment
+
+About ELF Auxiliary Vectors
+	http://articles.manugarg.com/aboutelfauxiliaryvectors
+	The way Linux passes command line arguments, environment variables and additional information to a new process.
+
+getauxval - retrieve a value from the auxiliary vector
+	http://man7.org/linux/man-pages/man3/getauxval.3.html
+	C function to get an entry from the auxilliary vector
+
+Linux System Call Table for x86_64
+	http://blog.rchapman.org/post/36801038863/linux-system-call-table-for-x86-64
+	Numbers and arguments for the syscall instruction.
+
+How statically linked programs run on Linux 
+	http://eli.thegreenplace.net/2012/08/13/how-statically-linked-programs-run-on-linux
+	Not read yet, but looks like a pretty complete explaination.
+
+
+# Language design
+
+C Operator Precedence
+	http://en.cppreference.com/w/c/language/operator_precedence
+	Conceptual values for operator precendence. Actual precedence is hardwired into grammar.
+
+Search for a good name of integer 32 type
+	http://english.stackexchange.com/questions/264935/what-could-be-an-appropriate-word-in-between-long-lived-event-and-short-lived-ev
+	https://www.vocabulary.com/dictionary/long
+	https://www.vocabulary.com/dictionary/short
+
+
+# Low-level assembler
+
+The gen on function perilogues
+	http://homepage.ntlworld.com./jonathan.deboynepollard/FGA/function-perilogues.html
+	Very good explaination of the instructions needed for function perilogues.
+
+Stack frame layout on x86-64 
+	http://eli.thegreenplace.net/2011/09/06/stack-frame-layout-on-x86-64/
+	Nice pictures showing what a function call does.
+
+Calling Conventions
+	http://wiki.osdev.org/Calling_Conventions
+	Nice overview but it DOESN'T show the syscall calling convention.
+
+Why does Windows64 use a different calling convention from all other OSes on x86-64?
+	http://stackoverflow.com/questions/4429398/why-does-windows64-use-a-different-calling-convention-from-all-other-oses-on-x86
+	Good insights into why the x86_64 calling convention is like it is.
+
+ARM to C calling convention, registers to save
+	http://stackoverflow.com/questions/261419/arm-to-c-calling-convention-registers-to-save
+	Starting point for ARM calling convention.
+
+Basic Assembler Debugging with GDB - or - you thought you only needed to know C/C++?
+	http://dbp-consulting.com/tutorials/debugging/basicAsmDebuggingGDB.html
+
+Using gdb for Assembly Language Debugging
+	http://www.csee.umbc.edu/~cpatel2/links/310/nasm/gdb_help.shtml
+
+
+# Railroad diagram tools
+
+Tool for generating railroad diagram used on json.org [closed]
+	http://stackoverflow.com/questions/796824/tool-for-generating-railroad-diagram-used-on-json-org
+	List of tools that can be used to create Railroad diagrams.
+
+http://bottlecaps.de/rr/ui
+	Online tool to generate Railroad diagrams out of EBNF grammars. Very useful.
