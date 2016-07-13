@@ -5,6 +5,10 @@ Changes
 - Adding typed variable definitions and function calls without paras.
   Both become the same node type in the parser. A later pass then decides what
   it is based on the thing in the first slot (a type or function).
+- Naming: Function calls without parenthesis are now called "free calls". Just
+  to make it easier to write about them.
+- UNFINISHED: Found no solution to differ free function calls from binary
+  expressions.
 
 Not handled:
 
@@ -25,7 +29,8 @@ def     = "func" ID [ def-mod ] "{" [ stmt ] "}"
 def-mod = ( "in" | "out" )  "(" ID ID? [ "," ID ID? ] ")"
 
 // cexpr short for chainable expression: expr with known end and no operators
-// To be more exact: No user defined operators that can be an ID.
+// To be more exact: No user defined operators that can be an ID. In theory we
+// could put all operators with explicit tokens into cexpr.
 cexpr = ID
         INTL
         STRL
@@ -34,8 +39,9 @@ cexpr = ID
         cexpr "(" ( expr [ "," expr ] )? ")"
         cexpr "[" ( expr [ "," expr ] )? "]"
         cexpr "." ID
-expr  = cexpr ( expr [ "," expr ] )?
-        cexpr [ binary_op cexpr ]
+bexpr = cexpr [ binary_op cexpr ]
+expr  = cexpr ( cexpr [ binary_op cexpr ] [ "," bexpr ] )?
+        bexpr
 
 unary_op  = + - not ~
 binary_op = ID * / %  + - << >> < <= > >= == != & ^ | and or = *= /= %= += -= <<= >>= &= ^= |=
@@ -189,3 +195,111 @@ run at compile time.
   ptr(int) x  → ptr is a meta function → expression is run a compile time
   foo x       → foo is a normal function → expression is compiled (runs at run time)
   int x       → int is a compile time/meta variable → expression is run a compile time
+
+
+Rationale: Free calls can't be nested
+=====================================
+
+PROBLEM: Right now one argument to a free call can be another free call. This
+won't work! We can't tell where the argument list of the child free call ends.
+Possible arguments should be cexpr or binary operators. Child call expressions
+need explicit parenthesis.
+
+SOLUTION: Revise grammar.
+
+  cexpr = ID
+          INTL
+          STRL
+          "(" expr ")"
+          unary_op cexpr
+          cexpr "(" ( expr [ "," expr ] )? ")"
+          cexpr "[" ( expr [ "," expr ] )? "]"
+          cexpr "." ID
+  bexpr = cexpr [ binary_op cexpr ]
+  expr  = cexpr ( cexpr [ binary_op cexpr ] [ "," bexpr ] )?
+          bexpr
+
+bexpr is short for binary expression and is a cexpr which can also contain all
+binary operators.
+
+
+Rationale: How to differ between free calls and a user defined binary op?
+=========================================================================
+
+Relevant part of the grammar:
+
+  cexpr = ID
+          INTL
+          STRL
+          "(" expr ")"
+          unary_op cexpr
+          cexpr "(" ( expr [ "," expr ] )? ")"
+          cexpr "[" ( expr [ "," expr ] )? "]"
+          cexpr "." ID
+  bexpr = cexpr [ binary_op cexpr ]
+  expr  = cexpr ( cexpr [ binary_op cexpr ] [ "," bexpr ] )?
+          cexpr [ binary_op cexpr ]  // expanded bexpr rule to make the problem more visible
+
+In the expr rule after parsing the first cexpr we have to decide if we have an
+binary operator (binary_op) or another cexpr.
+
+binary_op can be:     ID * / %  + - << >> < <= > >= == != & ^ | and or = *= /= %= += -= <<= >>= &= ^= |=
+cexpr can start with: ID INTL STRL (
+        and unary_op: + - not ~
+
+PROBLEM: Both alternatives can start with ID "+" and "-". For these tokens we
+have to figure out how to decide the correct case.
+
+Possible follow up tokens if the expr is a free call or a binary operator:
+
+free call: ... ID  "("  // for bracketed call
+                   "["  // for index access
+                   "."  // for member access
+                   ID   // user define binary op
+                   ...
+               "-" ID
+                   INTL
+                   STRL
+                   "("
+                   "-"
+                   "+"
+               "+" ID
+                   INTL
+                   STRL
+                   "("
+                   "-"
+                   "+"
+binary op: ... ID ID   // for variable reference
+                  "("  // for bracketed expr
+
+IDEA: Can't tell difference of an ID soup in parser. Throw IDs into an AST node
+resolved in a later pass where we know what is an operator, function and
+variable.
+
+PROBLEM: Figure out where that AST node should end. The problem can span
+multiple statements, e.g. telling the difference between:
+
+  foo x
+  bar
+  
+  x dot
+  y
+
+Is impossible without knowing that foo is a function and dot an operator.
+
+PROBLEM: Even worse depending on the alternative we have to ignore line breaks
+at different positions:
+
+  foo [nl is eos] x [nl is eos] bar
+  
+  x [nl is eos] dot [nl ignored] y
+
+IDEA: As soon as we get anything else than an ID we can decide which alternative
+to take (what about "+" and "-"?). Make a look ahead for the
+
+  ID ID WSNL
+
+token sequence to find the end. Not sure how I got that thought...
+
+IDEA: Look how Ruby solves the problem with "+" and "-". They haven't got user
+defined operators but maybe we can use the technique for them, too.
