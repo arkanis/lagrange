@@ -19,6 +19,11 @@ How to write a very basic compiler
 	http://programmers.stackexchange.com/questions/165543/how-to-write-a-very-basic-compiler
 	Good general tipps on writing your own compiler. Basically just what Gittinger did.
 
+Parsing Expressions by Recursive Descent
+	http://www.engr.mun.ca/~theo/Misc/exp_parsing.htm
+	Looks like a relativly short introcution into recursive descent grammars.
+	Might be worth a read.
+
 
 # Further resources not yet scanned
 
@@ -125,5 +130,6 @@ Tool for generating railroad diagram used on json.org [closed]
 	http://stackoverflow.com/questions/796824/tool-for-generating-railroad-diagram-used-on-json-org
 	List of tools that can be used to create Railroad diagrams.
 
-http://bottlecaps.de/rr/ui
+Railroad Diagram Generator
+	http://bottlecaps.de/rr/ui
 	Online tool to generate Railroad diagrams out of EBNF grammars. Very useful.
