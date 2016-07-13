@@ -303,3 +303,15 @@ token sequence to find the end. Not sure how I got that thought...
 
 IDEA: Look how Ruby solves the problem with "+" and "-". They haven't got user
 defined operators but maybe we can use the technique for them, too.
+
+Ruby source code: ruby/parse.y
+  https://github.com/ruby/ruby/blob/trunk/parse.y#L2219
+
+Place in the grammar where unary minus and plus are handled for some kind of
+expression. Might give a hint on how to solve it.
+
+Seems like Ruby somehow gets special tokens for unary plus and minus signs.
+
+SOLUTION (for "+" and "-"): Tell the tokenizer to differ between unary and
+binary minus with a simple look ahead. If "+" or "-" is followed by a whitespace
+it's binary, otherwise it's unary. Doesn't solve the ID case though.
