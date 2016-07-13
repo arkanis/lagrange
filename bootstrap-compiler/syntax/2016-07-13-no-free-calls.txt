@@ -3,6 +3,8 @@ Changes
 
 - Removed free function call syntax for now. This is just a bootstrap compiler,
   no need to get frustrated on one syntax aspect for to long.
+- Added explicit syntax for variable definition since it's no longer covered by
+  free function calls.
 
 
 Grammar
@@ -37,16 +39,58 @@ block   = "{"  [ stmt ] "}"
 stmt = block
        "while" expr "do" [ stmt ] "end"
                     "{"  [ stmt ] "}"
-                    WSNL [ stmt ] "end"  // check as last alternative, see problem (1)
+                    WSNL [ stmt ] "end"  // check as last alternative, see note 1
        "if" expr "do" [ stmt ]     ( "else"     [ stmt ] )? "end"
                  "{"  [ stmt ] "}" ( "else" "{" [ stmt ] "}" )?
-                 WSNL [ stmt ]     ( "else"     [ stmt ] )? "end"  // check as last alternative, see problem (1)
-       expr "while" expr
-       expr "if" expr
-       expr eos
+                 WSNL [ stmt ]     ( "else"     [ stmt ] )? "end"  // check as last alternative, see note 1
+       cexpr ID ( "=" expr )? [ "," ID ( "=" expr )? ]  // how to differ between ID and binary_op, see note 2
+       cexpr [ binary_op cexpr ] "while" expr eos
+                                 "if"    expr eos
+                                 eos
 
 eos  = EOF
        WSNL
        ";"
-       only-peek: "}"    // because of block and stmt bodies
-       only-peek: "end"  // because of block and stmt bodies
+       try-only: "}"    // because of block and stmt bodies
+       try-only: "end"  // because of block and stmt bodies
+
+
+Note 1: WSNL check on while and if statements
+=============================================
+
+When we generally ignore or accept a WSNL for a position we get some unexpected
+results when the block of a while or if statement starts in the next line:
+
+  while a < 10
+  {
+    a += 1
+  }
+
+This must not be parsed as a while statement where the first node of the body is
+a new scope and the "end" is missing:
+
+  while a < 10
+    {
+      a += 1
+    }
+  end  // missing!
+
+CONSEQUENCE: First check for "do" and "{" ignoring new lines. Only when they're
+not found check for an WSNL.
+
+
+Note 2: How to differ between ID and binary_op
+==============================================
+
+Use 2 token look ahead to detect variable definition:
+
+  ID "="  // var def with initializer
+  ID ","  // var def without initializer but following second var
+  ID eos  // single var def without initializer
+
+Or in rules:
+
+- Token after initial cexpr not an ID?  → has to be binary_op
+- Token after ID is an "=", "," or eos? → statement is var definition
+
+Best use a try_eos() function to check for all possible tokens of an eos.
