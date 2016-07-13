@@ -1,0 +1,52 @@
+Changes
+=======
+
+- Removed free function call syntax for now. This is just a bootstrap compiler,
+  no need to get frustrated on one syntax aspect for to long.
+
+
+Grammar
+=======
+
+module  = [ def ]
+def     = "func" ID [ def-mod ] "{" [ stmt ] "}"
+def-mod = ( "in" | "out" )  "(" ID ID? [ "," ID ID? ] ")"
+
+// cexpr short for chainable expression: expr with known end and no operators
+// To be more exact: No user defined operators that can be an ID. In theory we
+// could put all operators with explicit tokens into cexpr.
+cexpr = ID
+        INTL
+        STRL
+        "(" expr ")"
+        unary_op cexpr
+        cexpr "(" ( expr [ "," expr ] )? ")"
+        cexpr "[" ( expr [ "," expr ] )? "]"
+        cexpr "." ID
+expr  = cexpr [ binary_op cexpr ]
+
+unary_op  = + - not ~
+binary_op = ID * / %  + - << >> < <= > >= == != & ^ | and or = *= /= %= += -= <<= >>= &= ^= |=
+  // since "while" and "if" are keywords the ID doesn't match the modifier
+  // syntax for the while and if statements.
+
+
+block   = "{"  [ stmt ] "}"
+          "do" [ stmt ] "end"
+
+stmt = block
+       "while" expr "do" [ stmt ] "end"
+                    "{"  [ stmt ] "}"
+                    WSNL [ stmt ] "end"  // check as last alternative, see problem (1)
+       "if" expr "do" [ stmt ]     ( "else"     [ stmt ] )? "end"
+                 "{"  [ stmt ] "}" ( "else" "{" [ stmt ] "}" )?
+                 WSNL [ stmt ]     ( "else"     [ stmt ] )? "end"  // check as last alternative, see problem (1)
+       expr "while" expr
+       expr "if" expr
+       expr eos
+
+eos  = EOF
+       WSNL
+       ";"
+       only-peek: "}"    // because of block and stmt bodies
+       only-peek: "end"  // because of block and stmt bodies
