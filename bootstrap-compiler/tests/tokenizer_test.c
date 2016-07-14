@@ -189,6 +189,82 @@ struct { char* code; size_t tokens_len; token_p tokens_ptr; } samples[] = {
 		{ .type = T_EOF, .source = { 0, ""    } }
 	} },
 	
+	// Operators
+	{ " + += - -= * *= / /= % %= ", 22, (token_t[]){
+		{ .type = T_WS,         .source = { 1, " "  } },
+		{ .type = T_ADD,        .source = { 1, "+"  } },
+		{ .type = T_WS,         .source = { 1, " "  } },
+		{ .type = T_ADD_ASSIGN, .source = { 2, "+=" } },
+		{ .type = T_WS,         .source = { 1, " "  } },
+		{ .type = T_SUB,        .source = { 1, "-"  } },
+		{ .type = T_WS,         .source = { 1, " "  } },
+		{ .type = T_SUB_ASSIGN, .source = { 2, "-=" } },
+		{ .type = T_WS,         .source = { 1, " "  } },
+		{ .type = T_MUL,        .source = { 1, "*"  } },
+		{ .type = T_WS,         .source = { 1, " "  } },
+		{ .type = T_MUL_ASSIGN, .source = { 2, "*=" } },
+		{ .type = T_WS,         .source = { 1, " "  } },
+		{ .type = T_DIV,        .source = { 1, "/"  } },
+		{ .type = T_WS,         .source = { 1, " "  } },
+		{ .type = T_DIV_ASSIGN, .source = { 2, "/=" } },
+		{ .type = T_WS,         .source = { 1, " "  } },
+		{ .type = T_MOD,        .source = { 1, "%"  } },
+		{ .type = T_WS,         .source = { 1, " "  } },
+		{ .type = T_MOD_ASSIGN, .source = { 2, "%=" } },
+		{ .type = T_WS,         .source = { 1, " "  } },
+		{ .type = T_EOF,        .source = { 0, ""   } }
+	} },
+	{ " < <= << <<= > >= >> >>= ", 18, (token_t[]){
+		{ .type = T_WS,        .source = { 1, " "   } },
+		{ .type = T_LT,        .source = { 1, "<"   } },
+		{ .type = T_WS,        .source = { 1, " "   } },
+		{ .type = T_LE,        .source = { 2, "<="  } },
+		{ .type = T_WS,        .source = { 1, " "   } },
+		{ .type = T_SL,        .source = { 2, "<<"  } },
+		{ .type = T_WS,        .source = { 1, " "   } },
+		{ .type = T_SL_ASSIGN, .source = { 3, "<<=" } },
+		{ .type = T_WS,        .source = { 1, " "   } },
+		{ .type = T_GT,        .source = { 1, ">"   } },
+		{ .type = T_WS,        .source = { 1, " "   } },
+		{ .type = T_GE,        .source = { 2, ">="  } },
+		{ .type = T_WS,        .source = { 1, " "   } },
+		{ .type = T_SR,        .source = { 2, ">>"  } },
+		{ .type = T_WS,        .source = { 1, " "   } },
+		{ .type = T_SR_ASSIGN, .source = { 3, ">>=" } },
+		{ .type = T_WS,        .source = { 1, " "   } },
+		{ .type = T_EOF,       .source = { 0, ""    } }
+	} },
+	{ " & &= | |= ^ ^= ", 14, (token_t[]){
+		{ .type = T_WS,             .source = { 1, " "  } },
+		{ .type = T_BIT_AND,        .source = { 1, "&"  } },
+		{ .type = T_WS,             .source = { 1, " "  } },
+		{ .type = T_BIT_AND_ASSIGN, .source = { 2, "&=" } },
+		{ .type = T_WS,             .source = { 1, " "  } },
+		{ .type = T_BIT_OR,         .source = { 1, "|"  } },
+		{ .type = T_WS,             .source = { 1, " "  } },
+		{ .type = T_BIT_OR_ASSIGN,  .source = { 2, "|=" } },
+		{ .type = T_WS,             .source = { 1, " "  } },
+		{ .type = T_BIT_XOR,        .source = { 1, "^"  } },
+		{ .type = T_WS,             .source = { 1, " "  } },
+		{ .type = T_BIT_XOR_ASSIGN, .source = { 2, "^=" } },
+		{ .type = T_WS,             .source = { 1, " "  } },
+		{ .type = T_EOF,            .source = { 0, ""   } }
+	} },
+	{ " = == != . ~ ", 12, (token_t[]){
+		{ .type = T_WS,     .source = { 1, " "  } },
+		{ .type = T_ASSIGN, .source = { 1, "="  } },
+		{ .type = T_WS,     .source = { 1, " "  } },
+		{ .type = T_EQ,     .source = { 2, "==" } },
+		{ .type = T_WS,     .source = { 1, " "  } },
+		{ .type = T_NEQ,    .source = { 2, "!=" } },
+		{ .type = T_WS,     .source = { 1, " "  } },
+		{ .type = T_PERIOD, .source = { 1, "."  } },
+		{ .type = T_WS,     .source = { 1, " "  } },
+		{ .type = T_COMPL,  .source = { 1, "~"  } },
+		{ .type = T_WS,     .source = { 1, " "  } },
+		{ .type = T_EOF,    .source = { 0, ""   } }
+	} },
+	
 	// Unknown char error
 	{ " $ ", 4, (token_t[]){
 		{ .type = T_WS,    .source = { 1, " " } },
@@ -211,7 +287,8 @@ void test_samples() {
 			token_p actual_token = &tokens.ptr[j];
 			token_p expected_token = &samples[i].tokens_ptr[j];
 			
-			st_check_int(actual_token->type, expected_token->type);
+			st_check_msg(actual_token->type == expected_token->type, "got %s, expected %s",
+				token_type_name(actual_token->type), token_type_name(expected_token->type));
 			st_check_int(actual_token->source.len, expected_token->source.len);
 			st_check_strn(actual_token->source.ptr, expected_token->source.ptr, expected_token->source.len);
 			if (actual_token->type == T_INT) {

@@ -43,7 +43,7 @@ static int peek2(tokenizer_ctx_p ctx) {
 }
 
 static int peek3(tokenizer_ctx_p ctx) {
-	return peek_at_offset(ctx, 1);
+	return peek_at_offset(ctx, 2);
 }
 
 static token_t new_token(tokenizer_ctx_p ctx, token_type_t type, int chars_to_consume) {
