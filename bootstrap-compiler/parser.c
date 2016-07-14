@@ -114,8 +114,10 @@ static token_p try_consume(parser_p parser, token_type_t type) {
 
 static token_p consume_type(parser_p parser, token_type_t type) {
 	token_p token = try(parser, type);
-	if (!token)
+	if (!token) {
 		parser_error(parser, NULL);
+		abort();
+	}
 	return consume(parser, token);
 }
 
@@ -139,6 +141,16 @@ node_p parse(module_p module, parser_rule_func_t rule, FILE* error_stream) {
 	parser.error_stream = NULL;
 	return node;
 }
+
+
+
+//
+// Try functions for different rules
+//
+
+static token_p try_cexpr(parser_p parser);
+
+node_p parse_cexpr(parser_p parser);
 
 /*
 
@@ -231,8 +243,83 @@ void parse_stmts(parser_p parser, node_p parent, node_list_p list) {
 */
 
 //
+// Statements
+//
+
+static token_p try_stmt(parser_p parser) {
+	token_p t = NULL;
+	if      ( (t = try(parser, T_CBO))   ) return t;
+	else if ( (t = try(parser, T_DO))    ) return t;
+	else if ( (t = try(parser, T_WHILE)) ) return t;
+	else if ( (t = try(parser, T_IF))    ) return t;
+	else if ( (t = try_cexpr(parser))    ) return t;
+	
+	return NULL;
+}
+
+node_p parse_stmt(parser_p parser) {
+	token_p t = NULL;
+	node_p node = NULL;
+	
+	if ( (t = try_consume(parser, T_CBO)) || (t = try_consume(parser, T_DO)) ) {
+		// stmt = "{"  [ stmt ] "}"
+		//        "do" [ stmt ] "end"
+		node = node_alloc(NT_SCOPE);
+		
+		while ( try_stmt(parser) )
+			node_append(node, &node->scope.stmts, parse_stmt(parser) );
+		
+		consume_type(parser, (t->type == T_CBO) ? T_CBC : T_END);
+	} else if ( (t = try_consume(parser, T_WHILE)) ) {
+		// stmt = "while" expr "do" [ stmt ] "end"
+		//                     "{"  [ stmt ] "}"
+		//                     WSNL [ stmt ] "end"  // check as last alternative, see note 1
+		node = node_alloc(NT_WHILE_STMT);
+		node_p cond = parse_expr(parser);
+		node_set(node, &node->while_stmt.cond, cond);
+		
+		t = try_consume(parser, T_DO);
+		if (!t) t = try_consume(parser, T_CBO);
+		if (!t) t = try_consume(parser, T_WSNL);
+		if (!t) {
+			parser_error(parser, "while needs a block as body!");
+			abort();
+		}
+		
+		while ( try_stmt(parser) )
+			node_append(node, &node->while_stmt.body, parse_stmt(parser) );
+		
+		consume_type(parser, (t->type == T_DO || t->type == T_WSNL) ? T_END : T_CBC );
+	} else if ( try_cexpr(parser) ) {
+		// stmt = cexpr ...
+		// TODO: Implement var definition and binary ops (from expr)
+		node = parse_cexpr(parser);
+	} else {
+		parser_error(parser, NULL);
+		abort();
+	}
+	
+	return node;
+}
+
+
+
+//
 // Expressions
 //
+
+static token_p try_cexpr(parser_p parser) {
+	token_p t = NULL;
+	if      ( (t = try(parser, T_ID)) ) return t;
+	else if ( (t = try(parser, T_INT)) ) return t;
+	else if ( (t = try(parser, T_STR)) ) return t;
+	else if ( (t = try(parser, T_RBO)) ) return t;
+	#define UNARY_OP(token, id, name)  \
+		else if ( (t = try(parser, token)) ) return t;
+	#include "op_spec.h"
+	
+	return NULL;
+}
 
 node_p parse_cexpr(parser_p parser) {
 	token_p t = NULL;
@@ -317,7 +404,7 @@ node_p parse_cexpr(parser_p parser) {
 	return node;
 }
 
-token_p try_binary_op(parser_p parser) {
+static token_p try_binary_op(parser_p parser) {
 	token_p t = NULL;
 	if ( (t = try(parser, T_ID)) ) return t;
 	#define BINARY_OP(token, id, name)  \

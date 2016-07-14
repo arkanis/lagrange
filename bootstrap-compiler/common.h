@@ -93,6 +93,7 @@ node_p parse(module_p module, parser_rule_func_t rule, FILE* error_stream);
 
 node_p parse_module(parser_p parser);
 node_p parse_func_def(parser_p parser);
+node_p parse_stmt(parser_p parser);
 node_p parse_expr(parser_p parser);
 
 

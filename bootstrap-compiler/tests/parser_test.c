@@ -239,6 +239,139 @@ struct { parser_rule_func_t rule; char* code; char* expected_ast_dump; } samples
 		"      type: \n"
 		"    type: \n"
 	},
+	
+	//
+	// Statements: scope
+	//
+	{ parse_stmt, "{ x }",
+		"scope: \n"
+		"  stmts[0]: id: \"x\"\n"
+		"    type: \n"
+		"  ns: \n"
+	},
+	{ parse_stmt, "do x end",
+		"scope: \n"
+		"  stmts[0]: id: \"x\"\n"
+		"    type: \n"
+		"  ns: \n"
+	},
+	
+	//
+	// Statements: while
+	//
+	{ parse_stmt, "while x > 0 do dec(x) end",
+		"while_stmt: \n"
+		"  cond: uops: \n"
+		"    list[0]: id: \"x\"\n"
+		"      type: \n"
+		"    list[1]: id: \">\"\n"
+		"      type: \n"
+		"    list[2]: intl: 0\n"
+		"      type: \n"
+		"  body[0]: call: \n"
+		"    target_expr: id: \"dec\"\n"
+		"      type: \n"
+		"    args[0]: id: \"x\"\n"
+		"      type: \n"
+		"    type: \n"
+	},
+	{ parse_stmt, "while x > 0 { dec(x) }",
+		"while_stmt: \n"
+		"  cond: uops: \n"
+		"    list[0]: id: \"x\"\n"
+		"      type: \n"
+		"    list[1]: id: \">\"\n"
+		"      type: \n"
+		"    list[2]: intl: 0\n"
+		"      type: \n"
+		"  body[0]: call: \n"
+		"    target_expr: id: \"dec\"\n"
+		"      type: \n"
+		"    args[0]: id: \"x\"\n"
+		"      type: \n"
+		"    type: \n"
+	},
+	{ parse_stmt, "while x > 0 do \n dec(x) \n end",
+		"while_stmt: \n"
+		"  cond: uops: \n"
+		"    list[0]: id: \"x\"\n"
+		"      type: \n"
+		"    list[1]: id: \">\"\n"
+		"      type: \n"
+		"    list[2]: intl: 0\n"
+		"      type: \n"
+		"  body[0]: call: \n"
+		"    target_expr: id: \"dec\"\n"
+		"      type: \n"
+		"    args[0]: id: \"x\"\n"
+		"      type: \n"
+		"    type: \n"
+	},
+	{ parse_stmt, "while x > 0 { \n dec(x) \n }",
+		"while_stmt: \n"
+		"  cond: uops: \n"
+		"    list[0]: id: \"x\"\n"
+		"      type: \n"
+		"    list[1]: id: \">\"\n"
+		"      type: \n"
+		"    list[2]: intl: 0\n"
+		"      type: \n"
+		"  body[0]: call: \n"
+		"    target_expr: id: \"dec\"\n"
+		"      type: \n"
+		"    args[0]: id: \"x\"\n"
+		"      type: \n"
+		"    type: \n"
+	},
+	{ parse_stmt, "while x > 0 \n do \n dec(x) \n end",
+		"while_stmt: \n"
+		"  cond: uops: \n"
+		"    list[0]: id: \"x\"\n"
+		"      type: \n"
+		"    list[1]: id: \">\"\n"
+		"      type: \n"
+		"    list[2]: intl: 0\n"
+		"      type: \n"
+		"  body[0]: call: \n"
+		"    target_expr: id: \"dec\"\n"
+		"      type: \n"
+		"    args[0]: id: \"x\"\n"
+		"      type: \n"
+		"    type: \n"
+	},
+	{ parse_stmt, "while x > 0 \n { \n dec(x) \n }",
+		"while_stmt: \n"
+		"  cond: uops: \n"
+		"    list[0]: id: \"x\"\n"
+		"      type: \n"
+		"    list[1]: id: \">\"\n"
+		"      type: \n"
+		"    list[2]: intl: 0\n"
+		"      type: \n"
+		"  body[0]: call: \n"
+		"    target_expr: id: \"dec\"\n"
+		"      type: \n"
+		"    args[0]: id: \"x\"\n"
+		"      type: \n"
+		"    type: \n"
+	},
+	{ parse_stmt, "while x > 0 \n dec(x) \n end",
+		"while_stmt: \n"
+		"  cond: uops: \n"
+		"    list[0]: id: \"x\"\n"
+		"      type: \n"
+		"    list[1]: id: \">\"\n"
+		"      type: \n"
+		"    list[2]: intl: 0\n"
+		"      type: \n"
+		"  body[0]: call: \n"
+		"    target_expr: id: \"dec\"\n"
+		"      type: \n"
+		"    args[0]: id: \"x\"\n"
+		"      type: \n"
+		"    type: \n"
+	},
+	
 };
 
 void test_samples() {
