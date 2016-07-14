@@ -317,9 +317,40 @@ node_p parse_cexpr(parser_p parser) {
 	return node;
 }
 
+token_p try_binary_op(parser_p parser) {
+	token_p t = NULL;
+	if ( (t = try(parser, T_ID)) ) return t;
+	#define BINARY_OP(token, id, name)  \
+		else if ( (t = try(parser, token)) ) return t;
+	#include "op_spec.h"
+	
+	return NULL;
+}
+
 node_p parse_expr(parser_p parser) {
-	node_p cexpr = parse_cexpr(parser);
-	// expr  = cexpr ( expr [ "," expr ] )?
-	// expr  = cexpr [ binary_op cexpr ]
-	return cexpr;
+	// cexpr [ binary_op cexpr ]
+	node_p node = parse_cexpr(parser);
+	
+	token_p t = NULL;
+	if ( try_binary_op(parser) ) {
+		// Got an operator, wrap everything into an uops node and collect the
+		// remaining operators and expressions.
+		node_p cexpr = node;
+		node = node_alloc(NT_UOPS);
+		node_append(node, &node->uops.list, cexpr);
+		
+		while ( (t = try_binary_op(parser)) ) {
+			consume(parser, t);
+			
+			// TODO: Store the token in the node, the resolve uops pass can then
+			// look at the token to figure out which operator it was.
+			node_p op_node = node_alloc_append(NT_ID, node, &node->uops.list);
+			op_node->id.name = t->source;
+			
+			cexpr = parse_cexpr(parser);
+			node_append(node, &node->uops.list, cexpr);
+		}
+	}
+	
+	return node;
 }

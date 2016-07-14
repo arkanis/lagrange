@@ -104,7 +104,7 @@ struct { parser_rule_func_t rule; char* code; char* expected_ast_dump; } samples
 	},
 	
 	//
-	// Index access
+	// cexpr: index access
 	//
 	{ parse_expr, "foo[0, \"bar\", x]",
 		"index: \n"
@@ -138,7 +138,7 @@ struct { parser_rule_func_t rule; char* code; char* expected_ast_dump; } samples
 	},
 	
 	//
-	// Member access
+	// cexpr: member access
 	//
 	{ parse_expr, "foo.bar",
 		"member: \n"
@@ -160,6 +160,84 @@ struct { parser_rule_func_t rule; char* code; char* expected_ast_dump; } samples
 		"    type: \n"
 		"  member: \"x\"\n"
 		"  type: \n"
+	},
+	
+	//
+	// expr: binary operators
+	//
+	{ parse_expr, "foo + bar",
+		"uops: \n"
+		"  list[0]: id: \"foo\"\n"
+		"    type: \n"
+		"  list[1]: id: \"+\"\n"
+		"    type: \n"
+		"  list[2]: id: \"bar\"\n"
+		"    type: \n"
+	},
+	{ parse_expr, "foo * bar",
+		"uops: \n"
+		"  list[0]: id: \"foo\"\n"
+		"    type: \n"
+		"  list[1]: id: \"*\"\n"
+		"    type: \n"
+		"  list[2]: id: \"bar\"\n"
+		"    type: \n"
+	},
+	{ parse_expr, "foo ^= bar",
+		"uops: \n"
+		"  list[0]: id: \"foo\"\n"
+		"    type: \n"
+		"  list[1]: id: \"^=\"\n"
+		"    type: \n"
+		"  list[2]: id: \"bar\"\n"
+		"    type: \n"
+	},
+	{ parse_expr, "a + b * c = x <<= y",
+		"uops: \n"
+		"  list[0]: id: \"a\"\n"
+		"    type: \n"
+		"  list[1]: id: \"+\"\n"
+		"    type: \n"
+		"  list[2]: id: \"b\"\n"
+		"    type: \n"
+		"  list[3]: id: \"*\"\n"
+		"    type: \n"
+		"  list[4]: id: \"c\"\n"
+		"    type: \n"
+		"  list[5]: id: \"=\"\n"
+		"    type: \n"
+		"  list[6]: id: \"x\"\n"
+		"    type: \n"
+		"  list[7]: id: \"<<=\"\n"
+		"    type: \n"
+		"  list[8]: id: \"y\"\n"
+		"    type: \n"
+	},
+	{ parse_expr, "foo.x[0].y ^= bar(z.a)",
+		"uops: \n"
+		"  list[0]: member: \n"
+		"    aggregate: index: \n"
+		"      target_expr: member: \n"
+		"        aggregate: id: \"foo\"\n"
+		"          type: \n"
+		"        member: \"x\"\n"
+		"        type: \n"
+		"      args[0]: intl: 0\n"
+		"        type: \n"
+		"      type: \n"
+		"    member: \"y\"\n"
+		"    type: \n"
+		"  list[1]: id: \"^=\"\n"
+		"    type: \n"
+		"  list[2]: call: \n"
+		"    target_expr: id: \"bar\"\n"
+		"      type: \n"
+		"    args[0]: member: \n"
+		"      aggregate: id: \"z\"\n"
+		"        type: \n"
+		"      member: \"a\"\n"
+		"      type: \n"
+		"    type: \n"
 	},
 };
 
