@@ -149,8 +149,11 @@ node_p parse(module_p module, parser_rule_func_t rule, FILE* error_stream) {
 //
 
 static token_p try_cexpr(parser_p parser);
+static token_p try_eos(parser_p parser);
+static token_p consume_eos(parser_p parser);
 
 node_p parse_cexpr(parser_p parser);
+
 
 /*
 
@@ -302,6 +305,26 @@ node_p parse_stmt(parser_p parser) {
 	return node;
 }
 
+static token_p try_eos(parser_p parser) {
+	token_p t = NULL;
+	if      ( (t = try(parser, T_EOF))  ) return t;
+	else if ( (t = try(parser, T_SEMI)) ) return t;
+	else if ( (t = try(parser, T_CBC))  ) return t;
+	else if ( (t = try(parser, T_END))  ) return t;
+	else if ( (t = try(parser, T_WSNL)) ) return t;
+	return NULL;
+}
+
+static token_p consume_eos(parser_p parser) {
+	token_p t = NULL;
+	if      ( (t = try_consume(parser, T_EOF))  ) return t;
+	else if ( (t = try_consume(parser, T_SEMI)) ) return t;
+	else if ( (t = try(parser, T_CBC))          ) return t;
+	else if ( (t = try(parser, T_END))          ) return t;
+	else if ( (t = try_consume(parser, T_WSNL)) ) return t;
+	return NULL;
+}
+
 
 
 //
@@ -419,14 +442,14 @@ node_p parse_expr(parser_p parser) {
 	node_p node = parse_cexpr(parser);
 	
 	token_p t = NULL;
-	if ( try_binary_op(parser) ) {
+	if ( try_binary_op(parser) && !try_eos(parser) ) {
 		// Got an operator, wrap everything into an uops node and collect the
 		// remaining operators and expressions.
 		node_p cexpr = node;
 		node = node_alloc(NT_UOPS);
 		node_append(node, &node->uops.list, cexpr);
 		
-		while ( (t = try_binary_op(parser)) ) {
+		while ( (t = try_binary_op(parser)) && !try_eos(parser) ) {
 			consume(parser, t);
 			
 			// TODO: Store the token in the node, the resolve uops pass can then

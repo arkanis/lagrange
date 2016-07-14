@@ -25,7 +25,8 @@ cexpr = ID
         cexpr "(" ( expr [ "," expr ] )? ")"
         cexpr "[" ( expr [ "," expr ] )? "]"
         cexpr "." ID
-expr  = cexpr [ binary_op cexpr ]
+expr  = cexpr [ binary_op cexpr ] try-only: eos
+        cexpr try-only: eos
 
 unary_op  = + - not ~
 binary_op = ID * / %  + - << >> < <= > >= == != & ^ | and or = *= /= %= += -= <<= >>= &= ^= |=
@@ -49,10 +50,11 @@ stmt = block
                                  eos
 
 eos  = EOF
-       WSNL
        ";"
        try-only: "}"    // because of block and stmt bodies
        try-only: "end"  // because of block and stmt bodies
+       WSNL             // because of if and while conditions with optional "do"
+                        // try last to avoid effects like in note 1
 
 
 Note 1: WSNL check on while and if statements
