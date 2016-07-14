@@ -273,7 +273,7 @@ node_p parse_stmt(parser_p parser) {
 			node_append(node, &node->scope.stmts, parse_stmt(parser) );
 		
 		consume_type(parser, (t->type == T_CBO) ? T_CBC : T_END);
-	} else if ( (t = try_consume(parser, T_WHILE)) ) {
+	} else if ( try_consume(parser, T_WHILE) ) {
 		// stmt = "while" expr "do" [ stmt ] "end"
 		//                     "{"  [ stmt ] "}"
 		//                     WSNL [ stmt ] "end"  // check as last alternative, see note 1
@@ -293,6 +293,41 @@ node_p parse_stmt(parser_p parser) {
 			node_append(node, &node->while_stmt.body, parse_stmt(parser) );
 		
 		consume_type(parser, (t->type == T_DO || t->type == T_WSNL) ? T_END : T_CBC );
+	} else if ( try_consume(parser, T_IF) ) {
+		// "if" expr "do" [ stmt ]     ( "else"     [ stmt ] )? "end"
+		//           "{"  [ stmt ] "}" ( "else" "{" [ stmt ] "}" )?
+		//           WSNL [ stmt ]     ( "else"     [ stmt ] )? "end"  // check as last alternative, see note 1
+		node = node_alloc(NT_IF_STMT);
+		node_p cond = parse_expr(parser);
+		node_set(node, &node->if_stmt.cond, cond);
+		
+		t = try_consume(parser, T_DO);
+		if (!t) t = try_consume(parser, T_CBO);
+		if (!t) t = try_consume(parser, T_WSNL);
+		if (!t) {
+			parser_error(parser, "if needs a block as body!");
+			abort();
+		}
+		
+		while ( try_stmt(parser) )
+			node_append(node, &node->if_stmt.true_case, parse_stmt(parser) );
+		
+		if (t->type == T_CBO)
+			consume_type(parser, T_CBC);
+		
+		if ( try_consume(parser, T_ELSE) ) {
+			if (t->type == T_CBO)
+				consume_type(parser, T_CBO);
+			
+			while ( try_stmt(parser) )
+				node_append(node, &node->if_stmt.false_case, parse_stmt(parser) );
+			
+			if (t->type == T_CBO)
+				consume_type(parser, T_CBC);
+		}
+		
+		if (t->type == T_DO || t->type == T_WSNL)
+			consume_type(parser, T_END);
 	} else if ( try_cexpr(parser) ) {
 		// stmt = cexpr ...
 		// TODO: Implement var definition and binary ops (from expr)

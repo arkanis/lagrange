@@ -45,20 +45,20 @@ BEGIN(scope, SCOPE)
 END(scope)
 
 BEGIN(var, VAR)
-	MEMBER(var, name, str_t, MT_STR)
-	MEMBER(var, type_expr,   type_p,   MT_TYPE)
-	MEMBER(var, value, node_p, MT_NODE)
+	MEMBER(var, name,      str_t,  MT_STR)
+	MEMBER(var, type_expr, type_p, MT_TYPE)
+	MEMBER(var, value,     node_p, MT_NODE)
 	
-	MEMBER(var, type, type_p, MT_TYPE)
+	MEMBER(var, type,        type_p,  MT_TYPE)
 	MEMBER(var, frame_displ, int64_t, MT_INT)
 END(var)
 
 BEGIN(if_stmt, IF_STMT)
-	MEMBER(if_stmt, cond,       node_p,    MT_NODE)
-	MEMBER(if_stmt, true_case,  node_p,    MT_NODE)
-	MEMBER(if_stmt, false_case, node_p,    MT_NODE)
+	MEMBER(if_stmt, cond,       node_p,      MT_NODE)
+	MEMBER(if_stmt, true_case,  node_list_t, MT_NODE_LIST)
+	MEMBER(if_stmt, false_case, node_list_t, MT_NODE_LIST)
 	
-	MEMBER(if_stmt, true_ns,    node_ns_t, MT_NS)
+	MEMBER(if_stmt, true_ns,    node_ns_t,   MT_NS)
 END(if_stmt)
 
 BEGIN(while_stmt, WHILE_STMT)
