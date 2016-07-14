@@ -138,6 +138,7 @@ static bool next_token(tokenizer_ctx_p ctx) {
 		case ']':  append_token(ctx, new_token(ctx, T_SBC, 1));     return true;
 		case ',':  append_token(ctx, new_token(ctx, T_COMMA, 1));   return true;
 		case '.':  append_token(ctx, new_token(ctx, T_PERIOD, 1));  return true;
+		case ';':  append_token(ctx, new_token(ctx, T_SEMI, 1));    return true;
 		case '~':  append_token(ctx, new_token(ctx, T_COMPL, 1));   return true;
 		case '"':  tokenize_string(ctx);  return true;
 		

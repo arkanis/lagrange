@@ -15,7 +15,7 @@ struct { char* code; size_t tokens_len; token_p tokens_ptr; } samples[] = {
 	} },
 	
 	// Test normal one char and simple white space tokens
-	{ "{ } ( ) [ ] , =", 16, (token_t[]){
+	{ "{ } ( ) [ ] , ; =", 18, (token_t[]){
 		{ .type = T_CBO,    .source = { 1, "{" } },
 		{ .type = T_WS,     .source = { 1, " " } },
 		{ .type = T_CBC,    .source = { 1, "}" } },
@@ -29,6 +29,8 @@ struct { char* code; size_t tokens_len; token_p tokens_ptr; } samples[] = {
 		{ .type = T_SBC,    .source = { 1, "]" } },
 		{ .type = T_WS,     .source = { 1, " " } },
 		{ .type = T_COMMA,  .source = { 1, "," } },
+		{ .type = T_WS,     .source = { 1, " " } },
+		{ .type = T_SEMI,   .source = { 1, ";" } },
 		{ .type = T_WS,     .source = { 1, " " } },
 		{ .type = T_ASSIGN, .source = { 1, "=" } },
 		{ .type = T_EOF,    .source = { 0, "", } }
