@@ -45,13 +45,17 @@ BEGIN(scope, SCOPE)
 END(scope)
 
 BEGIN(var, VAR)
-	MEMBER(var, name,      str_t,  MT_STR)
-	MEMBER(var, type_expr, type_p, MT_TYPE)
-	MEMBER(var, value,     node_p, MT_NODE)
-	
-	MEMBER(var, type,        type_p,  MT_TYPE)
-	MEMBER(var, frame_displ, int64_t, MT_INT)
+	MEMBER(var, type_expr, node_p,      MT_NODE)
+	MEMBER(var, bindings,  node_list_t, MT_NODE_LIST)
 END(var)
+
+BEGIN(binding, BINDING)
+	MEMBER(binding, name,  str_t,  MT_STR)
+	MEMBER(binding, value, node_p, MT_NODE)
+	
+	MEMBER(binding, type,        type_p,  MT_TYPE)
+	MEMBER(binding, frame_displ, int64_t, MT_INT)
+END(binding)
 
 BEGIN(if_stmt, IF_STMT)
 	MEMBER(if_stmt, cond,       node_p,      MT_NODE)

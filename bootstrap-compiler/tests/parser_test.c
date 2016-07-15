@@ -241,6 +241,19 @@ struct { parser_rule_func_t rule; char* code; char* expected_ast_dump; } samples
 	},
 	
 	//
+	// Statements: simple cexpr as statement
+	// This is used as placeholder statements for the next samples.
+	//
+	{ parse_stmt, "dec(x)",
+		"call: \n"
+		"  target_expr: id: \"dec\"\n"
+		"    type: \n"
+		"  args[0]: id: \"x\"\n"
+		"    type: \n"
+		"  type: \n"
+	},
+	
+	//
 	// Statements: scope
 	//
 	{ parse_stmt, "{ x }",
@@ -577,6 +590,321 @@ struct { parser_rule_func_t rule; char* code; char* expected_ast_dump; } samples
 		"    type: \n"
 		"  true_ns: \n"
 	},
+	
+	//
+	// Statements: var definitions
+	//
+	{ parse_stmt, "int x",
+		"var: \n"
+		"  type_expr: id: \"int\"\n"
+		"    type: \n"
+		"  bindings[0]: binding: \"x\"\n"
+		"    value: \n"
+		"    type: \n"
+		"    frame_displ: 0\n"
+	},
+	{ parse_stmt, "int x = 7",
+		"var: \n"
+		"  type_expr: id: \"int\"\n"
+		"    type: \n"
+		"  bindings[0]: binding: \"x\"\n"
+		"    value: intl: 7\n"
+		"      type: \n"
+		"    type: \n"
+		"    frame_displ: 0\n"
+	},
+	{ parse_stmt, "int x, y, z",
+		"var: \n"
+		"  type_expr: id: \"int\"\n"
+		"    type: \n"
+		"  bindings[0]: binding: \"x\"\n"
+		"    value: \n"
+		"    type: \n"
+		"    frame_displ: 0\n"
+		"  bindings[1]: binding: \"y\"\n"
+		"    value: \n"
+		"    type: \n"
+		"    frame_displ: 0\n"
+		"  bindings[2]: binding: \"z\"\n"
+		"    value: \n"
+		"    type: \n"
+		"    frame_displ: 0\n"
+	},
+	{ parse_stmt, "int x = 1, y = 2, z = 3",
+		"var: \n"
+		"  type_expr: id: \"int\"\n"
+		"    type: \n"
+		"  bindings[0]: binding: \"x\"\n"
+		"    value: intl: 1\n"
+		"      type: \n"
+		"    type: \n"
+		"    frame_displ: 0\n"
+		"  bindings[1]: binding: \"y\"\n"
+		"    value: intl: 2\n"
+		"      type: \n"
+		"    type: \n"
+		"    frame_displ: 0\n"
+		"  bindings[2]: binding: \"z\"\n"
+		"    value: intl: 3\n"
+		"      type: \n"
+		"    type: \n"
+		"    frame_displ: 0\n"
+	},
+	{ parse_stmt, "int x = 1, y, z = 3",
+		"var: \n"
+		"  type_expr: id: \"int\"\n"
+		"    type: \n"
+		"  bindings[0]: binding: \"x\"\n"
+		"    value: intl: 1\n"
+		"      type: \n"
+		"    type: \n"
+		"    frame_displ: 0\n"
+		"  bindings[1]: binding: \"y\"\n"
+		"    value: \n"
+		"    type: \n"
+		"    frame_displ: 0\n"
+		"  bindings[2]: binding: \"z\"\n"
+		"    value: intl: 3\n"
+		"      type: \n"
+		"    type: \n"
+		"    frame_displ: 0\n"
+	},
+	{ parse_stmt, "int x, y = foo(1 + 2), z",
+		"var: \n"
+		"  type_expr: id: \"int\"\n"
+		"    type: \n"
+		"  bindings[0]: binding: \"x\"\n"
+		"    value: \n"
+		"    type: \n"
+		"    frame_displ: 0\n"
+		"  bindings[1]: binding: \"y\"\n"
+		"    value: call: \n"
+		"      target_expr: id: \"foo\"\n"
+		"        type: \n"
+		"      args[0]: uops: \n"
+		"        list[0]: intl: 1\n"
+		"          type: \n"
+		"        list[1]: id: \"+\"\n"
+		"          type: \n"
+		"        list[2]: intl: 2\n"
+		"          type: \n"
+		"      type: \n"
+		"    type: \n"
+		"    frame_displ: 0\n"
+		"  bindings[2]: binding: \"z\"\n"
+		"    value: \n"
+		"    type: \n"
+		"    frame_displ: 0\n"
+	},
+	{ parse_stmt, "ref(int)[] x",
+		"var: \n"
+		"  type_expr: index: \n"
+		"    target_expr: call: \n"
+		"      target_expr: id: \"ref\"\n"
+		"        type: \n"
+		"      args[0]: id: \"int\"\n"
+		"        type: \n"
+		"      type: \n"
+		"    type: \n"
+		"  bindings[0]: binding: \"x\"\n"
+		"    value: \n"
+		"    type: \n"
+		"    frame_displ: 0\n"
+	},
+	
+	//
+	// Statements: binary operators
+	//
+	{ parse_stmt, "x + y",
+		"uops: \n"
+		"  list[0]: id: \"x\"\n"
+		"    type: \n"
+		"  list[1]: id: \"+\"\n"
+		"    type: \n"
+		"  list[2]: id: \"y\"\n"
+		"    type: \n"
+	},
+	{ parse_stmt, "x + y ;",
+		"uops: \n"
+		"  list[0]: id: \"x\"\n"
+		"    type: \n"
+		"  list[1]: id: \"+\"\n"
+		"    type: \n"
+		"  list[2]: id: \"y\"\n"
+		"    type: \n"
+	},
+	{ parse_stmt, "x + y * z",
+		"uops: \n"
+		"  list[0]: id: \"x\"\n"
+		"    type: \n"
+		"  list[1]: id: \"+\"\n"
+		"    type: \n"
+		"  list[2]: id: \"y\"\n"
+		"    type: \n"
+		"  list[3]: id: \"*\"\n"
+		"    type: \n"
+		"  list[4]: id: \"z\"\n"
+		"    type: \n"
+	},
+	{ parse_stmt, "x corss y dot z",
+		"uops: \n"
+		"  list[0]: id: \"x\"\n"
+		"    type: \n"
+		"  list[1]: id: \"corss\"\n"
+		"    type: \n"
+		"  list[2]: id: \"y\"\n"
+		"    type: \n"
+		"  list[3]: id: \"dot\"\n"
+		"    type: \n"
+		"  list[4]: id: \"z\"\n"
+		"    type: \n"
+	},
+	
+	//
+	// Statements: while and if modifier
+	//
+	{ parse_stmt, "dec(a) while a > 0",
+		"while_stmt: \n"
+		"  cond: uops: \n"
+		"    list[0]: id: \"a\"\n"
+		"      type: \n"
+		"    list[1]: id: \">\"\n"
+		"      type: \n"
+		"    list[2]: intl: 0\n"
+		"      type: \n"
+		"  body[0]: call: \n"
+		"    target_expr: id: \"dec\"\n"
+		"      type: \n"
+		"    args[0]: id: \"a\"\n"
+		"      type: \n"
+		"    type: \n"
+	},
+	{ parse_stmt, "dec(a) while a > 0 ;",
+		"while_stmt: \n"
+		"  cond: uops: \n"
+		"    list[0]: id: \"a\"\n"
+		"      type: \n"
+		"    list[1]: id: \">\"\n"
+		"      type: \n"
+		"    list[2]: intl: 0\n"
+		"      type: \n"
+		"  body[0]: call: \n"
+		"    target_expr: id: \"dec\"\n"
+		"      type: \n"
+		"    args[0]: id: \"a\"\n"
+		"      type: \n"
+		"    type: \n"
+	},
+	{ parse_stmt, "a -= 1 while a > 0",
+		"while_stmt: \n"
+		"  cond: uops: \n"
+		"    list[0]: id: \"a\"\n"
+		"      type: \n"
+		"    list[1]: id: \">\"\n"
+		"      type: \n"
+		"    list[2]: intl: 0\n"
+		"      type: \n"
+		"  body[0]: uops: \n"
+		"    list[0]: id: \"a\"\n"
+		"      type: \n"
+		"    list[1]: id: \"-=\"\n"
+		"      type: \n"
+		"    list[2]: intl: 1\n"
+		"      type: \n"
+	},
+	{ parse_stmt, "dec(a) while a > 0 and x",
+		"while_stmt: \n"
+		"  cond: uops: \n"
+		"    list[0]: id: \"a\"\n"
+		"      type: \n"
+		"    list[1]: id: \">\"\n"
+		"      type: \n"
+		"    list[2]: intl: 0\n"
+		"      type: \n"
+		"    list[3]: id: \"and\"\n"
+		"      type: \n"
+		"    list[4]: id: \"x\"\n"
+		"      type: \n"
+		"  body[0]: call: \n"
+		"    target_expr: id: \"dec\"\n"
+		"      type: \n"
+		"    args[0]: id: \"a\"\n"
+		"      type: \n"
+		"    type: \n"
+	},
+	{ parse_stmt, "dec(a) if a > 0",
+		"if_stmt: \n"
+		"  cond: uops: \n"
+		"    list[0]: id: \"a\"\n"
+		"      type: \n"
+		"    list[1]: id: \">\"\n"
+		"      type: \n"
+		"    list[2]: intl: 0\n"
+		"      type: \n"
+		"  true_case[0]: call: \n"
+		"    target_expr: id: \"dec\"\n"
+		"      type: \n"
+		"    args[0]: id: \"a\"\n"
+		"      type: \n"
+		"    type: \n"
+		"  true_ns: \n"
+	},
+	{ parse_stmt, "dec(a) if a > 0 ;",
+		"if_stmt: \n"
+		"  cond: uops: \n"
+		"    list[0]: id: \"a\"\n"
+		"      type: \n"
+		"    list[1]: id: \">\"\n"
+		"      type: \n"
+		"    list[2]: intl: 0\n"
+		"      type: \n"
+		"  true_case[0]: call: \n"
+		"    target_expr: id: \"dec\"\n"
+		"      type: \n"
+		"    args[0]: id: \"a\"\n"
+		"      type: \n"
+		"    type: \n"
+		"  true_ns: \n"
+	},
+	{ parse_stmt, "a -= 1 if a > 0",
+		"if_stmt: \n"
+		"  cond: uops: \n"
+		"    list[0]: id: \"a\"\n"
+		"      type: \n"
+		"    list[1]: id: \">\"\n"
+		"      type: \n"
+		"    list[2]: intl: 0\n"
+		"      type: \n"
+		"  true_case[0]: uops: \n"
+		"    list[0]: id: \"a\"\n"
+		"      type: \n"
+		"    list[1]: id: \"-=\"\n"
+		"      type: \n"
+		"    list[2]: intl: 1\n"
+		"      type: \n"
+		"  true_ns: \n"
+	},
+	{ parse_stmt, "dec(a) if a > 0 and x",
+		"if_stmt: \n"
+		"  cond: uops: \n"
+		"    list[0]: id: \"a\"\n"
+		"      type: \n"
+		"    list[1]: id: \">\"\n"
+		"      type: \n"
+		"    list[2]: intl: 0\n"
+		"      type: \n"
+		"    list[3]: id: \"and\"\n"
+		"      type: \n"
+		"    list[4]: id: \"x\"\n"
+		"      type: \n"
+		"  true_case[0]: call: \n"
+		"    target_expr: id: \"dec\"\n"
+		"      type: \n"
+		"    args[0]: id: \"a\"\n"
+		"      type: \n"
+		"    type: \n"
+		"  true_ns: \n"
+  	},
 };
 
 void test_samples() {

@@ -44,12 +44,12 @@ stmt = block
        "if" expr "do" [ stmt ]     ( "else"     [ stmt ] )? "end"
                  "{"  [ stmt ] "}" ( "else" "{" [ stmt ] "}" )?
                  WSNL [ stmt ]     ( "else"     [ stmt ] )? "end"  // check as last alternative, see note 1
-       cexpr ID ( "=" expr )? [ "," ID ( "=" expr )? ]  // how to differ between ID and binary_op, see note 2
+       cexpr ID ( "=" expr )? [ "," ID ( "=" expr )? ] eos  // how to differ between ID and binary_op, see note 2
        cexpr [ binary_op cexpr ] "while" expr eos
                                  "if"    expr eos
                                  eos
 
-eos  = EOF
+eos  = try-only: EOF    // don't consume because parser function consumes the EOF
        ";"
        try-only: "}"    // because of block and stmt bodies
        try-only: "end"  // because of block and stmt bodies
@@ -84,15 +84,27 @@ not found check for an WSNL.
 Note 2: How to differ between ID and binary_op
 ==============================================
 
-Use 2 token look ahead to detect variable definition:
+After the first cexpr in the statement we need to differ between a variable
+definition and a binary operator or eos directly after the first cexpr.
 
-  ID "="  // var def with initializer
-  ID ","  // var def without initializer but following second var
-  ID eos  // single var def without initializer
+We can manage this with a two token look ahead after the first cexpr:
+
+  ID
+    "="           → var def
+    ","           → var def
+    try_eos()     → var def
+    else          → [ binary_op cexpr ]
+  binary_op_token → [ binary_op cexpr ]
+  "while"         → while modifier
+  "if"            → if modifier
+  try_eos()       → expr only stmt
+
+Only case that's ambiguous is if cexpr is followed by an ID. All other tokens
+follow the expr statement branch. 
 
 Or in rules:
 
-- Token after initial cexpr not an ID?  → has to be binary_op
+- Token after initial cexpr not an ID?  → has to be binary_op or eos
 - Token after ID is an "=", "," or eos? → statement is var definition
 
 Best use a try_eos() function to check for all possible tokens of an eos.

@@ -14,8 +14,8 @@ struct parser_s {
 };
 
 
-static token_p next_filtered_token(parser_p parser, bool ignore_line_breaks) {
-	size_t pos = parser->pos;
+static token_p next_filtered_token(parser_p parser, size_t start_pos, bool ignore_line_breaks) {
+	size_t pos = start_pos;
 	while (pos < parser->module->tokens.len) {
 		token_p token = &parser->module->tokens.ptr[pos];
 		pos++;
@@ -78,11 +78,30 @@ static token_p try(parser_p parser, token_type_t type) {
 	if (!already_tried)
 		list_append(&parser->tried_token_types, type);
 	
-	token_p token = next_filtered_token(parser, (type == T_WSNL) ? false : true);
+	token_p token = next_filtered_token(parser, parser->pos, (type == T_WSNL) ? false : true);
 	if (token && token->type == type)
 		return token;
 	return NULL;
 }
+
+static token_p try_after_token(parser_p parser, token_type_t type, token_p start_token) {
+	if (start_token == NULL)
+		return try(parser, type);
+	
+	// Don't log look ahead tokens for error messages right now. Not sure if
+	// this information is helpful to the user.
+	size_t start_token_pos = start_token - parser->module->tokens.ptr + 1;
+	if ( start_token_pos >= parser->module->tokens.len ) {
+		fprintf(stderr, "try_after_token(): Start token not part of the currently parsed module!\n");
+		abort();
+	}
+	
+	token_p token = next_filtered_token(parser, start_token_pos, (type == T_WSNL) ? false : true);
+	if (token && token->type == type)
+		return token;
+	return NULL;
+}
+
 
 static token_p consume(parser_p parser, token_p token) {
 	if (token == NULL) {
@@ -148,11 +167,15 @@ node_p parse(module_p module, parser_rule_func_t rule, FILE* error_stream) {
 // Try functions for different rules
 //
 
-static token_p try_cexpr(parser_p parser);
-static token_p try_eos(parser_p parser);
+static token_p try_stmt(parser_p parser);
+static node_p  complete_parser_var_def_statement(parser_p parser, node_p cexpr);
+static node_p  complete_parser_expr_statement(parser_p parser, node_p cexpr);
+static token_p try_eos(parser_p parser, token_p after_token);
 static token_p consume_eos(parser_p parser);
 
-node_p parse_cexpr(parser_p parser);
+static token_p try_cexpr(parser_p parser);
+       node_p  parse_cexpr(parser_p parser);
+static node_p  complete_parser_expr(parser_p parser, node_p cexpr);
 
 
 /*
@@ -329,9 +352,28 @@ node_p parse_stmt(parser_p parser) {
 		if (t->type == T_DO || t->type == T_WSNL)
 			consume_type(parser, T_END);
 	} else if ( try_cexpr(parser) ) {
-		// stmt = cexpr ...
-		// TODO: Implement var definition and binary ops (from expr)
-		node = parse_cexpr(parser);
+		// cexpr ID ( "=" expr )? [ "," ID ( "=" expr )? ]  // how to differ between ID and binary_op, see note 2
+		// cexpr [ binary_op cexpr ] "while" expr eos
+		//                           "if"    expr eos
+		//                           eos
+		node_p cexpr = parse_cexpr(parser);
+		
+		if ( (t = try(parser, T_ID)) ) {
+			// In case of an ID we use a lookahead to decide if it's user
+			// defined operator or the name of a variable that gets defined.
+			if (
+				try_after_token(parser, T_ASSIGN, t) ||
+				try_after_token(parser, T_COMMA, t)  ||
+				try_eos(parser, t)
+			) {
+				node = complete_parser_var_def_statement(parser, cexpr);
+			} else {
+				node = complete_parser_expr_statement(parser, cexpr);
+			}
+		} else {
+			// has to be the expr statement case (with optional binary_op, etc.)
+			node = complete_parser_expr_statement(parser, cexpr);
+		}
 	} else {
 		parser_error(parser, NULL);
 		abort();
@@ -340,19 +382,72 @@ node_p parse_stmt(parser_p parser) {
 	return node;
 }
 
-static token_p try_eos(parser_p parser) {
+static node_p complete_parser_var_def_statement(parser_p parser, node_p cexpr) {
+	// The first cexpr is already consumed and passed to us as parameter
+	// cexpr ID ( "=" expr )? [ "," ID ( "=" expr )? ]  // how to differ between ID and binary_op, see note 2
+	node_p node = node_alloc(NT_VAR);
+	node_set(node, &node->var.type_expr, cexpr);
+	node_p binding = NULL;
 	token_p t = NULL;
-	if      ( (t = try(parser, T_EOF))  ) return t;
-	else if ( (t = try(parser, T_SEMI)) ) return t;
-	else if ( (t = try(parser, T_CBC))  ) return t;
-	else if ( (t = try(parser, T_END))  ) return t;
-	else if ( (t = try(parser, T_WSNL)) ) return t;
+	
+	do {
+		binding = node_alloc_append(NT_BINDING, node, &node->var.bindings);
+		t = consume_type(parser, T_ID);
+		binding->binding.name = t->source;
+		
+		if ( (t = try_consume(parser, T_ASSIGN)) ) {
+			node_p expr = parse_expr(parser);
+			node_set(binding, &binding->binding.value, expr);
+		}
+	} while ( try_consume(parser, T_COMMA) );
+	
+	consume_eos(parser);
+	
+	return node;
+}
+
+static node_p complete_parser_expr_statement(parser_p parser, node_p cexpr) {
+	// The first cexpr is already consumed and passed to us as parameter
+	// cexpr [ binary_op cexpr ] "while" expr eos
+	//                           "if"    expr eos
+	//                           eos
+	node_p node = complete_parser_expr(parser, cexpr);
+	
+	if ( try_consume(parser, T_WHILE) ) {
+		node_p body = node;
+		node = node_alloc(NT_WHILE_STMT);
+		node_p cond = parse_expr(parser);
+		
+		node_set(node, &node->while_stmt.cond, cond);
+		node_append(node, &node->while_stmt.body, body);
+	} else if ( try_consume(parser, T_IF) ) {
+		node_p body = node;
+		node = node_alloc(NT_IF_STMT);
+		node_p cond = parse_expr(parser);
+		
+		node_set(node, &node->if_stmt.cond, cond);
+		node_append(node, &node->if_stmt.true_case, body);
+	}
+	
+	consume_eos(parser);
+	
+	return node;
+}
+
+
+static token_p try_eos(parser_p parser, token_p after_token) {
+	token_p t = NULL;
+	if      ( (t = try_after_token(parser, T_EOF,  after_token)) ) return t;
+	else if ( (t = try_after_token(parser, T_SEMI, after_token)) ) return t;
+	else if ( (t = try_after_token(parser, T_CBC,  after_token)) ) return t;
+	else if ( (t = try_after_token(parser, T_END,  after_token)) ) return t;
+	else if ( (t = try_after_token(parser, T_WSNL, after_token)) ) return t;
 	return NULL;
 }
 
 static token_p consume_eos(parser_p parser) {
 	token_p t = NULL;
-	if      ( (t = try_consume(parser, T_EOF))  ) return t;
+	if      ( (t = try(parser, T_EOF))          ) return t;
 	else if ( (t = try_consume(parser, T_SEMI)) ) return t;
 	else if ( (t = try(parser, T_CBC))          ) return t;
 	else if ( (t = try(parser, T_END))          ) return t;
@@ -472,19 +567,20 @@ static token_p try_binary_op(parser_p parser) {
 	return NULL;
 }
 
-node_p parse_expr(parser_p parser) {
+static node_p complete_parser_expr(parser_p parser, node_p cexpr) {
+	// The first cexpr is already consumed and passed to us as parameter
 	// cexpr [ binary_op cexpr ]
-	node_p node = parse_cexpr(parser);
+	node_p node = cexpr;
 	
 	token_p t = NULL;
-	if ( try_binary_op(parser) && !try_eos(parser) ) {
+	if ( try_binary_op(parser) && !try_eos(parser, NULL) ) {
 		// Got an operator, wrap everything into an uops node and collect the
 		// remaining operators and expressions.
 		node_p cexpr = node;
 		node = node_alloc(NT_UOPS);
 		node_append(node, &node->uops.list, cexpr);
 		
-		while ( (t = try_binary_op(parser)) && !try_eos(parser) ) {
+		while ( (t = try_binary_op(parser)) && !try_eos(parser, NULL) ) {
 			consume(parser, t);
 			
 			// TODO: Store the token in the node, the resolve uops pass can then
@@ -498,4 +594,10 @@ node_p parse_expr(parser_p parser) {
 	}
 	
 	return node;
+}
+
+node_p parse_expr(parser_p parser) {
+	// cexpr [ binary_op cexpr ]
+	node_p cexpr = parse_cexpr(parser);
+	return complete_parser_expr(parser, cexpr);
 }
