@@ -189,7 +189,7 @@ node_p parse_module(parser_p parser) {
 	node_p node = node_alloc(NT_MODULE);
 	node->tokens = parser->module->tokens;
 	
-	while ( ! try_consume(parser, T_EOF) ) {
+	while ( ! try(parser, T_EOF) ) {
 		node_p def = NULL;
 		
 		if ( try(parser, T_FUNC) ) {
@@ -219,7 +219,7 @@ node_p parse_func_def(parser_p parser) {
 	node->func.name = consume_type(parser, T_ID)->source;
 	
 	token_p t = NULL;
-	if ( (t = try_consume(parser, T_IN)) || (t = try_consume(parser, T_OUT)) ) {
+	while ( (t = try_consume(parser, T_IN)) || (t = try_consume(parser, T_OUT)) ) {
 		node_list_p arg_list = NULL;
 		if ( t->type == T_IN )
 			arg_list = &node->func.in;
@@ -244,8 +244,9 @@ node_p parse_func_def(parser_p parser) {
 				break;
 		}
 		consume_type(parser, T_RBC);
-		
-	} else if ( try_consume(parser, T_CBO) ) {
+	}
+	
+	if ( try_consume(parser, T_CBO) ) {
 		parse_stmts(parser, node, &node->func.body);
 		consume_type(parser, T_CBC);
 	} else if ( try_consume(parser, T_DO) ) {

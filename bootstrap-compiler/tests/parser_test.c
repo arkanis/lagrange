@@ -5,6 +5,7 @@
 #include "../common.h"
 
 #define SLIM_TEST_IMPLEMENTATION
+#define ST_MAX_MESSAGE_SIZE 4096
 #include "slim_test.h"
 
 
@@ -905,6 +906,72 @@ struct { parser_rule_func_t rule; char* code; char* expected_ast_dump; } samples
 		"    type: \n"
 		"  true_ns: \n"
   	},
+  	
+  	//
+  	// Definition: functions
+  	//
+	{ parse_module, "func foo in(int argc, int.ptr argv) out(int) { int a; a += 1 if argc < 2; { foo(a) } }",
+		"module: \n"
+		"  defs[0]: func: \"foo\"\n"
+		"    in[0]: arg: \"argc\"\n"
+		"      type_expr: id: \"int\"\n"
+		"        type: \n"
+		"      type: \n"
+		"      frame_displ: 0\n"
+		"    in[1]: arg: \"argv\"\n"
+		"      type_expr: member: \n"
+		"        aggregate: id: \"int\"\n"
+		"          type: \n"
+		"        member: \"ptr\"\n"
+		"        type: \n"
+		"      type: \n"
+		"      frame_displ: 0\n"
+		"    out[0]: arg: \"\"\n"
+		"      type_expr: id: \"int\"\n"
+		"        type: \n"
+		"      type: \n"
+		"      frame_displ: 0\n"
+		"    body[0]: var: \n"
+		"      type_expr: id: \"int\"\n"
+		"        type: \n"
+		"      bindings[0]: binding: \"a\"\n"
+		"        value: \n"
+		"        type: \n"
+		"        frame_displ: 0\n"
+		"    body[1]: if_stmt: \n"
+		"      cond: uops: \n"
+		"        list[0]: id: \"argc\"\n"
+		"          type: \n"
+		"        list[1]: id: \"<\"\n"
+		"          type: \n"
+		"        list[2]: intl: 2\n"
+		"          type: \n"
+		"      true_case[0]: uops: \n"
+		"        list[0]: id: \"a\"\n"
+		"          type: \n"
+		"        list[1]: id: \"+=\"\n"
+		"          type: \n"
+		"        list[2]: intl: 1\n"
+		"          type: \n"
+		"      true_ns: \n"
+		"    body[2]: scope: \n"
+		"      stmts[0]: call: \n"
+		"        target_expr: id: \"foo\"\n"
+		"          type: \n"
+		"        args[0]: id: \"a\"\n"
+		"          type: \n"
+		"        type: \n"
+		"      ns: \n"
+		"    ns: \n"
+		"    compiled: false\n"
+		"    linked: false\n"
+		"    as_offset: 0\n"
+		"    stack_frame_size: 0\n"
+		"    addr_slots: \n"
+		"    return_jump_slots: ???\n"
+		"  ns: \n"
+	},
+	
 };
 
 void test_samples() {
