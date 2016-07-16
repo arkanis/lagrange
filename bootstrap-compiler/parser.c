@@ -167,6 +167,8 @@ node_p parse(module_p module, parser_rule_func_t rule, FILE* error_stream) {
 // Try functions for different rules
 //
 
+void parse_stmts(parser_p parser, node_p parent, node_list_p list);
+
 static token_p try_stmt(parser_p parser);
 static node_p  complete_parser_var_def_statement(parser_p parser, node_p cexpr);
 static node_p  complete_parser_expr_statement(parser_p parser, node_p cexpr);
@@ -178,14 +180,10 @@ static token_p try_cexpr(parser_p parser);
 static node_p  complete_parser_expr(parser_p parser, node_p cexpr);
 
 
-/*
 
 //
 // Parser rules
 //
-
-void parse_stmts(parser_p parser, node_p parent, node_list_p list);
-
 
 node_p parse_module(parser_p parser) {
 	node_p node = node_alloc(NT_MODULE);
@@ -213,6 +211,8 @@ node_p parse_module(parser_p parser) {
 //
 
 node_p parse_func_def(parser_p parser) {
+	// def     = "func" ID [ def-mod ] "{" [ stmt ] "}"
+	// def-mod = ( "in" | "out" )  "(" ID ID? [ "," ID ID? ] ")"
 	node_p node = node_alloc(NT_FUNC);
 	
 	consume_type(parser, T_FUNC);
@@ -230,18 +230,15 @@ node_p parse_func_def(parser_p parser) {
 		
 		consume_type(parser, T_RBO);
 		while ( !try(parser, T_RBC) ) {
-			node_p arg = node_alloc(NT_ARG);
+			node_p arg = node_alloc_append(NT_ARG, node, arg_list);
 			
-			t = consume_type(parser, T_ID);
-			node_p type_expr = node_alloc_set(NT_ID, arg, &arg->arg.type_expr);
-			type_expr->id.name = t->src;
+			node_p type_expr = parse_cexpr(parser);
+			node_set(arg, &arg->arg.type_expr, type_expr);
 			
 			// Set the arg name if we got an ID after the type. Otherwise leave
 			// the arg unnamed (nulled out)
 			if ( try(parser, T_ID) )
-				arg->arg.name = consume_type(parser, T_ID)->src;
-			
-			node_append(node, arg_list, arg);
+				arg->arg.name = consume_type(parser, T_ID)->source;
 			
 			if ( !try_consume(parser, T_COMMA) )
 				break;
@@ -260,13 +257,13 @@ node_p parse_func_def(parser_p parser) {
 }
 
 void parse_stmts(parser_p parser, node_p parent, node_list_p list) {
-	while ( try_stmt_start(parser) ) {
+	while ( try_stmt(parser) ) {
 		node_p stmt = parse_stmt(parser);
 		node_append(parent, list, stmt);
 	}
 }
 
-*/
+
 
 //
 // Statements
