@@ -24,7 +24,7 @@ x Start of with a simple parser test case
 	x Write very simple version of parse_expr() that parses string and int literals
 	x Refactor AST allocation and printing functions
 	x Write simple automated test case for parsing
-- Port entire grammar
+x Port entire grammar
 	x Implement and test cexpr grammar
 	x Figure out how to handle user defined operators and function calls without
 	  paras
@@ -32,7 +32,7 @@ x Start of with a simple parser test case
 	x Implement and test statement grammar
 	x Implement and test definition grammar
 	x Implement and test return statement
-- Add pass identifier to AST node members and flags to node_print to only print
+x Add pass identifier to AST node members and flags to node_print to only print
   members up to a specified pass. This way the parser test can only print parser
   members and skip all the rest (like type, etc.). So we don't break the parser
   test when adding fields for later passes.

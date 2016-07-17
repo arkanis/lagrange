@@ -4,12 +4,12 @@
 // Node specs
 //
 
-#define BEGIN(nn, NN)           [ NT_##NN ] = &(node_spec_t){  \
-                                    #nn, (member_spec_t[]){
-#define MEMBER(nn, mn, ct, mt)  	    { mt, offsetof(node_t, nn.mn), #mn },
-#define END(nn)                         { 0 }  \
-                                    }  \
-                                },
+#define BEGIN(nn, NN)              [ NT_##NN ] = &(node_spec_t){  \
+                                       #nn, (member_spec_t[]){
+#define MEMBER(nn, mn, ct, mt, p)          { mt, offsetof(node_t, nn.mn), #mn, p },
+#define END(nn)                            { 0 }  \
+                                       }  \
+                                   },
 
 node_spec_p* node_specs = (node_spec_p[]){
 	#include "ast_spec.h"
@@ -96,10 +96,15 @@ void node_append(node_p parent, node_list_p list, node_p child) {
 // Printing functions
 //
 
-static void node_print_recursive(node_p node, FILE* output, int level) {
+static void node_print_recursive(node_p node, pass_t pass, FILE* output, int level) {
 	fprintf(output, "%s: ", node->spec->name);
 	
 	for(member_spec_p member = node->spec->members; member->type != 0; member++) {
+		// Skip members from later passes. So we only show members up to and
+		// including the requested pass.
+		if (member->pass > pass)
+			continue;
+		
 		// Print the first non-node member inline (no line break, no indention,
 		// don't print the member name). MT_NODE_LIST also prints it's member
 		// name by itself (with an index).
@@ -112,13 +117,13 @@ static void node_print_recursive(node_p node, FILE* output, int level) {
 			case MT_NODE: {
 				node_p value = *(node_p*)member_ptr;
 				if (value != NULL)
-					node_print_recursive(value, output, level+1);
+					node_print_recursive(value, pass, output, level+1);
 				} break;
 			case MT_NODE_LIST: {
 				node_list_p list = member_ptr;
 				for(size_t i = 0; i < list->len; i++) {
 					fprintf(output, "\n%*s%s[%zu]: ", (level+1)*2, "", member->name, i);
-					node_print_recursive(list->ptr[i], output, level+1);
+					node_print_recursive(list->ptr[i], pass, output, level+1);
 				}
 				} break;
 			case MT_NS: {
@@ -133,7 +138,7 @@ static void node_print_recursive(node_p node, FILE* output, int level) {
 				list_t(node_addr_slot_t)* asl = member_ptr;
 				for(size_t i = 0; i < asl->len; i++) {
 					fprintf(output, "\n%*soffset %zu → ", (level+2)*2, "", asl->ptr[i].offset);
-					node_print_inline(asl->ptr[i].target, output);
+					node_print_inline(asl->ptr[i].target, pass, output);
 					fprintf(output, "\n");
 				}
 				} break;
@@ -174,15 +179,20 @@ static void node_print_recursive(node_p node, FILE* output, int level) {
 	}
 }
 
-void node_print(node_p node, FILE* output) {
-	node_print_recursive(node, output, 0);
+void node_print(node_p node, pass_t pass, FILE* output) {
+	node_print_recursive(node, pass, output, 0);
 	fprintf(output, "\n");
 }
 
-void node_print_inline(node_p node, FILE* output) {
+void node_print_inline(node_p node, pass_t pass, FILE* output) {
 	fprintf(output, "%s", node->spec->name);
 	
 	for(member_spec_p member = node->spec->members; member->type != 0; member++) {
+		// Skip members from later passes. So we only show members up to and
+		// including the requested pass.
+		if (member->pass > pass)
+			continue;
+		
 		fprintf(output, " %s: ", member->name);
 		
 		void* member_ptr = (uint8_t*)node + member->offset;
