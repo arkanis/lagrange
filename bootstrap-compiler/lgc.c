@@ -47,7 +47,7 @@ int main(int argc, char** argv) {
 	printf("\n");
 	
 	// Step 2 - Parse tokens into an AST
-	node_p node = parse(module, parse_expr, stderr);
+	node_p node = parse(module, parse_module, stderr);
 	node_print(node, P_PARSER, stdout);
 	
 	
