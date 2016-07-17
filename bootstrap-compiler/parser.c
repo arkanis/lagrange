@@ -36,7 +36,8 @@ static token_p next_filtered_token(parser_p parser, size_t start_pos, bool ignor
 }
 
 static void parser_error(parser_p parser, const char* message) {
-	token_p token = &parser->module->tokens.ptr[parser->pos];
+	token_p token = next_filtered_token(parser, parser->pos, true);
+	
 	fprintf(parser->error_stream, "%s:%d:%d: ", parser->module->filename,
 		token_line(parser->module, token),
 		token_col(parser->module, token)
@@ -58,7 +59,7 @@ static void parser_error(parser_p parser, const char* message) {
 			fputs(",", parser->error_stream);
 	}
 	
-	fputs(" after ", parser->error_stream);
+	fputs(" before ", parser->error_stream);
 	token_print(parser->error_stream, token, TP_INLINE_DUMP);
 	fputs("\n", parser->error_stream);
 	
@@ -196,7 +197,7 @@ node_p parse_module(parser_p parser) {
 			def = parse_func_def(parser);
 		} else {
 			parser_error(parser, NULL);
-			return node;
+			abort();
 		}
 		
 		node_append(node, &node->module.defs, def);
