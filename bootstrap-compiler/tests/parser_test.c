@@ -579,6 +579,9 @@ struct { parser_rule_func_t rule; char* code; char* expected_ast_dump; } samples
   	//
   	// Statements: return
   	//
+	{ parse_stmt, "return",
+		"return_stmt: \n"
+  	},
 	{ parse_stmt, "return x",
 		"return_stmt: \n"
 		"  args[0]: id: \"x\"\n"

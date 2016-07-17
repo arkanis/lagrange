@@ -355,12 +355,14 @@ node_p parse_stmt(parser_p parser) {
 		// "return" ( expr ["," expr] )? eos
 		node = node_alloc(NT_RETURN_STMT);
 		
-		node_p expr = parse_expr(parser);
-		node_append(node, &node->return_stmt.args, expr);
-		
-		while ( try_consume(parser, T_COMMA) ) {
-			expr = parse_expr(parser);
+		if ( !try_eos(parser, NULL) ) {
+			node_p expr = parse_expr(parser);
 			node_append(node, &node->return_stmt.args, expr);
+			
+			while ( try_consume(parser, T_COMMA) ) {
+				expr = parse_expr(parser);
+				node_append(node, &node->return_stmt.args, expr);
+			}
 		}
 		
 		consume_eos(parser);
