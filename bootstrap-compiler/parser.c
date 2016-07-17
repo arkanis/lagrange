@@ -272,11 +272,12 @@ void parse_stmts(parser_p parser, node_p parent, node_list_p list) {
 
 static token_p try_stmt(parser_p parser) {
 	token_p t = NULL;
-	if      ( (t = try(parser, T_CBO))   ) return t;
-	else if ( (t = try(parser, T_DO))    ) return t;
-	else if ( (t = try(parser, T_WHILE)) ) return t;
-	else if ( (t = try(parser, T_IF))    ) return t;
-	else if ( (t = try_cexpr(parser))    ) return t;
+	if      ( (t = try(parser, T_CBO))    ) return t;
+	else if ( (t = try(parser, T_DO))     ) return t;
+	else if ( (t = try(parser, T_WHILE))  ) return t;
+	else if ( (t = try(parser, T_IF))     ) return t;
+	else if ( (t = try(parser, T_RETURN)) ) return t;
+	else if ( (t = try_cexpr(parser))     ) return t;
 	
 	return NULL;
 }
@@ -349,6 +350,19 @@ node_p parse_stmt(parser_p parser) {
 		
 		if (t->type == T_DO || t->type == T_WSNL)
 			consume_type(parser, T_END);
+	} else if ( try_consume(parser, T_RETURN) ) {
+		// "return" ( expr ["," expr] )? eos
+		node = node_alloc(NT_RETURN_STMT);
+		
+		node_p expr = parse_expr(parser);
+		node_append(node, &node->return_stmt.args, expr);
+		
+		while ( try_consume(parser, T_COMMA) ) {
+			expr = parse_expr(parser);
+			node_append(node, &node->return_stmt.args, expr);
+		}
+		
+		consume_eos(parser);
 	} else if ( try_cexpr(parser) ) {
 		// cexpr ID ( "=" expr )? [ "," ID ( "=" expr )? ]  // how to differ between ID and binary_op, see note 2
 		// cexpr [ binary_op cexpr ] "while" expr eos

@@ -5,6 +5,7 @@ Changes
   no need to get frustrated on one syntax aspect for to long.
 - Added explicit syntax for variable definition since it's no longer covered by
   free function calls.
+- Added the return statement again. Forgot that in the last grammar.
 
 
 Grammar
@@ -44,6 +45,7 @@ stmt = block
        "if" expr "do" [ stmt ]     ( "else"     [ stmt ] )? "end"
                  "{"  [ stmt ] "}" ( "else" "{" [ stmt ] "}" )?
                  WSNL [ stmt ]     ( "else"     [ stmt ] )? "end"  // check as last alternative, see note 1
+       "return" ( expr ["," expr] )? eos
        cexpr ID ( "=" expr )? [ "," ID ( "=" expr )? ] eos  // how to differ between ID and binary_op, see note 2
        cexpr [ binary_op cexpr ] "while" expr eos
                                  "if"    expr eos

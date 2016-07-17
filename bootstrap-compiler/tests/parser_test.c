@@ -908,6 +908,51 @@ struct { parser_rule_func_t rule; char* code; char* expected_ast_dump; } samples
   	},
   	
   	//
+  	// Statements: return
+  	//
+	{ parse_stmt, "return x",
+		"return_stmt: \n"
+		"  args[0]: id: \"x\"\n"
+		"    type: \n"
+  	},
+	{ parse_stmt, "return x, y, z",
+		"return_stmt: \n"
+		"  args[0]: id: \"x\"\n"
+		"    type: \n"
+		"  args[1]: id: \"y\"\n"
+		"    type: \n"
+		"  args[2]: id: \"z\"\n"
+		"    type: \n"
+  	},
+	{ parse_stmt, "return dec(x) + 7, foo.bar(1, 2, 3)",
+		"return_stmt: \n"
+		"  args[0]: uops: \n"
+		"    list[0]: call: \n"
+		"      target_expr: id: \"dec\"\n"
+		"        type: \n"
+		"      args[0]: id: \"x\"\n"
+		"        type: \n"
+		"      type: \n"
+		"    list[1]: id: \"+\"\n"
+		"      type: \n"
+		"    list[2]: intl: 7\n"
+		"      type: \n"
+		"  args[1]: call: \n"
+		"    target_expr: member: \n"
+		"      aggregate: id: \"foo\"\n"
+		"        type: \n"
+		"      member: \"bar\"\n"
+		"      type: \n"
+		"    args[0]: intl: 1\n"
+		"      type: \n"
+		"    args[1]: intl: 2\n"
+		"      type: \n"
+		"    args[2]: intl: 3\n"
+		"      type: \n"
+		"    type: \n"
+  	},
+  	
+  	//
   	// Definition: functions
   	//
 	{ parse_module, "func foo in(int argc, int.ptr argv) out(int) { int a; a += 1 if argc < 2; { foo(a) } }",
