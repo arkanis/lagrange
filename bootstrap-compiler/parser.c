@@ -428,7 +428,9 @@ static node_p complete_parser_expr_statement(parser_p parser, node_p cexpr) {
 	//                           eos
 	node_p node = complete_parser_expr(parser, cexpr);
 	
-	if ( try_consume(parser, T_WHILE) ) {
+	if ( try_eos(parser, NULL) ) {
+		// Just skip all the other cases
+	} else if ( try_consume(parser, T_WHILE) ) {
 		node_p body = node;
 		node = node_alloc(NT_WHILE_STMT);
 		node_p cond = parse_expr(parser);

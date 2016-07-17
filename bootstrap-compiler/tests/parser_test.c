@@ -671,7 +671,121 @@ void test_samples() {
 	free(output_ptr);
 }
 
+
+struct { char* code; char* ast_dump; } statement_pool[] = {
+	{	"{ dec(x) } \n",
+		"    body[%d]: scope: \n"
+		"      stmts[0]: call: \n"
+		"        target_expr: id: \"dec\"\n"
+		"        args[0]: id: \"x\"\n"
+	},
+	{	"do dec(x) end \n",
+		"    body[%d]: scope: \n"
+		"      stmts[0]: call: \n"
+		"        target_expr: id: \"dec\"\n"
+		"        args[0]: id: \"x\"\n"
+	},
+	{	"while x > 0 \n dec(x) \n end \n",
+		"    body[%d]: while_stmt: \n"
+		"      cond: uops: \n"
+		"        list[0]: id: \"x\"\n"
+		"        list[1]: id: \">\"\n"
+		"        list[2]: intl: 0\n"
+		"      body[0]: call: \n"
+		"        target_expr: id: \"dec\"\n"
+		"        args[0]: id: \"x\"\n"
+	},
+	{	"if x > 0 \n dec(x) \n else inc(x) end \n",
+		"    body[%d]: if_stmt: \n"
+		"      cond: uops: \n"
+		"        list[0]: id: \"x\"\n"
+		"        list[1]: id: \">\"\n"
+		"        list[2]: intl: 0\n"
+		"      true_case[0]: call: \n"
+		"        target_expr: id: \"dec\"\n"
+		"        args[0]: id: \"x\"\n"
+		"      false_case[0]: call: \n"
+		"        target_expr: id: \"inc\"\n"
+		"        args[0]: id: \"x\"\n"
+	},
+	{	"return x + 1 \n",
+		"    body[%d]: return_stmt: \n"
+		"      args[0]: uops: \n"
+		"        list[0]: id: \"x\"\n"
+		"        list[1]: id: \"+\"\n"
+		"        list[2]: intl: 1\n"
+	},
+	{	"int x, y = 1 \n",
+		"    body[%d]: var: \n"
+		"      type_expr: id: \"int\"\n"
+		"      bindings[0]: binding: \"x\"\n"
+		"        value: \n"
+		"      bindings[1]: binding: \"y\"\n"
+		"        value: intl: 1\n"
+	},
+	{	"x + y \n",
+		"    body[%d]: uops: \n"
+		"      list[0]: id: \"x\"\n"
+		"      list[1]: id: \"+\"\n"
+		"      list[2]: id: \"y\"\n"
+	},
+};
+
+void test_statement_combinations() {
+	char   *code_ptr = NULL, *ast_dump_ptr = NULL, *output_ptr = NULL;
+	size_t  code_len = 0,     ast_dump_len = 0,     output_len = 0;
+	FILE   *code     = NULL, *ast_dump     = NULL, *output     = NULL;
+	
+	const size_t sample_count = sizeof(statement_pool) / sizeof(statement_pool[0]);
+	for(size_t i = 0; i < sample_count; i++) {
+		for(size_t j = 0; j < sample_count; j++) {
+			for(size_t k = 0; k < sample_count; k++) {
+				code = open_memstream(&code_ptr, &code_len);
+					fputs("func main do\n", code);
+					fputs(statement_pool[i].code, code);
+					fputs(statement_pool[j].code, code);
+					fputs(statement_pool[k].code, code);
+					fputs("end\n", code);
+				fclose(code);
+				
+				ast_dump = open_memstream(&ast_dump_ptr, &ast_dump_len);
+					fprintf(ast_dump,
+						"module: \n"
+						"  defs[0]: func: \"main\"\n"
+					);
+					fprintf(ast_dump, statement_pool[i].ast_dump, 0);
+					fprintf(ast_dump, statement_pool[j].ast_dump, 1);
+					fprintf(ast_dump, statement_pool[k].ast_dump, 2);
+				fclose(ast_dump);
+				
+				
+				//printf("sample code i = %zu, j = %zu, k = %zu:\n%s\n", i, j, k, code_ptr);
+				module_p module = &(module_t){
+					.filename = "parser_test.c/test_statement_combinations",
+					.source   = str_from_c(code_ptr)
+				};
+				
+				size_t errors = tokenize(module->source, &module->tokens, stderr);
+				st_check_int(errors, 0);
+				
+				output = open_memstream(&output_ptr, &output_len);
+					node_p node = parse(module, parse_module, stderr);
+					node_print(node, P_PARSER, output);
+				fclose(output);
+				
+				st_check_str(output_ptr, ast_dump_ptr);
+				
+				list_destroy(&module->tokens);
+				free(code_ptr);  free(ast_dump_ptr);  free(output_ptr);
+				code_ptr = NULL; ast_dump_ptr = NULL; output_ptr = NULL;
+				code_len = 0;    ast_dump_len = 0;    output_len = 0;
+			}
+		}
+	}
+}
+
 int main() {
 	st_run(test_samples);
+	st_run(test_statement_combinations);
 	return st_show_report();
 }
