@@ -216,10 +216,10 @@ node_p parse_func_def(parser_p parser) {
 	// def-mod = ( "in" | "out" )  "(" ID ID? [ "," ID ID? ] ")"
 	node_p node = node_alloc(NT_FUNC);
 	
-	consume_type(parser, T_FUNC);
+	token_p t = consume_type(parser, T_FUNC);
+	node_first_token(node, t);
 	node->func.name = consume_type(parser, T_ID)->source;
 	
-	token_p t = NULL;
 	while ( (t = try_consume(parser, T_IN)) || (t = try_consume(parser, T_OUT)) ) {
 		node_list_p arg_list = NULL;
 		if ( t->type == T_IN )
@@ -249,12 +249,16 @@ node_p parse_func_def(parser_p parser) {
 	
 	if ( try_consume(parser, T_CBO) ) {
 		parse_stmts(parser, node, &node->func.body);
-		consume_type(parser, T_CBC);
+		t = consume_type(parser, T_CBC);
 	} else if ( try_consume(parser, T_DO) ) {
 		parse_stmts(parser, node, &node->func.body);
-		consume_type(parser, T_END);
+		t = consume_type(parser, T_END);
+	} else {
+		parser_error(parser, NULL);
+		abort();
 	}
 	
+	node_last_token(node, t);
 	return node;
 }
 
@@ -291,16 +295,20 @@ node_p parse_stmt(parser_p parser) {
 		// stmt = "{"  [ stmt ] "}"
 		//        "do" [ stmt ] "end"
 		node = node_alloc(NT_SCOPE);
+		node_first_token(node, t);
 		
 		while ( try_stmt(parser) )
 			node_append(node, &node->scope.stmts, parse_stmt(parser) );
 		
-		consume_type(parser, (t->type == T_CBO) ? T_CBC : T_END);
-	} else if ( try_consume(parser, T_WHILE) ) {
+		t = consume_type(parser, (t->type == T_CBO) ? T_CBC : T_END);
+		node_last_token(node, t);
+	} else if ( (t = try_consume(parser, T_WHILE)) ) {
 		// stmt = "while" expr "do" [ stmt ] "end"
 		//                     "{"  [ stmt ] "}"
 		//                     WSNL [ stmt ] "end"  // check as last alternative, see note 1
 		node = node_alloc(NT_WHILE_STMT);
+		node_first_token(node, t);
+		
 		node_p cond = parse_expr(parser);
 		node_set(node, &node->while_stmt.cond, cond);
 		
@@ -315,19 +323,22 @@ node_p parse_stmt(parser_p parser) {
 		while ( try_stmt(parser) )
 			node_append(node, &node->while_stmt.body, parse_stmt(parser) );
 		
-		consume_type(parser, (t->type == T_DO || t->type == T_WSNL) ? T_END : T_CBC );
-	} else if ( try_consume(parser, T_IF) ) {
+		t = consume_type(parser, (t->type == T_DO || t->type == T_WSNL) ? T_END : T_CBC );
+		node_last_token(node, t);
+	} else if ( (t = try_consume(parser, T_IF)) ) {
 		// "if" expr "do" [ stmt ]     ( "else"     [ stmt ] )? "end"
 		//           "{"  [ stmt ] "}" ( "else" "{" [ stmt ] "}" )?
 		//           WSNL [ stmt ]     ( "else"     [ stmt ] )? "end"  // check as last alternative, see note 1
 		node = node_alloc(NT_IF_STMT);
+		node_first_token(node, t);
+		
 		node_p cond = parse_expr(parser);
 		node_set(node, &node->if_stmt.cond, cond);
 		
-		t = try_consume(parser, T_DO);
-		if (!t) t = try_consume(parser, T_CBO);
-		if (!t) t = try_consume(parser, T_WSNL);
-		if (!t) {
+		token_p block_token = try_consume(parser, T_DO);
+		if (!block_token) block_token = try_consume(parser, T_CBO);
+		if (!block_token) block_token = try_consume(parser, T_WSNL);
+		if (!block_token) {
 			parser_error(parser, "if needs a block as body!");
 			abort();
 		}
@@ -335,25 +346,28 @@ node_p parse_stmt(parser_p parser) {
 		while ( try_stmt(parser) )
 			node_append(node, &node->if_stmt.true_case, parse_stmt(parser) );
 		
-		if (t->type == T_CBO)
-			consume_type(parser, T_CBC);
+		if (block_token->type == T_CBO)
+			t = consume_type(parser, T_CBC);
 		
 		if ( try_consume(parser, T_ELSE) ) {
-			if (t->type == T_CBO)
+			if (block_token->type == T_CBO)
 				consume_type(parser, T_CBO);
 			
 			while ( try_stmt(parser) )
 				node_append(node, &node->if_stmt.false_case, parse_stmt(parser) );
 			
-			if (t->type == T_CBO)
-				consume_type(parser, T_CBC);
+			if (block_token->type == T_CBO)
+				t = consume_type(parser, T_CBC);
 		}
 		
-		if (t->type == T_DO || t->type == T_WSNL)
-			consume_type(parser, T_END);
-	} else if ( try_consume(parser, T_RETURN) ) {
+		if (block_token->type == T_DO || block_token->type == T_WSNL)
+			t = consume_type(parser, T_END);
+		
+		node_last_token(node, t);
+	} else if ( (t = try_consume(parser, T_RETURN)) ) {
 		// "return" ( expr ["," expr] )? eos
 		node = node_alloc(NT_RETURN_STMT);
+		node_first_token(node, t);
 		
 		if ( !try_eos(parser, NULL) ) {
 			node_p expr = parse_expr(parser);
@@ -365,8 +379,9 @@ node_p parse_stmt(parser_p parser) {
 			}
 		}
 		
-		consume_eos(parser);
-	} else if ( try_cexpr(parser) ) {
+		t = consume_eos(parser);
+		node_last_token(node, t);
+	} else if ( (t = try_cexpr(parser)) ) {
 		// cexpr ID ( "=" expr )? [ "," ID ( "=" expr )? ]  // how to differ between ID and binary_op, see note 2
 		// cexpr [ binary_op cexpr ] "while" expr eos
 		//                           "if"    expr eos
@@ -401,6 +416,8 @@ static node_p complete_parser_var_def_statement(parser_p parser, node_p cexpr) {
 	// The first cexpr is already consumed and passed to us as parameter
 	// cexpr ID ( "=" expr )? [ "," ID ( "=" expr )? ]  // how to differ between ID and binary_op, see note 2
 	node_p node = node_alloc(NT_VAR);
+	node_first_token(node, cexpr->tokens.ptr);
+	
 	node_set(node, &node->var.type_expr, cexpr);
 	node_p binding = NULL;
 	token_p t = NULL;
@@ -409,14 +426,18 @@ static node_p complete_parser_var_def_statement(parser_p parser, node_p cexpr) {
 		binding = node_alloc_append(NT_BINDING, node, &node->var.bindings);
 		t = consume_type(parser, T_ID);
 		binding->binding.name = t->source;
+		node_first_token(binding, t);
 		
 		if ( (t = try_consume(parser, T_ASSIGN)) ) {
 			node_p expr = parse_expr(parser);
 			node_set(binding, &binding->binding.value, expr);
+			
+			node_last_token(node, expr->tokens.ptr + expr->tokens.len - 1);
 		}
 	} while ( try_consume(parser, T_COMMA) );
 	
-	consume_eos(parser);
+	t = consume_eos(parser);
+	node_last_token(node, t);
 	
 	return node;
 }
@@ -433,20 +454,25 @@ static node_p complete_parser_expr_statement(parser_p parser, node_p cexpr) {
 	} else if ( try_consume(parser, T_WHILE) ) {
 		node_p body = node;
 		node = node_alloc(NT_WHILE_STMT);
-		node_p cond = parse_expr(parser);
+		node_first_token(node, body->tokens.ptr);
 		
+		node_p cond = parse_expr(parser);
 		node_set(node, &node->while_stmt.cond, cond);
+		
 		node_append(node, &node->while_stmt.body, body);
 	} else if ( try_consume(parser, T_IF) ) {
 		node_p body = node;
 		node = node_alloc(NT_IF_STMT);
-		node_p cond = parse_expr(parser);
+		node_first_token(node, body->tokens.ptr);
 		
+		node_p cond = parse_expr(parser);
 		node_set(node, &node->if_stmt.cond, cond);
+		
 		node_append(node, &node->if_stmt.true_case, body);
 	}
 	
-	consume_eos(parser);
+	token_p t = consume_eos(parser);
+	node_last_token(node, t);
 	
 	return node;
 }
@@ -458,6 +484,7 @@ static token_p try_eos(parser_p parser, token_p after_token) {
 	else if ( (t = try_after_token(parser, T_SEMI, after_token)) ) return t;
 	else if ( (t = try_after_token(parser, T_CBC,  after_token)) ) return t;
 	else if ( (t = try_after_token(parser, T_END,  after_token)) ) return t;
+	else if ( (t = try_after_token(parser, T_ELSE, after_token)) ) return t;
 	else if ( (t = try_after_token(parser, T_WSNL, after_token)) ) return t;
 	return NULL;
 }
@@ -468,6 +495,7 @@ static token_p consume_eos(parser_p parser) {
 	else if ( (t = try_consume(parser, T_SEMI)) ) return t;
 	else if ( (t = try(parser, T_CBC))          ) return t;
 	else if ( (t = try(parser, T_END))          ) return t;
+	else if ( (t = try(parser, T_ELSE))         ) return t;
 	else if ( (t = try_consume(parser, T_WSNL)) ) return t;
 	return NULL;
 }
@@ -497,21 +525,27 @@ node_p parse_cexpr(parser_p parser) {
 	
 	if ( (t = try_consume(parser, T_ID)) ) {
 		node = node_alloc(NT_ID);
+		node_first_token(node, t);
 		node->id.name = t->source;
 	} else if ( (t = try_consume(parser, T_INT)) ) {
 		node = node_alloc(NT_INTL);
+		node_first_token(node, t);
 		node->intl.value = t->int_val;
 	} else if ( (t = try_consume(parser, T_STR)) ) {
 		node = node_alloc(NT_STRL);
+		node_first_token(node, t);
 		node->strl.value = t->str_val;
 	} else if ( (t = try_consume(parser, T_RBO)) ) {
 		node = parse_expr(parser);
-		consume_type(parser, T_RBC);
+		node_first_token(node, t);
+		t = consume_type(parser, T_RBC);
+		node_last_token(node, t);
 	
 	// cexpr = unary_op cexpr
 	#define UNARY_OP(token, id, name)                     \
 		} else if ( (t = try_consume(parser, token)) ) {  \
 			node = node_alloc(NT_UNARY_OP);               \
+			node_first_token(node, t);                    \
 			node->unary_op.index = id;                    \
 			node_p arg = parse_cexpr(parser);             \
 			node_set(node, &node->unary_op.arg, arg);
@@ -530,6 +564,7 @@ node_p parse_cexpr(parser_p parser) {
 			// cexpr = cexpr "(" ( expr [ "," expr ] )? ")"
 			node_p target_expr = node;
 			node = node_alloc(NT_CALL);
+			node_first_token(node, target_expr->tokens.ptr);
 			node_set(node, &node->call.target_expr, target_expr);
 			
 			if ( !try(parser, T_RBC) ) {
@@ -542,11 +577,13 @@ node_p parse_cexpr(parser_p parser) {
 				}
 			}
 			
-			consume_type(parser, T_RBC);
+			t = consume_type(parser, T_RBC);
+			node_last_token(node, t);
 		} else if ( (t = try_consume(parser, T_SBO)) ) {
 			// cexpr "[" ( expr [ "," expr ] )? "]"
 			node_p target_expr = node;
 			node = node_alloc(NT_INDEX);
+			node_first_token(node, target_expr->tokens.ptr);
 			node_set(node, &node->index.target_expr, target_expr);
 			
 			if ( !try(parser, T_SBC) ) {
@@ -559,13 +596,19 @@ node_p parse_cexpr(parser_p parser) {
 				}
 			}
 			
-			consume_type(parser, T_SBC);
+			t = consume_type(parser, T_SBC);
+			node_last_token(node, t);
 		} else if ( (t = try_consume(parser, T_PERIOD)) ) {
 			// cexpr "." ID
 			node_p aggregate = node;
 			node = node_alloc(NT_MEMBER);
+			node_first_token(node, aggregate->tokens.ptr);
 			node_set(node, &node->member.aggregate, aggregate);
-			node->member.member = consume_type(parser, T_ID)->source;
+			
+			t = consume_type(parser, T_ID);
+			node->member.member = t->source;
+			
+			node_last_token(node, t);
 		} else {
 			break;
 		}
@@ -595,7 +638,10 @@ static node_p complete_parser_expr(parser_p parser, node_p cexpr) {
 		// remaining operators and expressions.
 		node_p cexpr = node;
 		node = node_alloc(NT_UOPS);
+		
+		node_first_token(node, cexpr->tokens.ptr);
 		node_append(node, &node->uops.list, cexpr);
+		node_last_token(node, cexpr->tokens.ptr + cexpr->tokens.len - 1);
 		
 		while ( (t = try_binary_op(parser)) && !try_eos(parser, NULL) ) {
 			consume(parser, t);
@@ -603,10 +649,12 @@ static node_p complete_parser_expr(parser_p parser, node_p cexpr) {
 			// TODO: Store the token in the node, the resolve uops pass can then
 			// look at the token to figure out which operator it was.
 			node_p op_node = node_alloc_append(NT_ID, node, &node->uops.list);
+			node_first_token(op_node, t);
 			op_node->id.name = t->source;
 			
 			cexpr = parse_cexpr(parser);
 			node_append(node, &node->uops.list, cexpr);
+			node_last_token(node, cexpr->tokens.ptr + cexpr->tokens.len - 1);
 		}
 	}
 	

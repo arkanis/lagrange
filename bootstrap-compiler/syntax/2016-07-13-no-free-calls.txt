@@ -55,6 +55,7 @@ eos  = try-only: EOF    // don't consume because parser function consumes the EO
        ";"
        try-only: "}"    // because of block and stmt bodies
        try-only: "end"  // because of block and stmt bodies
+       try-only: "else" // because of end of true case of if statement
        WSNL             // because of if and while conditions with optional "do"
                         // try last to avoid effects like in note 1
 
