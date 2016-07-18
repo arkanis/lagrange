@@ -93,6 +93,34 @@ void node_append(node_p parent, node_list_p list, node_p child) {
 
 
 //
+// Functions to assign tokens to nodes
+//
+
+void node_first_token(node_p node, token_p token) {
+	if (node->tokens.ptr) {
+		node->tokens.len -= token - node->tokens.ptr;
+		node->tokens.ptr = token;
+	} else {
+		node->tokens.ptr = token;
+		node->tokens.len = 1;
+	}
+}
+
+void node_last_token(node_p node, token_p token) {
+	if (token < node->tokens.ptr) {
+		fprintf(stderr, "node_last_token(): Tried to assign a last token that's before the first token of the node!\n");
+		abort();
+	} else if (!node->tokens.ptr) {
+		fprintf(stderr, "node_last_token(): Tried to assign a last token before assigning a first token!\n");
+		abort();
+	}
+	
+	node->tokens.len = token - node->tokens.ptr + 1;
+}
+
+
+
+//
 // Printing functions
 //
 

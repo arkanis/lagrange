@@ -226,6 +226,9 @@ node_p node_alloc_append(node_type_t type, node_p parent, node_list_p list);
 void node_set(node_p parent, node_p* member, node_p child);
 void node_append(node_p parent, node_list_p list, node_p child);
 
+void node_first_token(node_p node, token_p token);
+void node_last_token(node_p node, token_p token);
+
 void node_print(node_p node, pass_t pass, FILE* output);
 void node_print_inline(node_p node, pass_t pass, FILE* output);
 
