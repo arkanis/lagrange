@@ -1,16 +1,38 @@
+// for getopt()
+#define _GNU_SOURCE
+#include <unistd.h>
 #include "common.h"
 
+
 int main(int argc, char** argv) {
-	if (argc < 2) {
-		fprintf(stderr, "usage: %s source-file\n", argv[0]);
+	// Process command line arguments
+	bool show_tokens = false, show_parser_ast = false;
+	int opt;
+	while ( (opt = getopt(argc, argv, "tp")) != -1 ) {
+		switch (opt) {
+			case 't': show_tokens = true;     break;
+			case 'p': show_parser_ast = true; break;
+			default:
+				fprintf(stderr, "usage: %s [ -tp ] source-file\n", argv[0]);
+				return 1;
+		}
+	}
+	
+	if ( !(optind + 1 == argc) ) {
+		fprintf(stderr, "usage: %s [ -tp ] source-file\n", argv[0]);
 		return 1;
 	}
 	
+	char* source_file = argv[optind];
+	
+	
+	// Initialize module
 	module_p module = &(module_t){
-		.filename = argv[1],
-		.source   = str_fload(argv[1])
+		.filename = source_file,
+		.source   = str_fload(source_file)
 	};
 	int exit_code = 0;
+	
 	
 	// Step 1 - Tokenize source
 	size_t error_count = 0;
@@ -32,23 +54,27 @@ int main(int argc, char** argv) {
 	}
 	
 	// Print tokens
-	for(size_t i = 0; i < module->tokens.len; i++) {
-		token_p t = &module->tokens.ptr[i];
-		if (t->type == T_COMMENT || t->type == T_WS) {
-			token_print(stdout, t, TP_SOURCE);
-		} else if (t->type == T_WSNL || t->type == T_EOF) {
-			printf(" ");
-			token_print(stdout, t, TP_DUMP);
-			printf(" ");
-		} else {
-			token_print(stdout, t, TP_DUMP);
+	if (show_tokens) {
+		for(size_t i = 0; i < module->tokens.len; i++) {
+			token_p t = &module->tokens.ptr[i];
+			if (t->type == T_COMMENT || t->type == T_WS) {
+				token_print(stdout, t, TP_SOURCE);
+			} else if (t->type == T_WSNL || t->type == T_EOF) {
+				printf(" ");
+				token_print(stdout, t, TP_DUMP);
+				printf(" ");
+			} else {
+				token_print(stdout, t, TP_DUMP);
+			}
 		}
+		printf("\n");
 	}
-	printf("\n");
+	
 	
 	// Step 2 - Parse tokens into an AST
 	node_p node = parse(module, parse_module, stderr);
-	node_print(node, P_PARSER, stdout);
+	if (show_parser_ast)
+		node_print(node, P_PARSER, stdout);
 	
 	
 	cleanup_tokenizer:

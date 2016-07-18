@@ -41,6 +41,8 @@ x Add token range to AST nodes and support functions:
 	x Add token list to AST nodes
 	x Add to AST node creation functions
 	x Create an parser_error() function that prints the tokens we're at
+x Add command line arguments to lgc
+- Add operator reordering pass
 - Write a node_error() function thats like parser_error() but for AST processing.
   It just shows the first line of the AST nodes tokens. Otherwise we would get
   huge error messages on function nodes and the like. Usefull to emit errors in
