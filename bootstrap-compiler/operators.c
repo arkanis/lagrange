@@ -60,6 +60,11 @@ node_p pass_resolve_uops(node_p node) {
 			// Find operator of the current op_slot node based on the IDs name
 			ssize_t op_idx = -1;
 			for(size_t i = 0; i < sizeof(operators) / sizeof(operators[0]); i++) {
+				// Ignore holes in the operators array since we left out some
+				// operator IDs.
+				if (operators[i].name == NULL)
+					continue;
+				
 				if ( strncmp(operators[i].name, op_slot->id.name.ptr, op_slot->id.name.len) == 0 && (int)strlen(operators[i].name) == op_slot->id.name.len ) {
 					op_idx = i;
 					break;
