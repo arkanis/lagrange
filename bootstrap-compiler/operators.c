@@ -1,0 +1,123 @@
+#include "common.h"
+
+// Based on http://en.cppreference.com/w/c/language/operator_precedence
+// Worth a look because of bitwise and comparison ops: http://wiki.dlang.org/Operator_precedence
+typedef enum { LEFT_TO_RIGHT, RIGHT_TO_LEFT } op_assoc_t;
+// CAUTION: Operators with the same precedence need the same associativity!
+// Otherwise it probably gets complicates... not sure.
+struct { char* name; int precedence; op_assoc_t assoc; } operators[] = {
+	[OP_MUL]    = { "*",  80, LEFT_TO_RIGHT },
+	[OP_DIV]    = { "/",  80, LEFT_TO_RIGHT },
+	[OP_MOD]    = { "%",  80, LEFT_TO_RIGHT },
+	
+	[OP_ADD]    = { "+",  70, LEFT_TO_RIGHT },
+	[OP_SUB]    = { "-",  70, LEFT_TO_RIGHT },
+	
+	[OP_LT]     = { "<",  50, LEFT_TO_RIGHT },
+	[OP_LE]     = { "<=", 50, LEFT_TO_RIGHT },
+	[OP_GT]     = { ">",  50, LEFT_TO_RIGHT },
+	[OP_GE]     = { ">=", 50, LEFT_TO_RIGHT },
+	
+	[OP_EQ]     = { "==", 40, LEFT_TO_RIGHT },
+	[OP_NEQ]    = { "!=", 40, LEFT_TO_RIGHT },
+	
+	[OP_ASSIGN] = { "=",   0, RIGHT_TO_LEFT },
+};
+
+
+/**
+ * For each uops node: We find the strongest binding operator and replace it and
+ * the nodes it binds to with an op node. This is repeated until no operators
+ * are left to replace. The uops node should just have one op child at the end.
+ */
+node_p pass_resolve_uops(node_p node) {
+	// Frist resolve all uops in the child nodes. This needs less recursive
+	// calls than doing it afterwards.
+	for(ast_it_t it = ast_start(node); it.node != NULL; it = ast_next(node, it)) {
+		node_p new_child = pass_resolve_uops(it.node);
+		if (new_child != it.node)
+			ast_replace_node(node, it, new_child);
+	}
+	
+	// Leave non uops nodes untouched
+	if (node->type != NT_UOPS)
+		return node;
+	
+	node_list_p list = &node->uops.list;
+	
+	while (list->len > 1) {
+		// Find strongest operator (operator with highest precedence)
+		int strongest_op_idx = -1;
+		int strongest_op_prec = 0;
+		int strongest_op_node_idx = -1;
+		for(int node_idx = 1; node_idx < (int)list->len; node_idx += 2) {
+			node_p op_slot = list->ptr[node_idx];
+			if (op_slot->type != NT_ID) {
+				fprintf(stderr, "pass_resolve_uops(): got non NT_ID in uops op slot!\n");
+				abort();
+			}
+			
+			// Find operator of the current op_slot node based on the IDs name
+			ssize_t op_idx = -1;
+			for(size_t i = 0; i < sizeof(operators) / sizeof(operators[0]); i++) {
+				if ( strncmp(operators[i].name, op_slot->id.name.ptr, op_slot->id.name.len) == 0 && (int)strlen(operators[i].name) == op_slot->id.name.len ) {
+					op_idx = i;
+					break;
+				}
+			}
+			
+			if (op_idx == -1) {
+				fprintf(stderr, "pass_resolve_uops(): unknown operator: %.*s!",
+					op_slot->id.name.len, op_slot->id.name.ptr);
+				abort();
+			}
+			
+			printf("pass_resolve_uops(): got op %.*s (idx %zd) at node idx %d\n",
+				op_slot->id.name.len, op_slot->id.name.ptr, op_idx, node_idx
+			);
+			
+			// When several ops have the highest (same) precedence:
+			// For LEFT_TO_RIGHT operators we pick the first op
+			// For RIGHT_TO_LEFT operators we pick the last op
+			if (
+				(operators[op_idx].assoc == LEFT_TO_RIGHT && operators[op_idx].precedence >  strongest_op_prec) ||
+				(operators[op_idx].assoc == RIGHT_TO_LEFT && operators[op_idx].precedence >= strongest_op_prec)
+			) {
+				strongest_op_prec = operators[op_idx].precedence;
+				strongest_op_idx = op_idx;
+				strongest_op_node_idx = node_idx;
+			}
+		}
+		
+		if (strongest_op_idx == -1) {
+			fprintf(stderr, "pass_resolve_uops(): found no op in uops node!");
+			abort();
+		}
+		
+		printf("pass_resolve_uops(): op %s got highest precedence: %d\n",
+			operators[strongest_op_idx].name, strongest_op_prec
+		);
+		
+		
+		// Take the nodes left and right from the op_slot node and create a new op
+		// node out of them. Then replace these nodes in the list with the new op
+		// node.
+		node_p op_node = node_alloc(NT_OP);
+		op_node->parent = node;
+		op_node->op.index = strongest_op_idx;
+		node_set(op_node, &op_node->op.a, list->ptr[strongest_op_node_idx - 1]);
+		node_set(op_node, &op_node->op.b, list->ptr[strongest_op_node_idx + 1]);
+		
+		node_first_token(op_node, op_node->op.a->tokens.ptr);
+		node_last_token(op_node, op_node->op.b->tokens.ptr);
+		
+		node_list_replace_n1(list, strongest_op_node_idx - 1, 3, op_node);
+		
+		node_print(node, P_PARSER, stderr);
+	}
+	
+	// By now the uops node only contains one op node child. Return that so the
+	// recursive iteration code above replaces this uops node with the returned
+	// op node.
+	return node->uops.list.ptr[0];
+}
