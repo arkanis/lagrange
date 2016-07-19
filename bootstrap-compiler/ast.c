@@ -90,6 +90,23 @@ void node_append(node_p parent, node_list_p list, node_p child) {
 	list_append(list, child);
 }
 
+void node_list_replace_n1(node_list_p list, size_t start_idx, size_t hole_len, node_p replacement_node) {
+	size_t new_len = list->len - hole_len + 1;
+	
+	// Nodes from 0..start_idx remain unchanged
+	// Node at start_idx is replaced by replacement_node
+	// Overwrite nodes begining at start_idx+1 with nodes at (start_idx + hole_len)..new_len
+	list->ptr[start_idx] = replacement_node;
+	for(size_t i = start_idx + 1; i < new_len; i++)
+		list->ptr[i] = list->ptr[i + hole_len - 1];
+	// Null out free space
+	for(size_t i = new_len; i < list->len; i++)
+		list->ptr[i] = NULL;
+	
+	list->len = new_len;
+	list->ptr = realloc(list->ptr, list->len * sizeof(list->ptr[0]));
+}
+
 
 
 //
@@ -270,5 +287,115 @@ void node_print_inline(node_p node, pass_t pass, FILE* output) {
 				fprintf(output, "???");
 				break;
 		}
+	}
+}
+
+
+//
+// AST iteration functions
+//
+
+/*
+new iterator
+	search for first node or list
+	node:
+		member_index = idx of first member
+		node_index = -1
+		node = ptr
+	list:
+		member_index = idx of first member
+		node_index = 0
+		node = list.ptr[0]
+
+next iterator:
+	if member[member_idx] is node
+		new iterator for member_idx+1
+	is list
+		node_index++
+		if node_index < list.len
+			node = list.ptr[node_index]
+		else
+			new iterator for member_idx+1
+*/
+
+static ast_it_t ast_it_for_node(node_p node, size_t member_index) {
+	for(size_t i = member_index; node->spec->members[i].type != 0; i++) {
+		member_spec_p member = &node->spec->members[i];
+		void* member_ptr = (uint8_t*)node + member->offset;
+		
+		if (member->type == MT_NODE) {
+			node_p* child_node = member_ptr;
+			if (*child_node) {
+				return (ast_it_t){
+					.member_index = i,
+					.node_index = -1,
+					.node = *child_node
+				};
+			}
+		} else if (member->type == MT_NODE_LIST) {
+			node_list_p list = member_ptr;
+			if (list->len > 0) {
+				return (ast_it_t){
+					.member_index = i,
+					.node_index = 0,
+					.node = list->ptr[0]
+				};
+			}
+		}
+	}
+	
+	return (ast_it_t){
+		.member_index = -1,
+		.node_index = -1,
+		.node = NULL
+	};
+}
+
+ast_it_t ast_start(node_p node) {
+	return ast_it_for_node(node, 0);
+}
+
+ast_it_t ast_next(node_p node, ast_it_t it) {
+	if (it.member_index == -1)
+		return it;
+	
+	member_spec_p member = &node->spec->members[it.member_index];
+	void* member_ptr = (uint8_t*)node + member->offset;
+	if ( member->type == MT_NODE_LIST ) {
+		node_list_p list = member_ptr;
+		it.node_index++;
+		if (it.node_index < (ssize_t)list->len) {
+			it.node = list->ptr[it.node_index];
+			return it;
+		}
+	}
+	
+	return ast_it_for_node(node, it.member_index + 1);
+}
+
+void ast_replace_node(node_p node, ast_it_t it, node_p new_child) {
+	if (it.member_index == -1 || it.node == NULL) {
+		fprintf(stderr, "ast_replace_node(): Tried to replace a node with an iterator that doesn't point to a node!\n");
+		abort();
+	}
+	
+	// Kill parent link in old child node and set it in the new child node
+	it.node->parent = NULL;
+	new_child->parent = node;
+	
+	member_spec_p member_spec = &node->spec->members[it.member_index];
+	void*         member_ptr  = (uint8_t*)node + member_spec->offset;
+	
+	if ( member_spec->type == MT_NODE ) {
+		node_p* child_node = member_ptr;
+		(*child_node)->parent = NULL;
+		*child_node = new_child;
+	} else if ( member_spec->type == MT_NODE_LIST ) {
+		node_list_p list = member_ptr;
+		list->ptr[it.node_index]->parent = NULL;
+		list->ptr[it.node_index] = new_child;
+	} else {
+		fprintf(stderr, "ast_replace_node(): The iterator doesn't point to a node or node list member!\n");
+		abort();
 	}
 }

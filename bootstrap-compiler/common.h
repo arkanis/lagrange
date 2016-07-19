@@ -225,6 +225,7 @@ node_p node_alloc_append(node_type_t type, node_p parent, node_list_p list);
 
 void node_set(node_p parent, node_p* member, node_p child);
 void node_append(node_p parent, node_list_p list, node_p child);
+void node_list_replace_n1(node_list_p list, size_t start_idx, size_t hole_len, node_p replacement_node);
 
 void node_first_token(node_p node, token_p token);
 void node_last_token(node_p node, token_p token);
@@ -246,6 +247,7 @@ typedef struct {
 
 ast_it_t ast_start(node_p node);
 ast_it_t ast_next(node_p node, ast_it_t it);
+void     ast_replace_node(node_p node, ast_it_t it, node_p new_child);
 
 
 //
@@ -261,3 +263,5 @@ typedef enum {
 	#define BINARY_OP(token, id, name) id,
 	#include "op_spec.h"
 } binary_op_type_t;
+
+node_p pass_resolve_uops(node_p node);
