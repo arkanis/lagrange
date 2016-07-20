@@ -44,8 +44,8 @@ x Add token range to AST nodes and support functions:
 x Add command line arguments to lgc
 x Add operator reordering pass
 x Change unary ops from indices to names
-- Change binary ops from indices to names
-- Write test for operator reordering (either sample bases with lgc or by using functions directly)
+x Change binary ops from indices to names
+x Write test for operator reordering (either sample bases with lgc or by using functions directly)
 - Add namespace pass
 - Create buildins...
 - Replace operator tables with buildin operator objects
