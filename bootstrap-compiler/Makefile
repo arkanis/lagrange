@@ -13,8 +13,9 @@ tests: $(TESTS)
 tests/utils_test: utils.o
 tests/asm_test: asm.o tests/disassembler_utils.o
 tests/tokenizer_test: tokenizer.o utils.o
-tests/parser_test: tokenizer.o parser.o ast.o utils.o
 tests/ast_test: ast.o utils.o
+tests/parser_test: tokenizer.o parser.o ast.o utils.o
+tests/resolve_uops_test: tokenizer.o parser.o ast.o utils.o operators.o
 
 
 # clean target for all directories, ensures that the ignore files are properly maintained.
