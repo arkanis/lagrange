@@ -35,23 +35,28 @@ struct { parser_rule_func_t rule; char* code; char* expected_ast_dump; } samples
 	// cexpr: unary operators
 	//
 	{ parse_expr, "+17",
-		"unary_op: 0\n"
+		"unary_op: \"plus\"\n"
+		"  op: id: \"+\"\n"
 		"  arg: intl: 17\n"
 	},
 	{ parse_expr, "-17",
-		"unary_op: 1\n"
+		"unary_op: \"minus\"\n"
+		"  op: id: \"-\"\n"
 		"  arg: intl: 17\n"
 	},
 	{ parse_expr, "!foo",
-		"unary_op: 2\n"
+		"unary_op: \"not\"\n"
+		"  op: id: \"!\"\n"
 		"  arg: id: \"foo\"\n"
 	},
 	{ parse_expr, "~foo",
-		"unary_op: 3\n"
+		"unary_op: \"compl\"\n"
+		"  op: id: \"~\"\n"
 		"  arg: id: \"foo\"\n"
 	},
 	{ parse_expr, " \n ~ \n foo \n ",
-		"unary_op: 3\n"
+		"unary_op: \"compl\"\n"
+		"  op: id: \"~\"\n"
 		"  arg: id: \"foo\"\n"
 	},
 	

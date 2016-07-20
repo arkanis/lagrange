@@ -255,11 +255,6 @@ void     ast_replace_node(node_p node, ast_it_t it, node_p new_child);
 //
 
 typedef enum {
-	#define UNARY_OP(token, id, name) id,
-	#include "op_spec.h"
-} unary_op_type_t;
-
-typedef enum {
 	#define BINARY_OP(token, id, name) id,
 	#include "op_spec.h"
 } binary_op_type_t;

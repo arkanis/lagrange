@@ -42,7 +42,13 @@ x Add token range to AST nodes and support functions:
 	x Add to AST node creation functions
 	x Create an parser_error() function that prints the tokens we're at
 x Add command line arguments to lgc
-- Add operator reordering pass
+x Add operator reordering pass
+x Change unary ops from indices to names
+- Change binary ops from indices to names
+- Write test for operator reordering (either sample bases with lgc or by using functions directly)
+- Add namespace pass
+- Create buildins...
+- Replace operator tables with buildin operator objects
 - Write a node_error() function thats like parser_error() but for AST processing.
   It just shows the first line of the AST nodes tokens. Otherwise we would get
   huge error messages on function nodes and the like. Usefull to emit errors in

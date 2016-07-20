@@ -1,5 +1,5 @@
 #ifndef UNARY_OP
-	#define UNARY_OP(token, id, name)
+	#define UNARY_OP(token, name)
 #endif
 #ifndef SPECIAL_OP
 	#define SPECIAL_OP(token, id, name)
@@ -9,10 +9,10 @@
 #endif
 
 
-UNARY_OP(T_ADD,    OP_PLUS,  plus)
-UNARY_OP(T_SUB,    OP_MINUS, minus)
-UNARY_OP(T_NOT,    OP_NOT,   not)
-UNARY_OP(T_COMPL,  OP_COMPL, compl)
+UNARY_OP(T_ADD,   plus)
+UNARY_OP(T_SUB,   minus)
+UNARY_OP(T_NOT,   not)
+UNARY_OP(T_COMPL, compl)
 
 SPECIAL_OP(T_PERIOD,   OP_PERIOD,      _)
 SPECIAL_OP(T_ID,       OP_USERDEFINED, _)

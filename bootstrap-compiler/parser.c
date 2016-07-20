@@ -512,7 +512,7 @@ static token_p try_cexpr(parser_p parser) {
 	else if ( (t = try(parser, T_INT)) ) return t;
 	else if ( (t = try(parser, T_STR)) ) return t;
 	else if ( (t = try(parser, T_RBO)) ) return t;
-	#define UNARY_OP(token, id, name)  \
+	#define UNARY_OP(token, name)  \
 		else if ( (t = try(parser, token)) ) return t;
 	#include "op_spec.h"
 	
@@ -542,13 +542,19 @@ node_p parse_cexpr(parser_p parser) {
 		node_last_token(node, t);
 	
 	// cexpr = unary_op cexpr
-	#define UNARY_OP(token, id, name)                     \
-		} else if ( (t = try_consume(parser, token)) ) {  \
-			node = node_alloc(NT_UNARY_OP);               \
-			node_first_token(node, t);                    \
-			node->unary_op.index = id;                    \
-			node_p arg = parse_cexpr(parser);             \
-			node_set(node, &node->unary_op.arg, arg);
+	#define UNARY_OP(token, op_text_name)                                 \
+		} else if ( (t = try_consume(parser, token)) ) {                  \
+			node = node_alloc(NT_UNARY_OP);                               \
+			node->unary_op.name = str_from_c(#op_text_name);              \
+			node_first_token(node, t);                                    \
+			                                                              \
+			node_p op = node_alloc_set(NT_ID, node, &node->unary_op.op);  \
+			op->id.name = t->source;                                      \
+			node_first_token(op, t);                                      \
+			                                                              \
+			node_p arg = parse_cexpr(parser);                             \
+			node_set(node, &node->unary_op.arg, arg);                     \
+			node_last_token(node, arg->tokens.ptr + arg->tokens.len - 1);
 	#include "op_spec.h"
 	
 	} else {

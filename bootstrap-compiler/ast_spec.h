@@ -106,10 +106,11 @@ END(strl)
 //
 
 BEGIN(unary_op, UNARY_OP)
-	MEMBER(unary_op, index, size_t, MT_SIZE, P_PARSER)
-	MEMBER(unary_op, arg,   node_p, MT_NODE, P_PARSER)
+	MEMBER(unary_op, name, str_t,  MT_STR,  P_PARSER)
+	MEMBER(unary_op, op,   node_p, MT_NODE, P_PARSER)
+	MEMBER(unary_op, arg,  node_p, MT_NODE, P_PARSER)
 	
-	MEMBER(unary_op, type,  type_p, MT_TYPE, P_TYPE)
+	MEMBER(unary_op, type, type_p, MT_TYPE, P_TYPE)
 END(unary_op)
 
 BEGIN(uops, UOPS)
