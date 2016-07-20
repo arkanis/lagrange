@@ -6,13 +6,15 @@
 
 int main(int argc, char** argv) {
 	// Process command line arguments
-	bool show_tokens = false, show_parser_ast = false, show_resloved_uops = false;
+	bool show_tokens = false, show_parser_ast = false, show_filled_namespaces = false;
+	bool show_resloved_uops = false;
 	int opt;
-	while ( (opt = getopt(argc, argv, "tpo")) != -1 ) {
+	while ( (opt = getopt(argc, argv, "tpno")) != -1 ) {
 		switch (opt) {
-			case 't': show_tokens = true;        break;
-			case 'p': show_parser_ast = true;    break;
-			case 'o': show_resloved_uops = true; break;
+			case 't': show_tokens = true;            break;
+			case 'p': show_parser_ast = true;        break;
+			case 'n': show_filled_namespaces = true; break;
+			case 'o': show_resloved_uops = true;     break;
 			default:
 				fprintf(stderr, "usage: %s [ -tp ] source-file\n", argv[0]);
 				return 1;
@@ -76,6 +78,11 @@ int main(int argc, char** argv) {
 	node_p node = parse(module, parse_module, stderr);
 	if (show_parser_ast)
 		node_print(node, P_PARSER, stdout);
+	
+	// Step 3 - Fill namespaces
+	fill_namespaces(node, NULL);
+	if (show_filled_namespaces)
+		node_print(node, P_NAMESPACE, stdout);
 	
 	// Step 3 - Resolve uops nodes
 	node = pass_resolve_uops(node);

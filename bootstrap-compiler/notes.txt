@@ -46,7 +46,7 @@ x Add operator reordering pass
 x Change unary ops from indices to names
 x Change binary ops from indices to names
 x Write test for operator reordering (either sample bases with lgc or by using functions directly)
-- Add namespace pass
+x Add namespace pass
 - Create buildins...
 - Replace operator tables with buildin operator objects
 - Write a node_error() function thats like parser_error() but for AST processing.
@@ -66,3 +66,9 @@ For next syntax step
 	- Requires double collon token.
 	- Requires 2 token look ahead: Check for the ID followed by a double collon.
 	  Otherwise we can't differ between a leading name and an expression.
+
+Nice to have stuff
+==================
+
+- Variables defined in conditions of if, while, etc. that are accessible when
+  the condition matches (inspired by D).

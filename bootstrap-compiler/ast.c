@@ -90,6 +90,12 @@ void node_append(node_p parent, node_list_p list, node_p child) {
 	list_append(list, child);
 }
 
+
+
+//
+// Node list utility functions
+//
+
 void node_list_replace_n1(node_list_p list, size_t start_idx, size_t hole_len, node_p replacement_node) {
 	size_t new_len = list->len - hole_len + 1;
 	
@@ -105,6 +111,15 @@ void node_list_replace_n1(node_list_p list, size_t start_idx, size_t hole_len, n
 	
 	list->len = new_len;
 	list->ptr = realloc(list->ptr, list->len * sizeof(list->ptr[0]));
+}
+
+bool node_list_contains_node(node_list_p list, node_p node) {
+	for(size_t i = 0; i < list->len; i++) {
+		if (list->ptr[i] == node)
+			return true;
+	}
+	
+	return false;
 }
 
 
@@ -172,12 +187,10 @@ static void node_print_recursive(node_p node, pass_t pass, FILE* output, int lev
 				}
 				} break;
 			case MT_NS: {
-				/*
 				node_ns_p ns = member_ptr;
 				for(node_ns_it_p it = node_ns_start(ns); it != NULL; it = node_ns_next(ns, it)) {
 					fprintf(output, "\"%.*s\" ", it->key.len, it->key.ptr);
 				}
-				*/
 				} break;
 			case MT_ASL: {
 				list_t(node_addr_slot_t)* asl = member_ptr;
