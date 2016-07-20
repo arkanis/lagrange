@@ -254,9 +254,4 @@ void     ast_replace_node(node_p node, ast_it_t it, node_p new_child);
 // Operators
 //
 
-typedef enum {
-	#define BINARY_OP(token, id, name) id,
-	#include "op_spec.h"
-} binary_op_type_t;
-
 node_p pass_resolve_uops(node_p node);

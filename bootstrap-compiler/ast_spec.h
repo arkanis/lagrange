@@ -120,11 +120,12 @@ BEGIN(uops, UOPS)
 END(uops)
 
 BEGIN(op, OP)
-	MEMBER(op, index, size_t, MT_SIZE, P_PARSER)
-	MEMBER(op, a,     node_p, MT_NODE, P_PARSER)
-	MEMBER(op, b,     node_p, MT_NODE, P_PARSER)
+	MEMBER(op, name, str_t,  MT_STR,  P_PARSER)
+	MEMBER(op, op,   node_p, MT_NODE, P_PARSER)
+	MEMBER(op, a,    node_p, MT_NODE, P_PARSER)
+	MEMBER(op, b,    node_p, MT_NODE, P_PARSER)
 	
-	MEMBER(op, type,  type_p, MT_TYPE, P_TYPE)
+	MEMBER(op, type, type_p, MT_TYPE, P_TYPE)
 END(op)
 
 BEGIN(member, MEMBER)

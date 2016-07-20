@@ -623,12 +623,19 @@ node_p parse_cexpr(parser_p parser) {
 	return node;
 }
 
-static token_p try_binary_op(parser_p parser) {
+static token_p try_binary_op(parser_p parser, str_p op_text_name) {
 	token_p t = NULL;
-	if ( (t = try(parser, T_ID)) ) return t;
-	#define BINARY_OP(token, id, name)  \
-		else if ( (t = try(parser, token)) ) return t;
+	if ( (t = try(parser, T_ID)) ) {
+		if (op_text_name)
+			*op_text_name = t->source;
+		return t;
+	#define BINARY_OP(token, name)                \
+		} else if ( (t = try(parser, token)) ) {  \
+			if (op_text_name)                     \
+				*op_text_name = str_from_c(#name); \
+			return t;
 	#include "op_spec.h"
+	}
 	
 	return NULL;
 }
@@ -639,7 +646,7 @@ static node_p complete_parser_expr(parser_p parser, node_p cexpr) {
 	node_p node = cexpr;
 	
 	token_p t = NULL;
-	if ( try_binary_op(parser) && !try_eos(parser, NULL) ) {
+	if ( try_binary_op(parser, NULL) && !try_eos(parser, NULL) ) {
 		// Got an operator, wrap everything into an uops node and collect the
 		// remaining operators and expressions.
 		node_p cexpr = node;
@@ -649,14 +656,13 @@ static node_p complete_parser_expr(parser_p parser, node_p cexpr) {
 		node_append(node, &node->uops.list, cexpr);
 		node_last_token(node, cexpr->tokens.ptr + cexpr->tokens.len - 1);
 		
-		while ( (t = try_binary_op(parser)) && !try_eos(parser, NULL) ) {
+		str_t op_text_name = { 0 };
+		while ( (t = try_binary_op(parser, &op_text_name)) && !try_eos(parser, NULL) ) {
 			consume(parser, t);
 			
-			// TODO: Store the token in the node, the resolve uops pass can then
-			// look at the token to figure out which operator it was.
-			node_p op_node = node_alloc_append(NT_ID, node, &node->uops.list);
-			node_first_token(op_node, t);
-			op_node->id.name = t->source;
+			node_p op = node_alloc_append(NT_ID, node, &node->uops.list);
+			op->id.name = op_text_name;
+			node_first_token(op, t);
 			
 			cexpr = parse_cexpr(parser);
 			node_append(node, &node->uops.list, cexpr);
