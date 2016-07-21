@@ -30,11 +30,11 @@ struct { char* name; int precedence; op_assoc_t assoc; } operators[] = {
  * the nodes it binds to with an op node. This is repeated until no operators
  * are left to replace. The uops node should just have one op child at the end.
  */
-node_p pass_resolve_uops(node_p node) {
+node_p pass_resolve_uops(module_p module, node_p node) {
 	// Frist resolve all uops in the child nodes. This needs less recursive
 	// calls than doing it afterwards.
 	for(ast_it_t it = ast_start(node); it.node != NULL; it = ast_next(node, it)) {
-		node_p new_child = pass_resolve_uops(it.node);
+		node_p new_child = pass_resolve_uops(module, it.node);
 		if (new_child != it.node)
 			ast_replace_node(node, it, new_child);
 	}
@@ -53,7 +53,7 @@ node_p pass_resolve_uops(node_p node) {
 		for(int node_idx = 1; node_idx < (int)list->len; node_idx += 2) {
 			node_p op_slot = list->ptr[node_idx];
 			if (op_slot->type != NT_ID) {
-				fprintf(stderr, "pass_resolve_uops(): got non NT_ID in uops op slot!\n");
+				node_error(stderr, op_slot, module, "pass_resolve_uops(): got non NT_ID in uops op slot!\n");
 				abort();
 			}
 			
@@ -72,8 +72,7 @@ node_p pass_resolve_uops(node_p node) {
 			}
 			
 			if (op_idx == -1) {
-				fprintf(stderr, "pass_resolve_uops(): unknown operator: %.*s!",
-					op_slot->id.name.len, op_slot->id.name.ptr);
+				node_error(stderr, op_slot, module, "pass_resolve_uops(): got unimplemented operator!\n");
 				abort();
 			}
 			
@@ -95,7 +94,7 @@ node_p pass_resolve_uops(node_p node) {
 		}
 		
 		if (strongest_op_idx == -1) {
-			fprintf(stderr, "pass_resolve_uops(): found no op in uops node!");
+			node_error(stderr, node, module, "pass_resolve_uops(): no operators found in uops node!\n");
 			abort();
 		}
 		

@@ -80,12 +80,12 @@ int main(int argc, char** argv) {
 		node_print(node, P_PARSER, stdout);
 	
 	// Step 3 - Fill namespaces
-	fill_namespaces(node, NULL);
+	fill_namespaces(module, node, NULL);
 	if (show_filled_namespaces)
 		node_print(node, P_NAMESPACE, stdout);
 	
-	// Step 3 - Resolve uops nodes
-	node = pass_resolve_uops(node);
+	// Step 4 - Resolve uops nodes
+	node = pass_resolve_uops(module, node);
 	if (show_resloved_uops)
 		node_print(node, P_PARSER, stdout);
 	

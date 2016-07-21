@@ -45,7 +45,7 @@ void test_samples() {
 	
 	for(size_t i = 0; i < sizeof(samples) / sizeof(samples[0]); i++) {
 		module_p module = &(module_t){
-			.filename = "parser_test.c/test_samples",
+			.filename = "resolve_uops_test.c/test_samples",
 			.source   = str_from_c(samples[i].code)
 		};
 		
@@ -53,7 +53,7 @@ void test_samples() {
 		st_check_int(errors, 0);
 		
 		node_p node = parse(module, parse_expr, stderr);
-		node = pass_resolve_uops(node);
+		node = pass_resolve_uops(module, node);
 		
 		output = open_memstream(&output_ptr, &output_len);
 			node_print(node, P_PARSER, output);

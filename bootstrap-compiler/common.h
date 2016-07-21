@@ -234,7 +234,7 @@ void node_last_token(node_p node, token_p token);
 
 void node_print(node_p node, pass_t pass, FILE* output);
 void node_print_inline(node_p node, pass_t pass, FILE* output);
-void node_error(node_p node, module_p module, FILE* output);
+void node_error(FILE* output, node_p node, module_p module, const char* message);
 
 
 // Example:
@@ -257,5 +257,5 @@ void     ast_replace_node(node_p node, ast_it_t it, node_p new_child);
 // Passes
 //
 
-node_p pass_resolve_uops(node_p node);
-void   fill_namespaces(node_p node, node_ns_p current_ns);
+node_p pass_resolve_uops(module_p module, node_p node);
+void   fill_namespaces(module_p module, node_p node, node_ns_p current_ns);

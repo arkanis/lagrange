@@ -20,7 +20,7 @@ SH_GEN_DEF(node_ns, str_t, node_p,
 // Pass to fill namespaces with links to their defining nodes
 //
 
-void fill_namespaces(node_p node, node_ns_p current_ns) {
+void fill_namespaces(module_p module, node_p node, node_ns_p current_ns) {
 	node_ns_p ns_for_children = current_ns;
 	
 	switch(node->type) {
@@ -36,9 +36,9 @@ void fill_namespaces(node_p node, node_ns_p current_ns) {
 			break;
 		case NT_IF_STMT:
 			for(size_t i = 0; i < node->if_stmt.true_case.len; i++)
-				fill_namespaces(node->if_stmt.true_case.ptr[i], &node->if_stmt.true_ns);
+				fill_namespaces(module, node->if_stmt.true_case.ptr[i], &node->if_stmt.true_ns);
 			for(size_t i = 0; i < node->if_stmt.false_case.len; i++)
-				fill_namespaces(node->if_stmt.false_case.ptr[i], current_ns);
+				fill_namespaces(module, node->if_stmt.false_case.ptr[i], current_ns);
 			// We already iterated over all children so return right away
 			return;
 		case NT_WHILE_STMT:
@@ -63,7 +63,7 @@ void fill_namespaces(node_p node, node_ns_p current_ns) {
 	}
 	
 	for(ast_it_t it = ast_start(node); it.node != NULL; it = ast_next(node, it))
-		fill_namespaces(it.node, ns_for_children);
+		fill_namespaces(module, it.node, ns_for_children);
 }
 
 
