@@ -47,12 +47,12 @@ x Change unary ops from indices to names
 x Change binary ops from indices to names
 x Write test for operator reordering (either sample bases with lgc or by using functions directly)
 x Add namespace pass
-- Create buildins...
-- Replace operator tables with buildin operator objects
-- Write a node_error() function thats like parser_error() but for AST processing.
+x Write a node_error() function thats like parser_error() but for AST processing.
   It just shows the first line of the AST nodes tokens. Otherwise we would get
   huge error messages on function nodes and the like. Usefull to emit errors in
   passes.
+- Create buildins...
+- Replace operator tables with buildin operator objects
 - Reenalble namespaces calls node_alloc(), node_print_recursive()
 - Reenalble type calls in node_print_recursive(), node_print_inline()
 

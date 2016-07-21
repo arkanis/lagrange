@@ -234,6 +234,7 @@ void node_last_token(node_p node, token_p token);
 
 void node_print(node_p node, pass_t pass, FILE* output);
 void node_print_inline(node_p node, pass_t pass, FILE* output);
+void node_error(node_p node, module_p module, FILE* output);
 
 
 // Example:

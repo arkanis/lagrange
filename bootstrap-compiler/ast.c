@@ -303,6 +303,16 @@ void node_print_inline(node_p node, pass_t pass, FILE* output) {
 	}
 }
 
+void node_error(node_p node, module_p module, FILE* output) {
+	if (node->tokens.ptr < module->tokens.ptr || node->tokens.ptr > module->tokens.ptr + module->tokens.len) {
+		fprintf(stderr, "token_print_line(): Specified token isn't part of the modules token list!\n");
+		abort();
+	}
+	
+	size_t index = node->tokens.ptr - module->tokens.ptr;
+	token_print_range(output, module, index, node->tokens.len);
+}
+
 
 //
 // AST iteration functions
