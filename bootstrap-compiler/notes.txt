@@ -51,10 +51,29 @@ x Write a node_error() function thats like parser_error() but for AST processing
   It just shows the first line of the AST nodes tokens. Otherwise we would get
   huge error messages on function nodes and the like. Usefull to emit errors in
   passes.
+x Reenalble namespaces calls node_alloc(), node_print_recursive()
 - Create buildins...
 - Replace operator tables with buildin operator objects
-- Reenalble namespaces calls node_alloc(), node_print_recursive()
 - Reenalble type calls in node_print_recursive(), node_print_inline()
+
+
+Buildins
+========
+
+For operators and types.
+
+- operators: Just like a function.
+  BUT: In case of stuff that translates to assember we want to call C code that
+  does the compilation.
+- types: size, operations.
+  size is a normal int property. Used by compiler functions.
+  operations basically a namespace with functions in it.
+  Functions in there can either be references to AST nodes or C code functions
+  like in operators.
+
+Idea: Create an AST node that represents C code functions. This is our "buildin".
+Not the complete compile time stuff we want but good enough for the bootstrap
+compiler.
 
 
 For next syntax step
