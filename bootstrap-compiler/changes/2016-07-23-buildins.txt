@@ -1,0 +1,93 @@
+Changes
+=======
+
+- Designed buildins.
+
+
+Buildins
+========
+
+For operators and types:
+
+- operators: name, precendence, associativity, operator body.
+  Also need a compile function: A C function that gets the AST and assembler and
+  compiles the operator code.
+- types: name, size, initial value (ptr, len).
+  size is a normal int property. Used by compiler functions when allocating memory.
+  initial value is used when variables are defined without assignment.
+  Compiler C code to load and store a variable of that type? Works well for ints
+  and stuff like that. But what about larger structs or arrays?
+  Ok, arrays are just pointer and length... two 64 bit values.
+
+No type specific functions since we use function overloading for now
+(interfaces later on when we need polymorphism). Functions within a type are
+translated into free functions taking "this" as first parameter.
+
+IDEA: Create an AST node that represents C code functions. This is our "buildin".
+Not the complete compile time stuff we want but good enough for now.
+
+PROBLEM: We need normal and buildin functions for function and operator nodes.
+This would lead to 4 permutations: function, operator, buildin func, buildin op.
+
+SOLUTION: Don't duplicate stuff for operators. The operator nodes just contain
+the stuff that an operator needs additionally to what a function need. The code
+op the operator itself is then contained within a function node of the operator.
+Like this:
+
+	operator:
+		precendence
+		associativity
+		func: → function with args, name, body, etc.
+
+PROBLEM: Not what we would expect as AST from the source code.
+
+SOLUTION: Might be a good time to go components. Make the AST nodes component
+based. This way we would have a function component and a buildin component. Each
+mutually exclusive.
+
+Rough list of components:
+
+- namespace
+- symbol (name attribute, nodes defines a thing that can be looked up by name)
+- function (assembler buffer, slots, etc. and linker stuff)
+- value (type attribute, e.g. interim results)
+- storage (aka lvalues, stuff that represents memory storage, frame_displ
+  attribute). Can also be read-only storage (e.g. literals) be we need a flag
+  for it so we can't assign new values.
+
+But each node would also have it's own private properties to represent
+attributes of the source code.
+
+IDEA: Have a big node struct with all the components in it. Mutually exclusive
+components can go into one union. The custom node attributes will follow after
+the components. This would make sure that one component has the same offset in
+every node. We would only need to access the component, not cast or anything.
+
+
+Types
+=====
+
+- For now types can only be singular type nodes (IDs, not cexpr).
+- When we encounter a type_expr we just lookup the ID in the current namespace.
+  That should return a type node. This node should provide everything needed to
+  compile the thing at hand.
+
+A type node might look like this:
+
+BEGIN(type, TYPE)
+	MEMBER(type, name, str_t,           MT_STR,  P_PARSER)
+	MEMBER(type, size, size_t,          MT_SIZE, P_PARSER)
+	MEMBER(type, init, list_t(uint8_t), MT_NONE, P_PARSER)
+	
+	MEMBER(type, load,  compile_func_t, MT_NONE, P_PARSER)
+	MEMBER(type, store, compile_func_t, MT_NONE, P_PARSER)
+END(type)
+
+And a compile_func_t might look like this:
+
+allocation_info_t compile_func_t(compiler_ctx_p ctx, node_p node, reg_t requested_register);
+
+This signature might also fit for every compiler job at hand. The load and store
+functions probably will be called with the var nodes as node argument. But from
+the var node we can get the type node of it and the size of the type. So one
+generic load function will do for ALU regs and one for SSE regs, etc.

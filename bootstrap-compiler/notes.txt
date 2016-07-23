@@ -57,25 +57,6 @@ x Reenalble namespaces calls node_alloc(), node_print_recursive()
 - Reenalble type calls in node_print_recursive(), node_print_inline()
 
 
-Buildins
-========
-
-For operators and types.
-
-- operators: Just like a function.
-  BUT: In case of stuff that translates to assember we want to call C code that
-  does the compilation.
-- types: size, operations.
-  size is a normal int property. Used by compiler functions.
-  operations basically a namespace with functions in it.
-  Functions in there can either be references to AST nodes or C code functions
-  like in operators.
-
-Idea: Create an AST node that represents C code functions. This is our "buildin".
-Not the complete compile time stuff we want but good enough for the bootstrap
-compiler.
-
-
 For next syntax step
 ====================
 
@@ -86,8 +67,29 @@ For next syntax step
 	- Requires 2 token look ahead: Check for the ID followed by a double collon.
 	  Otherwise we can't differ between a leading name and an expression.
 
+
+Var definitions in conditions
+=============================
+
+Variables defined in conditions of if, while, etc. that are accessible when the
+condition matches (inspired by D).
+
+Extend uops node in a way that the first member can be a type (cexpr). So an
+uops node could hold these patterns:
+
+	cexpr op cexpr ...
+	type ID "=" cexpr op cexpr ...
+
+After the namespace pass we could then look up what the first cexpr actually is
+(type or variable) and resolve the node.
+
+PROBLEM: Same as with free function calls. We're no longer sure when a new line
+represents an EOS or not (and we have to ignore it). So we can't put it into an
+uops node because we wouldn't know where the uops node has to end.
+
+SOLUTION: Two token look ahead after first cexpr. If it's ID "=" we know it's a
+variable definition. Otherwise it's a normal expression. No uops node needed.
+
+
 Nice to have stuff
 ==================
-
-- Variables defined in conditions of if, while, etc. that are accessible when
-  the condition matches (inspired by D).
