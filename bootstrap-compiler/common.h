@@ -191,6 +191,11 @@ typedef enum {
 // Node definitions
 //
 
+typedef enum {
+	SF_READ  = (1 << 0),
+	SF_WRITE = (1 << 1)
+} storage_flags_t;
+
 #define BEGIN(nn, NN)              struct {
 #define MEMBER(nn, mn, ct, mt, p)  	ct mn;
 #define END(nn)                    } nn;
@@ -205,6 +210,35 @@ struct node_s {
 	union {
 		#include "ast_spec.h"
 	};
+	
+	// namespace component: new things can be defined in the node
+	node_ns_t ns;
+	
+	// name component: node represents something that can be refered to by name
+	str_t     name;
+	
+	// exec component: node represents compilable and runable code
+	struct {
+		bool   compiled;
+		size_t as_offset;
+		size_t stack_frame_size;
+		list_t(node_addr_slot_t) addr_slots;
+		list_t(asm_slot_t)       return_jump_slots;
+		
+		// TODO: one ASM buffer for compile time execution, one for storage into a binary
+		bool linked;
+	} exec;
+	
+	// value component: node represents an interim result
+	struct {
+		type_p type;
+	} value;
+	
+	// storage component: lvalues, node represents a memory block
+	struct {
+		size_t frame_displ;
+		storage_flags_t flags;
+	} storage;
 };
 
 #undef BEGIN
