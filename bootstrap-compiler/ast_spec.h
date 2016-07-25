@@ -1,37 +1,31 @@
+#ifndef BEGIN
+	#define BEGIN(node_name, node_name_in_capitals)
+#endif
+#ifndef MEMBER
+	#define MEMBER(node_name, member_name, c_type, member_type, pass)
+#endif
+#ifndef END
+	#define END(node_name)
+#endif
+
+
 //
 // Definitions
 //
 
-BEGIN(module, MODULE)
+BEGIN(module, MODULE, NC_NS | NC_NAME)
 	MEMBER(module, defs, node_list_t, MT_NODE_LIST, P_PARSER)
-	
-	MEMBER(module, ns,   node_ns_t,   MT_NS,        P_NAMESPACE)
 END(module)
 
-BEGIN(func, FUNC)
-	MEMBER(func, name, str_t,       MT_STR,       P_PARSER)
+BEGIN(func, FUNC, NC_NS | NC_NAME | NC_EXEC)
 	MEMBER(func, in,   node_list_t, MT_NODE_LIST, P_PARSER)
 	MEMBER(func, out,  node_list_t, MT_NODE_LIST, P_PARSER)
 	MEMBER(func, body, node_list_t, MT_NODE_LIST, P_PARSER)
-	
-	MEMBER(func, ns,   node_ns_t,   MT_NS,        P_NAMESPACE)
-	
-	MEMBER(func, compiled,          bool,                     MT_BOOL, P_COMPILER)
-	MEMBER(func, as_offset,         size_t,                   MT_SIZE, P_COMPILER)
-	MEMBER(func, stack_frame_size,  size_t,                   MT_SIZE, P_COMPILER)
-	MEMBER(func, addr_slots,        list_t(node_addr_slot_t), MT_ASL,  P_COMPILER)
-	MEMBER(func, return_jump_slots, list_t(asm_slot_t),       MT_NONE, P_COMPILER)
-	
-	MEMBER(func, linked,            bool,                     MT_BOOL, P_LINKER)
 END(func)
 
-BEGIN(arg, ARG)
-	// Can be 0, NULL in case the arg is unnamed
-	MEMBER(arg, name,        str_t,   MT_STR,  P_PARSER)
+BEGIN(arg, ARG, NC_NAME | NC_VALUE | NC_STORAGE)
+	// name can be 0, NULL in case the arg is unnamed
 	MEMBER(arg, type_expr,   node_p,  MT_NODE, P_PARSER)
-	
-	MEMBER(arg, type,        type_p,  MT_TYPE, P_TYPE)
-	MEMBER(arg, frame_displ, int64_t, MT_INT,  P_COMPILER)
 END(arg)
 
 
@@ -39,41 +33,33 @@ END(arg)
 // Satements
 //
 
-BEGIN(scope, SCOPE)
+BEGIN(scope, SCOPE, NC_NS)
 	MEMBER(scope, stmts, node_list_t, MT_NODE_LIST, P_PARSER)
-	
-	MEMBER(scope, ns,    node_ns_t,   MT_NS,        P_NAMESPACE)
 END(scope)
 
-BEGIN(var, VAR)
+BEGIN(var, VAR, 0)
 	MEMBER(var, type_expr, node_p,      MT_NODE,      P_PARSER)
 	MEMBER(var, bindings,  node_list_t, MT_NODE_LIST, P_PARSER)
 END(var)
 
-BEGIN(binding, BINDING)
-	MEMBER(binding, name,        str_t,   MT_STR,  P_PARSER)
+BEGIN(binding, BINDING, NC_NAME | NC_VALUE | NC_STORAGE)
 	MEMBER(binding, value,       node_p,  MT_NODE, P_PARSER)
-	
-	MEMBER(binding, type,        type_p,  MT_TYPE, P_TYPE)
-	MEMBER(binding, frame_displ, int64_t, MT_INT,  P_COMPILER)
 END(binding)
 
-BEGIN(if_stmt, IF_STMT)
+BEGIN(if_stmt, IF_STMT, NC_NS)
+	// Namespace of this node should only be used for lookups that come
+	// from the true_case.
 	MEMBER(if_stmt, cond,       node_p,      MT_NODE,      P_PARSER)
 	MEMBER(if_stmt, true_case,  node_list_t, MT_NODE_LIST, P_PARSER)
 	MEMBER(if_stmt, false_case, node_list_t, MT_NODE_LIST, P_PARSER)
-	
-	MEMBER(if_stmt, true_ns,    node_ns_t,   MT_NS,        P_NAMESPACE)
 END(if_stmt)
 
-BEGIN(while_stmt, WHILE_STMT)
+BEGIN(while_stmt, WHILE_STMT, NT_NS)
 	MEMBER(while_stmt, cond, node_p,      MT_NODE,      P_PARSER)
 	MEMBER(while_stmt, body, node_list_t, MT_NODE_LIST, P_PARSER)
-	
-	MEMBER(while_stmt, ns,   node_ns_t,   MT_NS,        P_NAMESPACE)
 END(while_stmt)
 
-BEGIN(return_stmt, RETURN_STMT)
+BEGIN(return_stmt, RETURN_STMT, 0)
 	MEMBER(return_stmt, args, node_list_t, MT_NODE_LIST, P_PARSER)
 END(return_stmt)
 
@@ -82,22 +68,16 @@ END(return_stmt)
 // Literals
 //
 
-BEGIN(id, ID)
+BEGIN(id, ID, NT_VALUE)
 	MEMBER(id, name, str_t,  MT_STR,  P_PARSER)
-	
-	MEMBER(id, type, type_p, MT_TYPE, P_TYPE)
 END(id)
 
-BEGIN(intl, INTL)
+BEGIN(intl, INTL, NT_VALUE)
 	MEMBER(intl, value, int64_t, MT_INT,  P_PARSER)
-	
-	MEMBER(intl, type,  type_p,  MT_TYPE, P_TYPE)
 END(intl)
 
-BEGIN(strl, STRL)
+BEGIN(strl, STRL, NT_VALUE)
 	MEMBER(strl, value, str_t,  MT_STR,  P_PARSER)
-	
-	MEMBER(strl, type,  type_p, MT_TYPE, P_TYPE)
 END(strl)
 
 
@@ -105,46 +85,41 @@ END(strl)
 // Expressions
 //
 
-BEGIN(unary_op, UNARY_OP)
+BEGIN(unary_op, UNARY_OP, NT_VALUE)
 	MEMBER(unary_op, name, str_t,  MT_STR,  P_PARSER)
 	MEMBER(unary_op, op,   node_p, MT_NODE, P_PARSER)
 	MEMBER(unary_op, arg,  node_p, MT_NODE, P_PARSER)
-	
-	MEMBER(unary_op, type, type_p, MT_TYPE, P_TYPE)
 END(unary_op)
 
-BEGIN(uops, UOPS)
-	MEMBER(uops, list, node_list_t, MT_NODE_LIST, P_PARSER)
+BEGIN(uops, UOPS, 0)
 	// uops nodes are resolved directly after the parser pass so no member for
 	// further passes.
+	MEMBER(uops, list, node_list_t, MT_NODE_LIST, P_PARSER)
 END(uops)
 
-BEGIN(op, OP)
+BEGIN(op, OP, NT_VALUE)
 	MEMBER(op, name, str_t,  MT_STR,  P_PARSER)
 	MEMBER(op, op,   node_p, MT_NODE, P_PARSER)
 	MEMBER(op, a,    node_p, MT_NODE, P_PARSER)
 	MEMBER(op, b,    node_p, MT_NODE, P_PARSER)
-	
-	MEMBER(op, type, type_p, MT_TYPE, P_TYPE)
 END(op)
 
-BEGIN(member, MEMBER)
+BEGIN(member, MEMBER, NT_VALUE)
 	MEMBER(member, aggregate, node_p, MT_NODE, P_PARSER)
 	MEMBER(member, member,    str_t,  MT_STR,  P_PARSER)
-	
-	MEMBER(member, type,      type_p, MT_TYPE, P_TYPE)
 END(member)
 
-BEGIN(call, CALL)
+BEGIN(call, CALL, NT_VALUE)
 	MEMBER(call, target_expr, node_p,      MT_NODE,      P_PARSER)
 	MEMBER(call, args,        node_list_t, MT_NODE_LIST, P_PARSER)
-	
-	MEMBER(call, type,        type_p,      MT_TYPE,      P_TYPE)
 END(call)
 
-BEGIN(index, INDEX)
+BEGIN(index, INDEX, NT_VALUE)
 	MEMBER(index, target_expr, node_p,      MT_NODE,      P_PARSER)
 	MEMBER(index, args,        node_list_t, MT_NODE_LIST, P_PARSER)
-	
-	MEMBER(index, type,        type_p,      MT_TYPE,      P_TYPE)
 END(index)
+
+
+#undef BEGIN
+#undef MEMBER
+#undef END
