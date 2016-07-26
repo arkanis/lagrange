@@ -166,6 +166,7 @@ typedef struct {
 
 typedef struct {
 	char*         name;
+	uint32_t      components;
 	member_spec_p members;
 } node_spec_t, *node_spec_p;
 

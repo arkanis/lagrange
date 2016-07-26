@@ -1,5 +1,5 @@
 #ifndef BEGIN
-	#define BEGIN(node_name, node_name_in_capitals)
+	#define BEGIN(node_name, node_name_in_capitals, components)
 #endif
 #ifndef MEMBER
 	#define MEMBER(node_name, member_name, c_type, member_type, pass)
