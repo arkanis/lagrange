@@ -218,7 +218,7 @@ node_p parse_func_def(parser_p parser) {
 	
 	token_p t = consume_type(parser, T_FUNC);
 	node_first_token(node, t);
-	node->func.name = consume_type(parser, T_ID)->source;
+	node->name = consume_type(parser, T_ID)->source;
 	
 	while ( (t = try_consume(parser, T_IN)) || (t = try_consume(parser, T_OUT)) ) {
 		node_list_p arg_list = NULL;
@@ -239,7 +239,7 @@ node_p parse_func_def(parser_p parser) {
 			// Set the arg name if we got an ID after the type. Otherwise leave
 			// the arg unnamed (nulled out)
 			if ( try(parser, T_ID) )
-				arg->arg.name = consume_type(parser, T_ID)->source;
+				arg->name = consume_type(parser, T_ID)->source;
 			
 			if ( !try_consume(parser, T_COMMA) )
 				break;
@@ -425,7 +425,7 @@ static node_p complete_parser_var_def_statement(parser_p parser, node_p cexpr) {
 	do {
 		binding = node_alloc_append(NT_BINDING, node, &node->var.bindings);
 		t = consume_type(parser, T_ID);
-		binding->binding.name = t->source;
+		binding->name = t->source;
 		node_first_token(binding, t);
 		
 		if ( (t = try_consume(parser, T_ASSIGN)) ) {
