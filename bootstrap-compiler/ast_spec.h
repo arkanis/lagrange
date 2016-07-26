@@ -54,7 +54,7 @@ BEGIN(if_stmt, IF_STMT, NC_NS)
 	MEMBER(if_stmt, false_case, node_list_t, MT_NODE_LIST, P_PARSER)
 END(if_stmt)
 
-BEGIN(while_stmt, WHILE_STMT, NT_NS)
+BEGIN(while_stmt, WHILE_STMT, NC_NS)
 	MEMBER(while_stmt, cond, node_p,      MT_NODE,      P_PARSER)
 	MEMBER(while_stmt, body, node_list_t, MT_NODE_LIST, P_PARSER)
 END(while_stmt)
@@ -68,15 +68,15 @@ END(return_stmt)
 // Literals
 //
 
-BEGIN(id, ID, NT_VALUE)
+BEGIN(id, ID, NC_VALUE)
 	MEMBER(id, name, str_t,  MT_STR,  P_PARSER)
 END(id)
 
-BEGIN(intl, INTL, NT_VALUE)
+BEGIN(intl, INTL, NC_VALUE)
 	MEMBER(intl, value, int64_t, MT_INT,  P_PARSER)
 END(intl)
 
-BEGIN(strl, STRL, NT_VALUE)
+BEGIN(strl, STRL, NC_VALUE)
 	MEMBER(strl, value, str_t,  MT_STR,  P_PARSER)
 END(strl)
 
@@ -85,7 +85,7 @@ END(strl)
 // Expressions
 //
 
-BEGIN(unary_op, UNARY_OP, NT_VALUE)
+BEGIN(unary_op, UNARY_OP, NC_VALUE)
 	MEMBER(unary_op, name, str_t,  MT_STR,  P_PARSER)
 	MEMBER(unary_op, op,   node_p, MT_NODE, P_PARSER)
 	MEMBER(unary_op, arg,  node_p, MT_NODE, P_PARSER)
@@ -97,24 +97,24 @@ BEGIN(uops, UOPS, 0)
 	MEMBER(uops, list, node_list_t, MT_NODE_LIST, P_PARSER)
 END(uops)
 
-BEGIN(op, OP, NT_VALUE)
+BEGIN(op, OP, NC_VALUE)
 	MEMBER(op, name, str_t,  MT_STR,  P_PARSER)
 	MEMBER(op, op,   node_p, MT_NODE, P_PARSER)
 	MEMBER(op, a,    node_p, MT_NODE, P_PARSER)
 	MEMBER(op, b,    node_p, MT_NODE, P_PARSER)
 END(op)
 
-BEGIN(member, MEMBER, NT_VALUE)
+BEGIN(member, MEMBER, NC_VALUE)
 	MEMBER(member, aggregate, node_p, MT_NODE, P_PARSER)
 	MEMBER(member, member,    str_t,  MT_STR,  P_PARSER)
 END(member)
 
-BEGIN(call, CALL, NT_VALUE)
+BEGIN(call, CALL, NC_VALUE)
 	MEMBER(call, target_expr, node_p,      MT_NODE,      P_PARSER)
 	MEMBER(call, args,        node_list_t, MT_NODE_LIST, P_PARSER)
 END(call)
 
-BEGIN(index, INDEX, NT_VALUE)
+BEGIN(index, INDEX, NC_VALUE)
 	MEMBER(index, target_expr, node_p,      MT_NODE,      P_PARSER)
 	MEMBER(index, args,        node_list_t, MT_NODE_LIST, P_PARSER)
 END(index)
