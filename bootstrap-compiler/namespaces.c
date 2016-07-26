@@ -23,43 +23,20 @@ SH_GEN_DEF(node_ns, str_t, node_p,
 void fill_namespaces(module_p module, node_p node, node_ns_p current_ns) {
 	node_ns_p ns_for_children = current_ns;
 	
-	switch(node->type) {
-		case NT_MODULE:
-			ns_for_children = &node->module.ns;
-			break;
-		case NT_FUNC:
-			node_ns_put(current_ns, node->func.name, node);
-			ns_for_children = &node->func.ns;
-			break;
-		case NT_SCOPE:
-			ns_for_children = &node->scope.ns;
-			break;
-		case NT_IF_STMT:
-			for(size_t i = 0; i < node->if_stmt.true_case.len; i++)
-				fill_namespaces(module, node->if_stmt.true_case.ptr[i], &node->if_stmt.true_ns);
-			for(size_t i = 0; i < node->if_stmt.false_case.len; i++)
-				fill_namespaces(module, node->if_stmt.false_case.ptr[i], current_ns);
-			// We already iterated over all children so return right away
-			return;
-		case NT_WHILE_STMT:
-			ns_for_children = &node->while_stmt.ns;
-		
-		case NT_ARG:
-			// Don't add unnamed args to the namespace
-			if (node->arg.name.len > 0)
-				node_ns_put(current_ns, node->arg.name, node);
-			break;
-		case NT_BINDING:
-			node_ns_put(current_ns, node->binding.name, node);
-			break;
-		
-		default:
-			for(member_spec_p member = node->spec->members; member->type != 0; member++) {
-				if (member->type == MT_NS) {
-					fprintf(stderr, "fill_namespaces(): found unhandled node with a namespace!\n");
-					abort();
-				}
-			}
+	// If the node is something that can be referenced by name put it into the
+	// current namespace. Except it's unnamed (e.g. arguments).
+	if ( (node->spec->components & NC_NAME) && node->name.len > 0 )
+		node_ns_put(current_ns, node->name, node);
+	
+	if (node->type == NT_IF_STMT) {
+		for(size_t i = 0; i < node->if_stmt.true_case.len; i++)
+			fill_namespaces(module, node->if_stmt.true_case.ptr[i], &node->ns);
+		for(size_t i = 0; i < node->if_stmt.false_case.len; i++)
+			fill_namespaces(module, node->if_stmt.false_case.ptr[i], current_ns);
+		// We already iterated over all children so return right away
+		return;
+	} else if (node->spec->components & NC_NS) {
+		ns_for_children = &node->ns;
 	}
 	
 	for(ast_it_t it = ast_start(node); it.node != NULL; it = ast_next(node, it))
@@ -77,35 +54,16 @@ node_p ns_lookup(node_p node, str_t name) {
 	
 	while (current_node != NULL) {
 		node_p* value = NULL;
-		switch(current_node->type) {
-			case NT_MODULE:
-				value = node_ns_get_ptr(&current_node->module.ns, name);
-				break;
-			case NT_FUNC:
-				value = node_ns_get_ptr(&current_node->func.ns, name);
-				break;
-			case NT_SCOPE:
-				value = node_ns_get_ptr(&current_node->scope.ns, name);
-				break;
-			case NT_IF_STMT:
-				if ( node_list_contains_node(&current_node->if_stmt.true_case, child_node) ) {
-					// Only look into the true_ns if we came from the true_case list
-					// Otherwise we would find bindings from the true_case even when
-					// we're in the false_case.
-					value = node_ns_get_ptr(&current_node->if_stmt.true_ns, name);
-				}
-				break;
-			case NT_WHILE_STMT:
-				value = node_ns_get_ptr(&current_node->while_stmt.ns, name);
-				break;
-			
-			default:
-				for(member_spec_p member = current_node->spec->members; member->type != 0; member++) {
-					if (member->type == MT_NS) {
-						fprintf(stderr, "ns_lookup(): found unhandled node with a namespace!\n");
-						abort();
-					}
-				}
+		
+		if (current_node->type == NT_IF_STMT) {
+			if ( node_list_contains_node(&current_node->if_stmt.true_case, child_node) ) {
+				// Only look into the namespace if we came from the true_case list.
+				// Otherwise we would find bindings from the true_case even when
+				// we're in the false_case.
+				value = node_ns_get_ptr(&current_node->ns, name);
+			}
+		} else if (current_node->spec->components & NC_NS) {
+			value = node_ns_get_ptr(&current_node->ns, name);
 		}
 		
 		if (value)
