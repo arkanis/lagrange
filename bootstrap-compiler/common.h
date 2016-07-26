@@ -175,7 +175,7 @@ typedef struct {
 // List of module types
 //
 
-#define BEGIN(nn, NN)              NT_##NN,
+#define BEGIN(nn, NN, c)           NT_##NN,
 #define MEMBER(nn, mn, ct, mt, p)  
 #define END(nn)                    
 
@@ -205,7 +205,7 @@ typedef enum {
 	NC_STORAGE = (1 << 4)
 } node_component_t;
 
-#define BEGIN(nn, NN)              struct {
+#define BEGIN(nn, NN, c)           struct {
 #define MEMBER(nn, mn, ct, mt, p)  	ct mn;
 #define END(nn)                    } nn;
 
