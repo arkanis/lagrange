@@ -18,7 +18,7 @@ void test_iterator() {
 			node_p id131  = node_alloc_set(NT_ID, b12, &b12->var.type_expr);
 				id131->id.name = str_from_c("int");
 			node_p bdg132 = node_alloc_append(NT_BINDING, b12, &b12->var.bindings);
-				bdg132->binding.name = str_from_c("x");
+				bdg132->name = str_from_c("x");
 				node_p int132 = node_alloc_set(NT_INTL, bdg132, &bdg132->binding.value);
 					int132->intl.value = 17;
 		node_p b13 = node_alloc_append(NT_IF_STMT, f1, &f1->func.body);
