@@ -618,7 +618,7 @@ struct { parser_rule_func_t rule; char* code; char* expected_ast_dump; } samples
   	// Definition: functions
   	//
 	{ parse_module, "func foo in(int argc, int.ptr argv) out(int) { int a; a += 1 if argc < 2; { foo(a) } }",
-		"module: \n"
+		"module: \"\"\n"
 		"  defs[0]: func: \"foo\"\n"
 		"    in[0]: arg: \"argc\"\n"
 		"      type_expr: id: \"int\"\n"
@@ -755,7 +755,7 @@ void test_statement_combinations() {
 				
 				ast_dump = open_memstream(&ast_dump_ptr, &ast_dump_len);
 					fprintf(ast_dump,
-						"module: \n"
+						"module: \"\"\n"
 						"  defs[0]: func: \"main\"\n"
 					);
 					fprintf(ast_dump, statement_pool[i].ast_dump, 0);

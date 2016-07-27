@@ -157,7 +157,34 @@ void node_last_token(node_p node, token_p token) {
 //
 
 static void node_print_recursive(node_p node, pass_t pass, FILE* output, int level) {
+	// Helper function to inline the value into the same line as the node type.
+	// The function contains a whitelist of member types it allows to inline.
+	// For them it skips the first linebreak and label. If our first label is
+	// for something else (a node, node list, namespace, etc.) we force a line
+	// break and print it on the next line.
+	bool first_label = true;
+	void print_label(const char* name, member_type_t member_type) {
+		bool skip_label = first_label && (
+			member_type == MT_INT  ||
+			member_type == MT_CHAR ||
+			member_type == MT_STR  ||
+			member_type == MT_SIZE ||
+			member_type == MT_BOOL
+		);
+		
+		if ( !skip_label )
+			fprintf(output, "\n%*s%s: ", (level+1)*2, "", name);
+		
+		first_label = false;
+	}
+	
+	
 	fprintf(output, "%s: ", node->spec->name);
+	
+	if ( (node->spec->components & NC_NAME) && pass >= P_PARSER ) {
+		print_label("name", MT_STR);
+		fprintf(output, "\"%.*s\"", node->name.len, node->name.ptr);
+	}
 	
 	for(member_spec_p member = node->spec->members; member->type != 0; member++) {
 		// Skip members from later passes. So we only show members up to and
@@ -165,12 +192,9 @@ static void node_print_recursive(node_p node, pass_t pass, FILE* output, int lev
 		if (member->pass > pass)
 			continue;
 		
-		// Print the first non-node member inline (no line break, no indention,
-		// don't print the member name). MT_NODE_LIST also prints it's member
-		// name by itself (with an index).
-		bool print_without_label = (member == node->spec->members && member->type != MT_NODE && member->type != MT_NS) || member->type == MT_NODE_LIST;
-		if ( !print_without_label )
-			fprintf(output, "\n%*s%s: ", (level+1)*2, "", member->name);
+		// Node lists print their lables by themselfs and can't be inlined anyway
+		if (member->type != MT_NODE_LIST)
+			print_label(member->name, member->type);
 		
 		void* member_ptr = (uint8_t*)node + member->offset;
 		switch(member->type) {
@@ -185,29 +209,6 @@ static void node_print_recursive(node_p node, pass_t pass, FILE* output, int lev
 					fprintf(output, "\n%*s%s[%zu]: ", (level+1)*2, "", member->name, i);
 					node_print_recursive(list->ptr[i], pass, output, level+1);
 				}
-				} break;
-			case MT_NS: {
-				node_ns_p ns = member_ptr;
-				for(node_ns_it_p it = node_ns_start(ns); it != NULL; it = node_ns_next(ns, it)) {
-					fprintf(output, "\"%.*s\" ", it->key.len, it->key.ptr);
-				}
-				} break;
-			case MT_ASL: {
-				list_t(node_addr_slot_t)* asl = member_ptr;
-				for(size_t i = 0; i < asl->len; i++) {
-					fprintf(output, "\n%*soffset %zu → ", (level+2)*2, "", asl->ptr[i].offset);
-					node_print_inline(asl->ptr[i].target, pass, output);
-					fprintf(output, "\n");
-				}
-				} break;
-			case MT_TYPE: {
-				/*
-				type_p type = *(type_p*)member_ptr;
-				if (type == NULL)
-					fprintf(output, "NULL");
-				else
-					fprintf(output, "%.*s (%zu bytes)", type->name.len, type->name.ptr, type->size);
-				*/
 				} break;
 			
 			case MT_INT: {
@@ -230,10 +231,45 @@ static void node_print_recursive(node_p node, pass_t pass, FILE* output, int lev
 				bool* value = member_ptr;
 				fprintf(output, "%s", *value ? "true" : "false");
 				} break;
+			
 			case MT_NONE:
 				fprintf(output, "???");
 				break;
 		}
+	}
+	
+	if ( (node->spec->components & NC_NS) && pass >= P_NAMESPACE ) {
+		print_label("namespace", MT_NONE);
+		for(node_ns_it_p it = node_ns_start(&node->ns); it != NULL; it = node_ns_next(&node->ns, it)) {
+			fprintf(output, "\"%.*s\" ", it->key.len, it->key.ptr);
+		}
+	}
+	
+	if ( (node->spec->components & NC_VALUE) && pass >= P_TYPE ) {
+		// TODO: print type stuff
+		/*
+		type_p type = *(type_p*)member_ptr;
+		if (type == NULL)
+			fprintf(output, "NULL");
+		else
+			fprintf(output, "%.*s (%zu bytes)", type->name.len, type->name.ptr, type->size);
+		*/
+	}
+	
+	if ( (node->spec->components & NC_STORAGE) && pass >= P_COMPILER ) {
+		// TODO: print storage stuff
+	}
+	
+	if ( (node->spec->components & NC_EXEC) && pass >= P_COMPILER ) {
+		// TODO: print exec stuff
+		/*
+		list_t(node_addr_slot_t)* asl = member_ptr;
+		for(size_t i = 0; i < asl->len; i++) {
+			fprintf(output, "\n%*soffset %zu → ", (level+2)*2, "", asl->ptr[i].offset);
+			node_print_inline(asl->ptr[i].target, pass, output);
+			fprintf(output, "\n");
+		}
+		*/
 	}
 }
 
@@ -260,22 +296,6 @@ void node_print_inline(node_p node, pass_t pass, FILE* output) {
 				fprintf(output, "...");
 				break;
 			
-			case MT_NS:
-				fprintf(output, "ns");
-				break;
-			case MT_ASL:
-				fprintf(output, "asl");
-				break;
-			case MT_TYPE: {
-				/*
-				type_p type = *(type_p*)member_ptr;
-				if (type == NULL)
-					fprintf(output, "NULL");
-				else
-					fprintf(output, "%.*s (%zu bytes)", type->name.len, type->name.ptr, type->size);
-				*/
-				} break;
-				
 			case MT_INT: {
 				int64_t* value = member_ptr;
 				fprintf(output, "%ld", *value);
@@ -296,6 +316,7 @@ void node_print_inline(node_p node, pass_t pass, FILE* output) {
 				bool* value = member_ptr;
 				fprintf(output, "%s", *value ? "true" : "false");
 				} break;
+			
 			case MT_NONE:
 				fprintf(output, "???");
 				break;

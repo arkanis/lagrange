@@ -136,9 +136,6 @@ void node_list_replace_range_with_one(node_list_p list, size_t start_idx, size_t
 typedef enum {
 	MT_NODE = 1,
 	MT_NODE_LIST,
-	MT_NS,
-	MT_ASL,
-	MT_TYPE,
 	
 	MT_INT,
 	MT_CHAR,
@@ -220,11 +217,22 @@ struct node_s {
 		#include "ast_spec.h"
 	};
 	
+	// name component: node represents something that can be refered to by name
+	str_t     name;
+	
 	// namespace component: new things can be defined in the node
 	node_ns_t ns;
 	
-	// name component: node represents something that can be refered to by name
-	str_t     name;
+	// value component: node represents an interim result
+	struct {
+		type_p type;
+	} value;
+	
+	// storage component: lvalues, node represents a memory block
+	struct {
+		size_t frame_displ;
+		storage_flags_t flags;
+	} storage;
 	
 	// exec component: node represents compilable and runable code
 	struct {
@@ -237,17 +245,6 @@ struct node_s {
 		// TODO: one ASM buffer for compile time execution, one for storage into a binary
 		bool linked;
 	} exec;
-	
-	// value component: node represents an interim result
-	struct {
-		type_p type;
-	} value;
-	
-	// storage component: lvalues, node represents a memory block
-	struct {
-		size_t frame_displ;
-		storage_flags_t flags;
-	} storage;
 };
 
 #undef BEGIN

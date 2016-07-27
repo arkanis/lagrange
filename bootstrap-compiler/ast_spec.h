@@ -43,7 +43,7 @@ BEGIN(var, VAR, 0)
 END(var)
 
 BEGIN(binding, BINDING, NC_NAME | NC_VALUE | NC_STORAGE)
-	MEMBER(binding, value,       node_p,  MT_NODE, P_PARSER)
+	MEMBER(binding, value, node_p, MT_NODE, P_PARSER)
 END(binding)
 
 BEGIN(if_stmt, IF_STMT, NC_NS)
