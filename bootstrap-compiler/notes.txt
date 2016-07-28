@@ -52,9 +52,17 @@ x Write a node_error() function thats like parser_error() but for AST processing
   huge error messages on function nodes and the like. Usefull to emit errors in
   passes.
 x Reenalble namespaces calls node_alloc(), node_print_recursive()
-- Create buildins...
-- Replace operator tables with buildin operator objects
-- Reenalble type calls in node_print_recursive(), node_print_inline()
+- Create buildins for operators
+	- Replace operator tables with buildin operator objects
+	- Migrate resolve uops pass to operator buildins
+- Add stuff for compilation
+	- Add compilation function to operators
+	- Add compilation functions for nodes?
+- Migrate type system
+	- Add type for types (size, etc.)
+	- Compiler functions for load/store
+	- Reenalble type calls in node_print_recursive(), node_print_inline()
+- Try to get whole compilation process to work again
 
 
 For next syntax step
