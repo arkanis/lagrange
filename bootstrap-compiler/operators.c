@@ -2,7 +2,6 @@
 
 // Based on http://en.cppreference.com/w/c/language/operator_precedence
 // Worth a look because of bitwise and comparison ops: http://wiki.dlang.org/Operator_precedence
-typedef enum { LEFT_TO_RIGHT, RIGHT_TO_LEFT } op_assoc_t;
 // CAUTION: Operators with the same precedence need the same associativity!
 // Otherwise it probably gets complicates... not sure.
 struct { char* name; int precedence; op_assoc_t assoc; } operators[] = {

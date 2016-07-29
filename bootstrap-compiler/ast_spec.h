@@ -23,6 +23,17 @@ BEGIN(func, FUNC, NC_NS | NC_NAME | NC_EXEC)
 	MEMBER(func, body, node_list_t, MT_NODE_LIST, P_PARSER)
 END(func)
 
+BEGIN(op_def, OP_DEF, NC_NS | NC_NAME | NC_EXEC)
+	MEMBER(op_def, in,      node_list_t, MT_NODE_LIST, P_PARSER)
+	MEMBER(op_def, out,     node_list_t, MT_NODE_LIST, P_PARSER)
+	MEMBER(op_def, options, node_list_t, MT_NODE_LIST, P_PARSER)
+	MEMBER(op_def, body,    node_list_t, MT_NODE_LIST, P_PARSER)
+	
+	MEMBER(op_def, precendence, int64_t, MT_INT,  P_PARSER)
+	MEMBER(op_def, assoc,       int64_t, MT_BOOL, P_PARSER)  // actually op_assoc_t
+END(op_def)
+
+
 BEGIN(arg, ARG, NC_NAME | NC_VALUE | NC_STORAGE)
 	// name can be 0, NULL in case the arg is unnamed
 	MEMBER(arg, type_expr,   node_p,  MT_NODE, P_PARSER)

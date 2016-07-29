@@ -190,17 +190,23 @@ typedef enum {
 //
 
 typedef enum {
-	SF_READ  = (1 << 0),
-	SF_WRITE = (1 << 1)
-} storage_flags_t;
-
-typedef enum {
 	NC_NS      = (1 << 0),
 	NC_NAME    = (1 << 1),
 	NC_EXEC    = (1 << 2),
 	NC_VALUE   = (1 << 3),
 	NC_STORAGE = (1 << 4)
 } node_component_t;
+
+typedef enum {
+	LEFT_TO_RIGHT,
+	RIGHT_TO_LEFT
+} op_assoc_t;
+
+typedef enum {
+	SF_READ  = (1 << 0),
+	SF_WRITE = (1 << 1)
+} storage_flags_t;
+
 
 #define BEGIN(nn, NN, c)           struct {
 #define MEMBER(nn, mn, ct, mt, p)  	ct mn;
