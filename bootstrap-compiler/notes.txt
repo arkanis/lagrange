@@ -53,6 +53,9 @@ x Write a node_error() function thats like parser_error() but for AST processing
   passes.
 x Reenalble namespaces calls node_alloc(), node_print_recursive()
 - Create buildins for operators
+	x Create AST node for operator definitions
+	- Parse operator definitions into AST nodes
+	- Create a test operator in the buildin namespace
 	- Replace operator tables with buildin operator objects
 	- Migrate resolve uops pass to operator buildins
 - Add stuff for compilation
