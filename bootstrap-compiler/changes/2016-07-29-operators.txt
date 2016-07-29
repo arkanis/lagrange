@@ -1,0 +1,60 @@
+Changes
+=======
+
+- Added operator definitions
+
+
+Grammar
+=======
+
+module  = [ def ]
+def     = "func"     ID [ def-mod ] "{" [ stmt ] "}"
+        = "operator" ID [ def-mod ] "{" [ stmt ] "}"
+def-mod = ( "in" | "out" )  "(" ID ID? [ "," ID ID? ] ")"
+          "options" "(" ID ":" expr [ "," ID ":" expr ] ")"
+
+// cexpr short for chainable expression: expr with known end and no operators
+// To be more exact: No user defined operators that can be an ID. In theory we
+// could put all operators with explicit tokens into cexpr.
+cexpr = ID
+        INTL
+        STRL
+        "(" expr ")"
+        unary_op cexpr
+        cexpr "(" ( expr [ "," expr ] )? ")"
+        cexpr "[" ( expr [ "," expr ] )? "]"
+        cexpr "." ID
+expr  = cexpr [ binary_op cexpr ] try-only: eos
+        cexpr try-only: eos
+
+unary_op  = + - not ~
+binary_op = ID * / %  + - << >> < <= > >= == != & ^ | and or = *= /= %= += -= <<= >>= &= ^= |=
+  // since "while" and "if" are keywords the ID doesn't match the modifier
+  // syntax for the while and if statements.
+
+
+block   = "{"  [ stmt ] "}"
+          "do" [ stmt ] "end"
+
+stmt = block
+       "while" expr "do" [ stmt ] "end"
+                    "{"  [ stmt ] "}"
+                    WSNL [ stmt ] "end"  // check as last alternative, see note 1 of 2016-07-13-no-free-calls
+       "if" expr "do" [ stmt ]     ( "else"     [ stmt ] )? "end"
+                 "{"  [ stmt ] "}" ( "else" "{" [ stmt ] "}" )?
+                 WSNL [ stmt ]     ( "else"     [ stmt ] )? "end"  // check as last alternative, see note 1 of 2016-07-13-no-free-calls
+       "return" ( expr ["," expr] )? eos
+       cexpr ID ( "=" expr )? [ "," ID ( "=" expr )? ] eos  // how to differ between ID and binary_op, see note 2 of 2016-07-13-no-free-calls
+       cexpr [ binary_op cexpr ] "while" expr eos
+                                 "if"    expr eos
+                                 eos
+
+eos  = try-only: EOF    // don't consume because parser function consumes the EOF
+       ";"
+       try-only: "}"    // because of block and stmt bodies
+       try-only: "end"  // because of block and stmt bodies
+       try-only: "else" // because of end of true case of if statement
+       WSNL             // because of if and while conditions with optional "do"
+                        // try last to avoid effects like in note 1 of 2016-07-13-no-free-calls
+
+
