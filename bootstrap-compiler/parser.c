@@ -168,6 +168,7 @@ node_p parse(module_p module, parser_rule_func_t rule, FILE* error_stream) {
 // Try functions for different rules
 //
 
+node_p parse_operator_def(parser_p parser);
 void parse_stmts(parser_p parser, node_p parent, node_list_p list);
 
 static token_p try_stmt(parser_p parser);
@@ -195,6 +196,8 @@ node_p parse_module(parser_p parser) {
 		
 		if ( try(parser, T_FUNC) ) {
 			def = parse_func_def(parser);
+		} else if ( try(parser, T_OPERATOR) ) {
+			def = parse_operator_def(parser);
 		} else {
 			parser_error(parser, NULL);
 			abort();
@@ -233,13 +236,76 @@ node_p parse_func_def(parser_p parser) {
 		while ( !try(parser, T_RBC) ) {
 			node_p arg = node_alloc_append(NT_ARG, node, arg_list);
 			
-			node_p type_expr = parse_cexpr(parser);
-			node_set(arg, &arg->arg.type_expr, type_expr);
+			node_p expr = parse_cexpr(parser);
+			node_set(arg, &arg->arg.expr, expr);
 			
 			// Set the arg name if we got an ID after the type. Otherwise leave
 			// the arg unnamed (nulled out)
 			if ( try(parser, T_ID) )
 				arg->name = consume_type(parser, T_ID)->source;
+			
+			if ( !try_consume(parser, T_COMMA) )
+				break;
+		}
+		consume_type(parser, T_RBC);
+	}
+	
+	if ( try_consume(parser, T_CBO) ) {
+		parse_stmts(parser, node, &node->func.body);
+		t = consume_type(parser, T_CBC);
+	} else if ( try_consume(parser, T_DO) ) {
+		parse_stmts(parser, node, &node->func.body);
+		t = consume_type(parser, T_END);
+	} else {
+		parser_error(parser, NULL);
+		abort();
+	}
+	
+	node_last_token(node, t);
+	return node;
+}
+
+node_p parse_operator_def(parser_p parser) {
+	// def     = "operator" ID [ def-mod ] "{" [ stmt ] "}"
+	// def-mod = ( "in" | "out" )  "(" ID ID? [ "," ID ID? ] ")"
+	//           "options" "(" ID ":" expr [ "," ID ":" expr ] ")"
+	node_p node = node_alloc(NT_OPERATOR);
+	
+	token_p t = consume_type(parser, T_OPERATOR);
+	node_first_token(node, t);
+	node->name = consume_type(parser, T_ID)->source;
+	
+	while ( (t = try_consume(parser, T_IN)) || (t = try_consume(parser, T_OUT)) || (t = try_consume(parser, T_OPTIONS)) ) {
+		node_list_p arg_list = NULL;
+		if ( t->type == T_IN )
+			arg_list = &node->operator.in;
+		else if ( t->type == T_OUT )
+			arg_list = &node->operator.out;
+		else if ( t->type == T_OPTIONS )
+			arg_list = &node->operator.options;
+		else
+			abort();
+		
+		consume_type(parser, T_RBO);
+		while ( !try(parser, T_RBC) ) {
+			node_p arg = node_alloc_append(NT_ARG, node, arg_list);
+			
+			if (t->type == T_OPTIONS) {
+				token_p label = consume_type(parser, T_ID);
+				arg->name = label->source;
+				consume_type(parser, T_COLON);
+				
+				node_p expr = parse_cexpr(parser);
+				node_set(arg, &arg->arg.expr, expr);
+			} else {
+				node_p expr = parse_cexpr(parser);
+				node_set(arg, &arg->arg.expr, expr);
+				
+				// Set the arg name if we got an ID after the type. Otherwise leave
+				// the arg unnamed (nulled out)
+				if ( try(parser, T_ID) )
+					arg->name = consume_type(parser, T_ID)->source;
+			}
 			
 			if ( !try_consume(parser, T_COMMA) )
 				break;
