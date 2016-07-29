@@ -646,7 +646,27 @@ struct { parser_rule_func_t rule; char* code; char* expected_ast_dump; } samples
 		"        target_expr: id: \"foo\"\n"
 		"        args[0]: id: \"a\"\n"
 	},
-	
+	{ parse_module, "operator add in(int a, int b) out(int) options(precendence: 10, assoc: left_to_right) { return a + b; }",
+		"module: \"\"\n"
+		"  defs[0]: operator: \"add\"\n"
+		"    in[0]: arg: \"a\"\n"
+		"      expr: id: \"int\"\n"
+		"    in[1]: arg: \"b\"\n"
+		"      expr: id: \"int\"\n"
+		"    out[0]: arg: \"\"\n"
+		"      expr: id: \"int\"\n"
+		"    options[0]: arg: \"precendence\"\n"
+		"      expr: intl: 10\n"
+		"    options[1]: arg: \"assoc\"\n"
+		"      expr: id: \"left_to_right\"\n"
+		"    options[2]: return_stmt: \n"
+		"      args[0]: uops: \n"
+		"        list[0]: id: \"a\"\n"
+		"        list[1]: id: \"add\"\n"
+		"        list[2]: id: \"b\"\n"
+		"    precendence: 10\n"
+		"    assoc: 0\n"
+	},
 };
 
 void test_samples() {

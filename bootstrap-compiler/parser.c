@@ -295,8 +295,24 @@ node_p parse_operator_def(parser_p parser) {
 				arg->name = label->source;
 				consume_type(parser, T_COLON);
 				
-				node_p expr = parse_cexpr(parser);
+				node_p expr = parse_expr(parser);
 				node_set(arg, &arg->arg.expr, expr);
+				
+				if ( str_eqc(&arg->name, "precendence") && arg->arg.expr->type == NT_INTL ) {
+					node->operator.precendence = arg->arg.expr->intl.value;
+				} else if ( str_eqc(&arg->name, "assoc") && arg->arg.expr->type == NT_ID ) {
+					if ( str_eqc(&arg->arg.expr->id.name, "left_to_right") ) {
+						node->operator.assoc = LEFT_TO_RIGHT;
+					} else if ( str_eqc(&arg->arg.expr->id.name, "right_to_left") ) {
+						node->operator.assoc = RIGHT_TO_LEFT;
+					} else {
+						parser_error(parser, "Unknown operator associativity! Only left_to_right or right_to_left is supported!");
+						abort();
+					}
+				} else {
+					parser_error(parser, "Unknown operator option or invalid option type!");
+					abort();
+				}
 			} else {
 				node_p expr = parse_cexpr(parser);
 				node_set(arg, &arg->arg.expr, expr);
