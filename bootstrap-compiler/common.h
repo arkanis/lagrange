@@ -190,11 +190,12 @@ typedef enum {
 //
 
 typedef enum {
-	NC_NS      = (1 << 0),
-	NC_NAME    = (1 << 1),
-	NC_EXEC    = (1 << 2),
-	NC_VALUE   = (1 << 3),
-	NC_STORAGE = (1 << 4)
+	NC_NAME    = (1 << 0),
+	NC_NS      = (1 << 1),
+	NC_VALUE   = (1 << 2),
+	NC_STORAGE = (1 << 3),
+	NC_EXEC    = (1 << 4),
+	NC_BUILDIN = (1 << 5)
 } node_component_t;
 
 typedef enum {
@@ -251,6 +252,12 @@ struct node_s {
 		// TODO: one ASM buffer for compile time execution, one for storage into a binary
 		bool linked;
 	} exec;
+	
+	// buildin component: node represents functionality the compiler itself provides
+	struct {
+		void* private;
+		// TODO: add compile function pointer
+	} buildin;
 };
 
 #undef BEGIN

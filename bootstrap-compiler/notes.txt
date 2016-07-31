@@ -54,7 +54,8 @@ x Write a node_error() function thats like parser_error() but for AST processing
 x Reenalble namespaces calls node_alloc(), node_print_recursive()
 - Create buildins for operators
 	x Create AST node for operator definitions
-	- Parse operator definitions into AST nodes
+	x Parse operator definitions into AST nodes
+	- Create alternative to exec component: a function that's called at compile time
 	- Create a test operator in the buildin namespace
 	- Replace operator tables with buildin operator objects
 	- Migrate resolve uops pass to operator buildins
@@ -66,6 +67,9 @@ x Reenalble namespaces calls node_alloc(), node_print_recursive()
 	- Compiler functions for load/store
 	- Reenalble type calls in node_print_recursive(), node_print_inline()
 - Try to get whole compilation process to work again
+- Refactor compiler module into module AST node. Put the filename, source code and tokens into
+  properties of the AST node. This way we just create one module as container and use it for the
+  whole process.
 
 
 For next syntax step

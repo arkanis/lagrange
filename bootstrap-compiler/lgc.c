@@ -29,6 +29,12 @@ int main(int argc, char** argv) {
 	char* source_file = argv[optind];
 	
 	
+	// Initialize buildin stuff
+	node_p buildins = node_alloc(NT_MODULE);
+	buildins->name = str_from_c("buildins");
+	//buildins->module.ns;
+	fill_namespaces(NULL, buildins, NULL);
+	
 	// Initialize module
 	module_p module = &(module_t){
 		.filename = source_file,
@@ -78,6 +84,8 @@ int main(int argc, char** argv) {
 	node_p node = parse(module, parse_module, stderr);
 	if (show_parser_ast)
 		node_print(node, P_PARSER, stdout);
+	// Set the buildins module as parent of the new module so namespace lookups will find the buildins
+	node_append(buildins, &buildins->module.defs, node);
 	
 	// Step 3 - Fill namespaces
 	fill_namespaces(module, node, NULL);
