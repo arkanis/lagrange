@@ -4,6 +4,10 @@
 #include "common.h"
 
 
+int buildin_syscall(node_p node, int ctx, int out) { printf("buildin_syscall\n"); return 0; }
+int buildin_op_add(node_p node, int ctx, int out)  { printf("buildin_op_add\n");  return 0; }
+
+
 int main(int argc, char** argv) {
 	// Process command line arguments
 	bool show_tokens = false, show_parser_ast = false, show_filled_namespaces = false;
@@ -32,7 +36,16 @@ int main(int argc, char** argv) {
 	// Initialize buildin stuff
 	node_p buildins = node_alloc(NT_MODULE);
 	buildins->name = str_from_c("buildins");
-	//buildins->module.ns;
+		node_p syscall = node_alloc_append(NT_FUNC, buildins, &buildins->module.defs);
+		syscall->name = str_from_c("syscall");
+		node_convert_to_buildin(syscall, buildin_syscall, NULL);
+		
+		node_p add = node_alloc_append(NT_OPERATOR, buildins, &buildins->module.defs);
+		add->name = str_from_c("add");
+		add->operator.precendence = 70;
+		add->operator.assoc = LEFT_TO_RIGHT;
+		node_convert_to_buildin(add, buildin_op_add, NULL);
+		
 	fill_namespaces(NULL, buildins, NULL);
 	
 	// Initialize module
@@ -86,6 +99,8 @@ int main(int argc, char** argv) {
 		node_print(node, P_PARSER, stdout);
 	// Set the buildins module as parent of the new module so namespace lookups will find the buildins
 	node_append(buildins, &buildins->module.defs, node);
+	
+	//node_print(buildins, P_NAMESPACE, stdout);
 	
 	// Step 3 - Fill namespaces
 	fill_namespaces(module, node, NULL);

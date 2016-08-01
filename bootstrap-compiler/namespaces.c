@@ -25,7 +25,7 @@ void fill_namespaces(module_p module, node_p node, node_ns_p current_ns) {
 	
 	// If the node is something that can be referenced by name put it into the
 	// current namespace. Except it's unnamed (e.g. arguments).
-	if ( (node->spec->components & NC_NAME) && node->name.len > 0 )
+	if ( current_ns && (node->spec->components & NC_NAME) && node->name.len > 0 )
 		node_ns_put(current_ns, node->name, node);
 	
 	if (node->type == NT_IF_STMT) {

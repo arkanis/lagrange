@@ -208,6 +208,9 @@ typedef enum {
 	SF_WRITE = (1 << 1)
 } storage_flags_t;
 
+// TODO: update with proper type once we got the compile functions in again
+typedef int (*compile_func_t)(node_p node, int ctx, int out);
+
 
 #define BEGIN(nn, NN, c)           struct {
 #define MEMBER(nn, mn, ct, mt, p)  	ct mn;
@@ -255,8 +258,8 @@ struct node_s {
 	
 	// buildin component: node represents functionality the compiler itself provides
 	struct {
-		void* private;
-		// TODO: add compile function pointer
+		compile_func_t compile_func;
+		void*          private;
 	} buildin;
 };
 
@@ -288,6 +291,9 @@ void node_last_token(node_p node, token_p token);
 void node_print(node_p node, pass_t pass, FILE* output);
 void node_print_inline(node_p node, pass_t pass, FILE* output);
 void node_error(FILE* output, node_p node, module_p module, const char* message);
+
+void node_convert_to_buildin(node_p node, compile_func_t func, void* private_data);
+
 
 
 // Example:
