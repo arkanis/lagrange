@@ -24,6 +24,27 @@ struct { char* name; int precedence; op_assoc_t assoc; } operators[] = {
 };
 
 
+void add_buildin_ops_to_namespace(node_p module_node) {
+	if (module_node->type != NT_MODULE) {
+		fprintf(stderr, "add_buildin_ops_to_namespace(): Can only add buildin op definitions to a module!\n");
+		abort();
+	}
+	
+	for(size_t i = 0; i < sizeof(operators) / sizeof(operators[0]); i++) {
+		// Ignore holes in the operators array since we left out some
+		// operator IDs.
+		if (operators[i].name == NULL)
+			continue;
+		
+		node_p op = node_alloc_append(NT_OPERATOR, module_node, &module_node->module.defs);
+		op->name = str_from_c(operators[i].name);
+		op->operator.precedence = operators[i].precedence;
+		op->operator.assoc = operators[i].assoc;
+		node_convert_to_buildin(op, NULL, NULL);
+	}
+}
+
+
 /**
  * For each uops node: We find the strongest binding operator and replace it and
  * the nodes it binds to with an op node. This is repeated until no operators
@@ -46,9 +67,9 @@ node_p pass_resolve_uops(module_p module, node_p node) {
 	
 	while (list->len > 1) {
 		// Find strongest operator (operator with highest precedence)
-		int strongest_op_idx = -1;
-		int strongest_op_prec = 0;
-		int strongest_op_node_idx = -1;
+		node_p strongest_op_def = NULL;
+		int    strongest_op_prec = 0;
+		int    strongest_op_node_idx = -1;
 		for(int node_idx = 1; node_idx < (int)list->len; node_idx += 2) {
 			node_p op_slot = list->ptr[node_idx];
 			if (op_slot->type != NT_ID) {
@@ -57,64 +78,50 @@ node_p pass_resolve_uops(module_p module, node_p node) {
 			}
 			
 			// Find operator of the current op_slot node based on the IDs name
-			ssize_t op_idx = -1;
-			for(size_t i = 0; i < sizeof(operators) / sizeof(operators[0]); i++) {
-				// Ignore holes in the operators array since we left out some
-				// operator IDs.
-				if (operators[i].name == NULL)
-					continue;
-				
-				if ( strncmp(operators[i].name, op_slot->id.name.ptr, op_slot->id.name.len) == 0 && (int)strlen(operators[i].name) == op_slot->id.name.len ) {
-					op_idx = i;
-					break;
-				}
-			}
-			
-			if (op_idx == -1) {
-				node_error(stderr, op_slot, module, "pass_resolve_uops(): got unimplemented operator!\n");
+			node_p op_def = ns_lookup(node, op_slot->id.name);
+			if (op_def == NULL) {
+				node_error(stderr, op_slot, module, "pass_resolve_uops(): got undefined operator!\n");
 				abort();
 			}
 			
-			//printf("pass_resolve_uops(): got op %.*s (idx %zd) at node idx %d\n",
-			//	op_slot->id.name.len, op_slot->id.name.ptr, op_idx, node_idx
-			//);
+			printf("pass_resolve_uops(): got op %.*s at node idx %d\n",
+				op_def->name.len, op_def->name.ptr, node_idx
+			);
 			
 			// When several ops have the highest (same) precedence:
 			// For LEFT_TO_RIGHT operators we pick the first op
 			// For RIGHT_TO_LEFT operators we pick the last op
 			if (
-				(operators[op_idx].assoc == LEFT_TO_RIGHT && operators[op_idx].precedence >  strongest_op_prec) ||
-				(operators[op_idx].assoc == RIGHT_TO_LEFT && operators[op_idx].precedence >= strongest_op_prec)
+				(op_def->operator.assoc == LEFT_TO_RIGHT && op_def->operator.precedence >  strongest_op_prec) ||
+				(op_def->operator.assoc == RIGHT_TO_LEFT && op_def->operator.precedence >= strongest_op_prec)
 			) {
-				strongest_op_prec = operators[op_idx].precedence;
-				strongest_op_idx = op_idx;
+				strongest_op_prec = op_def->operator.precedence;
+				strongest_op_def = op_def;
 				strongest_op_node_idx = node_idx;
 			}
 		}
 		
-		if (strongest_op_idx == -1) {
+		if (strongest_op_def == NULL) {
 			node_error(stderr, node, module, "pass_resolve_uops(): no operators found in uops node!\n");
 			abort();
 		}
 		
-		//printf("pass_resolve_uops(): op %s got highest precedence: %d\n",
-		//	operators[strongest_op_idx].name, strongest_op_prec
-		//);
+		printf("pass_resolve_uops(): op %.*s got highest precedence: %d\n",
+			strongest_op_def->name.len, strongest_op_def->name.ptr, strongest_op_prec
+		);
 		
 		
 		// Take the nodes left and right from the op_slot node and create a new op
 		// node out of them. Then replace these nodes in the list with the new op
 		// node.
-		node_p op_node = node_alloc(NT_OP);
+		node_p op_node  = node_alloc(NT_OP);
 		op_node->parent = node;
+		// Just point to the operator definition node, don't set it's parent to our new op_node
+		op_node->op.def = strongest_op_def;
 		
-		op_node->op.name = list->ptr[strongest_op_node_idx]->id.name;
-		node_p untranslated_op = node_alloc_set(NT_ID, op_node, &op_node->op.op);
-		untranslated_op->id.name = list->ptr[strongest_op_node_idx]->tokens.ptr->source;
-		node_first_token(untranslated_op, list->ptr[strongest_op_node_idx]->tokens.ptr);
-		
-		node_set(op_node, &op_node->op.a, list->ptr[strongest_op_node_idx - 1]);
-		node_set(op_node, &op_node->op.b, list->ptr[strongest_op_node_idx + 1]);
+		node_set(op_node, &op_node->op.a,  list->ptr[strongest_op_node_idx - 1]);
+		node_set(op_node, &op_node->op.id, list->ptr[strongest_op_node_idx]    );
+		node_set(op_node, &op_node->op.b,  list->ptr[strongest_op_node_idx + 1]);
 		
 		node_first_token(op_node, op_node->op.a->tokens.ptr);
 		node_last_token(op_node, op_node->op.b->tokens.ptr);

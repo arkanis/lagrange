@@ -55,10 +55,11 @@ x Reenalble namespaces calls node_alloc(), node_print_recursive()
 - Create buildins for operators
 	x Create AST node for operator definitions
 	x Parse operator definitions into AST nodes
-	- Create alternative to exec component: a function that's called at compile time
-	- Create a test operator in the buildin namespace
-	- Replace operator tables with buildin operator objects
-	- Migrate resolve uops pass to operator buildins
+	x Create alternative to exec component: a function that's called at compile time
+	x Create a test operator in the buildin namespace
+	x Replace operator tables with buildin operator objects
+	x Migrate resolve uops pass to operator buildins
+	- Replace node_convert_to_buildin() since it overwrite the SPEC! Solve this in a different way...
 - Add stuff for compilation
 	- Add compilation function to operators
 	- Add compilation functions for nodes?

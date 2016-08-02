@@ -316,5 +316,6 @@ void     ast_replace_node(node_p node, ast_it_t it, node_p new_child);
 // Passes
 //
 
+void   add_buildin_ops_to_namespace(node_p module_node);
 node_p pass_resolve_uops(module_p module, node_p node);
 void   fill_namespaces(module_p module, node_p node, node_ns_p current_ns);

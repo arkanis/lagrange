@@ -298,8 +298,8 @@ node_p parse_operator_def(parser_p parser) {
 				node_p expr = parse_expr(parser);
 				node_set(arg, &arg->arg.expr, expr);
 				
-				if ( str_eqc(&arg->name, "precendence") && arg->arg.expr->type == NT_INTL ) {
-					node->operator.precendence = arg->arg.expr->intl.value;
+				if ( str_eqc(&arg->name, "precedence") && arg->arg.expr->type == NT_INTL ) {
+					node->operator.precedence = arg->arg.expr->intl.value;
 				} else if ( str_eqc(&arg->name, "assoc") && arg->arg.expr->type == NT_ID ) {
 					if ( str_eqc(&arg->arg.expr->id.name, "left_to_right") ) {
 						node->operator.assoc = LEFT_TO_RIGHT;

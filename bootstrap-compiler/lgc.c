@@ -40,12 +40,7 @@ int main(int argc, char** argv) {
 		syscall->name = str_from_c("syscall");
 		node_convert_to_buildin(syscall, buildin_syscall, NULL);
 		
-		node_p add = node_alloc_append(NT_OPERATOR, buildins, &buildins->module.defs);
-		add->name = str_from_c("add");
-		add->operator.precendence = 70;
-		add->operator.assoc = LEFT_TO_RIGHT;
-		node_convert_to_buildin(add, buildin_op_add, NULL);
-		
+		add_buildin_ops_to_namespace(buildins);
 	fill_namespaces(NULL, buildins, NULL);
 	
 	// Initialize module

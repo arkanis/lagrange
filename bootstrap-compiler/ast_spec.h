@@ -29,8 +29,8 @@ BEGIN(operator, OPERATOR, NC_NS | NC_NAME | NC_EXEC)
 	MEMBER(operator, options, node_list_t, MT_NODE_LIST, P_PARSER)
 	MEMBER(operator, body,    node_list_t, MT_NODE_LIST, P_PARSER)
 	
-	MEMBER(operator, precendence, int64_t, MT_INT, P_PARSER)
-	MEMBER(operator, assoc,       int64_t, MT_INT, P_PARSER)  // actually op_assoc_t
+	MEMBER(operator, precedence, int64_t, MT_INT, P_PARSER)
+	MEMBER(operator, assoc,      int64_t, MT_INT, P_PARSER)  // actually op_assoc_t
 END(operator)
 
 
@@ -111,10 +111,10 @@ BEGIN(uops, UOPS, 0)
 END(uops)
 
 BEGIN(op, OP, NC_VALUE)
-	MEMBER(op, name, str_t,  MT_STR,  P_PARSER)
-	MEMBER(op, op,   node_p, MT_NODE, P_PARSER)
-	MEMBER(op, a,    node_p, MT_NODE, P_PARSER)
-	MEMBER(op, b,    node_p, MT_NODE, P_PARSER)
+	MEMBER(op, def, node_p, MT_NODE, P_PARSER)
+	MEMBER(op, a,   node_p, MT_NODE, P_PARSER)
+	MEMBER(op, id,  node_p, MT_NODE, P_PARSER)
+	MEMBER(op, b,   node_p, MT_NODE, P_PARSER)
 END(op)
 
 BEGIN(member, MEMBER, NC_VALUE)

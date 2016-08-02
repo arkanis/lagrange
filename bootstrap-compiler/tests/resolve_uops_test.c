@@ -49,6 +49,12 @@ void test_samples() {
 			.source   = str_from_c(samples[i].code)
 		};
 		
+		// Initialize buildin stuff
+		node_p buildins = node_alloc(NT_MODULE);
+		buildins->name = str_from_c("buildins");
+			add_buildin_ops_to_namespace(buildins);
+		fill_namespaces(NULL, buildins, NULL);
+		
 		size_t errors = tokenize(module->source, &module->tokens, stderr);
 		st_check_int(errors, 0);
 		
