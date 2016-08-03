@@ -292,8 +292,6 @@ void node_print(node_p node, pass_t pass, FILE* output);
 void node_print_inline(node_p node, pass_t pass, FILE* output);
 void node_error(FILE* output, node_p node, module_p module, const char* message);
 
-void node_convert_to_buildin(node_p node, compile_func_t func, void* private_data);
-
 
 
 // Example:

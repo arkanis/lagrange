@@ -217,7 +217,7 @@ node_p parse_module(parser_p parser) {
 node_p parse_func_def(parser_p parser) {
 	// def     = "func" ID [ def-mod ] "{" [ stmt ] "}"
 	// def-mod = ( "in" | "out" )  "(" ID ID? [ "," ID ID? ] ")"
-	node_p node = node_alloc(NT_FUNC);
+	node_p node = node_alloc(NT_FUNC_DEF);
 	
 	token_p t = consume_type(parser, T_FUNC);
 	node_first_token(node, t);
@@ -226,9 +226,9 @@ node_p parse_func_def(parser_p parser) {
 	while ( (t = try_consume(parser, T_IN)) || (t = try_consume(parser, T_OUT)) ) {
 		node_list_p arg_list = NULL;
 		if ( t->type == T_IN )
-			arg_list = &node->func.in;
+			arg_list = &node->func_def.in;
 		else if ( t->type == T_OUT )
-			arg_list = &node->func.out;
+			arg_list = &node->func_def.out;
 		else
 			abort();
 		
@@ -251,10 +251,10 @@ node_p parse_func_def(parser_p parser) {
 	}
 	
 	if ( try_consume(parser, T_CBO) ) {
-		parse_stmts(parser, node, &node->func.body);
+		parse_stmts(parser, node, &node->func_def.body);
 		t = consume_type(parser, T_CBC);
 	} else if ( try_consume(parser, T_DO) ) {
-		parse_stmts(parser, node, &node->func.body);
+		parse_stmts(parser, node, &node->func_def.body);
 		t = consume_type(parser, T_END);
 	} else {
 		parser_error(parser, NULL);
@@ -269,7 +269,7 @@ node_p parse_operator_def(parser_p parser) {
 	// def     = "operator" ID [ def-mod ] "{" [ stmt ] "}"
 	// def-mod = ( "in" | "out" )  "(" ID ID? [ "," ID ID? ] ")"
 	//           "options" "(" ID ":" expr [ "," ID ":" expr ] ")"
-	node_p node = node_alloc(NT_OPERATOR);
+	node_p node = node_alloc(NT_OP_DEF);
 	
 	token_p t = consume_type(parser, T_OPERATOR);
 	node_first_token(node, t);
@@ -278,11 +278,11 @@ node_p parse_operator_def(parser_p parser) {
 	while ( (t = try_consume(parser, T_IN)) || (t = try_consume(parser, T_OUT)) || (t = try_consume(parser, T_OPTIONS)) ) {
 		node_list_p arg_list = NULL;
 		if ( t->type == T_IN )
-			arg_list = &node->operator.in;
+			arg_list = &node->op_def.in;
 		else if ( t->type == T_OUT )
-			arg_list = &node->operator.out;
+			arg_list = &node->op_def.out;
 		else if ( t->type == T_OPTIONS )
-			arg_list = &node->operator.options;
+			arg_list = &node->op_def.options;
 		else
 			abort();
 		
@@ -299,12 +299,12 @@ node_p parse_operator_def(parser_p parser) {
 				node_set(arg, &arg->arg.expr, expr);
 				
 				if ( str_eqc(&arg->name, "precedence") && arg->arg.expr->type == NT_INTL ) {
-					node->operator.precedence = arg->arg.expr->intl.value;
+					node->op_def.precedence = arg->arg.expr->intl.value;
 				} else if ( str_eqc(&arg->name, "assoc") && arg->arg.expr->type == NT_ID ) {
 					if ( str_eqc(&arg->arg.expr->id.name, "left_to_right") ) {
-						node->operator.assoc = LEFT_TO_RIGHT;
+						node->op_def.assoc = LEFT_TO_RIGHT;
 					} else if ( str_eqc(&arg->arg.expr->id.name, "right_to_left") ) {
-						node->operator.assoc = RIGHT_TO_LEFT;
+						node->op_def.assoc = RIGHT_TO_LEFT;
 					} else {
 						parser_error(parser, "Unknown operator associativity! Only left_to_right or right_to_left is supported!");
 						abort();
@@ -330,10 +330,10 @@ node_p parse_operator_def(parser_p parser) {
 	}
 	
 	if ( try_consume(parser, T_CBO) ) {
-		parse_stmts(parser, node, &node->func.body);
+		parse_stmts(parser, node, &node->func_def.body);
 		t = consume_type(parser, T_CBC);
 	} else if ( try_consume(parser, T_DO) ) {
-		parse_stmts(parser, node, &node->func.body);
+		parse_stmts(parser, node, &node->func_def.body);
 		t = consume_type(parser, T_END);
 	} else {
 		parser_error(parser, NULL);

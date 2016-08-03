@@ -90,20 +90,6 @@ void node_append(node_p parent, node_list_p list, node_p child) {
 	list_append(list, child);
 }
 
-void node_convert_to_buildin(node_p node, compile_func_t func, void* private_data) {
-	if ( !(node->spec->components & NC_EXEC) ) {
-		fprintf(stderr, "node_convert_to_buildin(): You can only convert nodes to buildins that have the exec component!\n");
-		abort();
-	}
-	
-	// Clear exec component and enable buildin component
-	node->spec->components &= ~NC_EXEC;
-	node->spec->components |= NC_BUILDIN;
-	
-	node->buildin.compile_func = func;
-	node->buildin.private = private_data;
-}
-
 
 
 //

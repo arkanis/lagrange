@@ -17,21 +17,27 @@ BEGIN(module, MODULE, NC_NS | NC_NAME)
 	MEMBER(module, defs, node_list_t, MT_NODE_LIST, P_PARSER)
 END(module)
 
-BEGIN(func, FUNC, NC_NS | NC_NAME | NC_EXEC)
-	MEMBER(func, in,   node_list_t, MT_NODE_LIST, P_PARSER)
-	MEMBER(func, out,  node_list_t, MT_NODE_LIST, P_PARSER)
-	MEMBER(func, body, node_list_t, MT_NODE_LIST, P_PARSER)
-END(func)
+BEGIN(func_def, FUNC_DEF, NC_NS | NC_NAME | NC_EXEC)
+	MEMBER(func_def, in,   node_list_t, MT_NODE_LIST, P_PARSER)
+	MEMBER(func_def, out,  node_list_t, MT_NODE_LIST, P_PARSER)
+	MEMBER(func_def, body, node_list_t, MT_NODE_LIST, P_PARSER)
+END(func_def)
 
-BEGIN(operator, OPERATOR, NC_NS | NC_NAME | NC_EXEC)
-	MEMBER(operator, in,      node_list_t, MT_NODE_LIST, P_PARSER)
-	MEMBER(operator, out,     node_list_t, MT_NODE_LIST, P_PARSER)
-	MEMBER(operator, options, node_list_t, MT_NODE_LIST, P_PARSER)
-	MEMBER(operator, body,    node_list_t, MT_NODE_LIST, P_PARSER)
+BEGIN(func_buildin, FUNC_BUILDIN, NC_NS | NC_NAME | NC_BUILDIN)
+END(func_buildin)
+
+BEGIN(op_def, OP_DEF, NC_NS | NC_NAME | NC_EXEC)
+	MEMBER(op_def, in,      node_list_t, MT_NODE_LIST, P_PARSER)
+	MEMBER(op_def, out,     node_list_t, MT_NODE_LIST, P_PARSER)
+	MEMBER(op_def, options, node_list_t, MT_NODE_LIST, P_PARSER)
+	MEMBER(op_def, body,    node_list_t, MT_NODE_LIST, P_PARSER)
 	
-	MEMBER(operator, precedence, int64_t, MT_INT, P_PARSER)
-	MEMBER(operator, assoc,      int64_t, MT_INT, P_PARSER)  // actually op_assoc_t
-END(operator)
+	MEMBER(op_def, precedence, int64_t, MT_INT, P_PARSER)
+	MEMBER(op_def, assoc,      int64_t, MT_INT, P_PARSER)  // actually op_assoc_t
+END(op_def)
+
+BEGIN(op_buildin, OP_BUILDIN, NC_NS | NC_NAME | NC_BUILDIN)
+END(op_buildin)
 
 
 // Represents general key-value node for named expressions (options list, named call args,

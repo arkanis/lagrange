@@ -36,9 +36,10 @@ int main(int argc, char** argv) {
 	// Initialize buildin stuff
 	node_p buildins = node_alloc(NT_MODULE);
 	buildins->name = str_from_c("buildins");
-		node_p syscall = node_alloc_append(NT_FUNC, buildins, &buildins->module.defs);
+		node_p syscall = node_alloc_append(NT_FUNC_BUILDIN, buildins, &buildins->module.defs);
 		syscall->name = str_from_c("syscall");
-		node_convert_to_buildin(syscall, buildin_syscall, NULL);
+		syscall->buildin.compile_func = buildin_syscall;
+		syscall->buildin.private = NULL;
 		
 		add_buildin_ops_to_namespace(buildins);
 	fill_namespaces(NULL, buildins, NULL);

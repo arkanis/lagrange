@@ -10,30 +10,36 @@
 
 struct { char* code; char* expected_ast_dump; } samples[] = {
 	{ "x + y",
-		"op: \"add\"\n"
-		"  op: id: \"+\"\n"
+		"op: \n"
+		"  def: op_buildin: \"add\"\n"
 		"  a: id: \"x\"\n"
+		"  id: id: \"add\"\n"
 		"  b: id: \"y\"\n"
 	},
 	{ "a + b * c",
-		"op: \"add\"\n"
-		"  op: id: \"+\"\n"
+		"op: \n"
+		"  def: op_buildin: \"add\"\n"
 		"  a: id: \"a\"\n"
-		"  b: op: \"mul\"\n"
-		"    op: id: \"*\"\n"
+		"  id: id: \"add\"\n"
+		"  b: op: \n"
+		"    def: op_buildin: \"mul\"\n"
 		"    a: id: \"b\"\n"
+		"    id: id: \"mul\"\n"
 		"    b: id: \"c\"\n"
 	},
 	{ "1 * 2 + 3 * 4",
-		"op: \"add\"\n"
-		"  op: id: \"+\"\n"
-		"  a: op: \"mul\"\n"
-		"    op: id: \"*\"\n"
+		"op: \n"
+		"  def: op_buildin: \"add\"\n"
+		"  a: op: \n"
+		"    def: op_buildin: \"mul\"\n"
 		"    a: intl: 1\n"
+		"    id: id: \"mul\"\n"
 		"    b: intl: 2\n"
-		"  b: op: \"mul\"\n"
-		"    op: id: \"*\"\n"
+		"  id: id: \"add\"\n"
+		"  b: op: \n"
+		"    def: op_buildin: \"mul\"\n"
 		"    a: intl: 3\n"
+		"    id: id: \"mul\"\n"
 		"    b: intl: 4\n"
 	},
 };
@@ -59,6 +65,7 @@ void test_samples() {
 		st_check_int(errors, 0);
 		
 		node_p node = parse(module, parse_expr, stderr);
+		node_append(buildins, &buildins->module.defs, node);
 		node = pass_resolve_uops(module, node);
 		
 		output = open_memstream(&output_ptr, &output_len);

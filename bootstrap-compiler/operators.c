@@ -36,11 +36,14 @@ void add_buildin_ops_to_namespace(node_p module_node) {
 		if (operators[i].name == NULL)
 			continue;
 		
-		node_p op = node_alloc_append(NT_OPERATOR, module_node, &module_node->module.defs);
+		node_p op = node_alloc_append(NT_OP_BUILDIN, module_node, &module_node->module.defs);
 		op->name = str_from_c(operators[i].name);
-		op->operator.precedence = operators[i].precedence;
-		op->operator.assoc = operators[i].assoc;
-		node_convert_to_buildin(op, NULL, NULL);
+		
+		op->op_def.precedence = operators[i].precedence;
+		op->op_def.assoc = operators[i].assoc;
+		
+		op->buildin.compile_func = NULL;
+		op->buildin.private = NULL;
 	}
 }
 
@@ -84,18 +87,18 @@ node_p pass_resolve_uops(module_p module, node_p node) {
 				abort();
 			}
 			
-			printf("pass_resolve_uops(): got op %.*s at node idx %d\n",
-				op_def->name.len, op_def->name.ptr, node_idx
-			);
+			//printf("pass_resolve_uops(): got op %.*s at node idx %d\n",
+			//	op_def->name.len, op_def->name.ptr, node_idx
+			//);
 			
 			// When several ops have the highest (same) precedence:
 			// For LEFT_TO_RIGHT operators we pick the first op
 			// For RIGHT_TO_LEFT operators we pick the last op
 			if (
-				(op_def->operator.assoc == LEFT_TO_RIGHT && op_def->operator.precedence >  strongest_op_prec) ||
-				(op_def->operator.assoc == RIGHT_TO_LEFT && op_def->operator.precedence >= strongest_op_prec)
+				(op_def->op_def.assoc == LEFT_TO_RIGHT && op_def->op_def.precedence >  strongest_op_prec) ||
+				(op_def->op_def.assoc == RIGHT_TO_LEFT && op_def->op_def.precedence >= strongest_op_prec)
 			) {
-				strongest_op_prec = op_def->operator.precedence;
+				strongest_op_prec = op_def->op_def.precedence;
 				strongest_op_def = op_def;
 				strongest_op_node_idx = node_idx;
 			}
@@ -106,9 +109,9 @@ node_p pass_resolve_uops(module_p module, node_p node) {
 			abort();
 		}
 		
-		printf("pass_resolve_uops(): op %.*s got highest precedence: %d\n",
-			strongest_op_def->name.len, strongest_op_def->name.ptr, strongest_op_prec
-		);
+		//printf("pass_resolve_uops(): op %.*s got highest precedence: %d\n",
+		//	strongest_op_def->name.len, strongest_op_def->name.ptr, strongest_op_prec
+		//);
 		
 		
 		// Take the nodes left and right from the op_slot node and create a new op

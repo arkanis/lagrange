@@ -619,7 +619,7 @@ struct { parser_rule_func_t rule; char* code; char* expected_ast_dump; } samples
   	//
 	{ parse_module, "func foo in(int argc, int.ptr argv) out(int) { int a; a += 1 if argc < 2; { foo(a) } }",
 		"module: \"\"\n"
-		"  defs[0]: func: \"foo\"\n"
+		"  defs[0]: func_def: \"foo\"\n"
 		"    in[0]: arg: \"argc\"\n"
 		"      expr: id: \"int\"\n"
 		"    in[1]: arg: \"argv\"\n"
@@ -648,7 +648,7 @@ struct { parser_rule_func_t rule; char* code; char* expected_ast_dump; } samples
 	},
 	{ parse_module, "operator add in(int a, int b) out(int) options(precedence: 10, assoc: left_to_right) { return a + b; }",
 		"module: \"\"\n"
-		"  defs[0]: operator: \"add\"\n"
+		"  defs[0]: op_def: \"add\"\n"
 		"    in[0]: arg: \"a\"\n"
 		"      expr: id: \"int\"\n"
 		"    in[1]: arg: \"b\"\n"
@@ -776,7 +776,7 @@ void test_statement_combinations() {
 				ast_dump = open_memstream(&ast_dump_ptr, &ast_dump_len);
 					fprintf(ast_dump,
 						"module: \"\"\n"
-						"  defs[0]: func: \"main\"\n"
+						"  defs[0]: func_def: \"main\"\n"
 					);
 					fprintf(ast_dump, statement_pool[i].ast_dump, 0);
 					fprintf(ast_dump, statement_pool[j].ast_dump, 1);
