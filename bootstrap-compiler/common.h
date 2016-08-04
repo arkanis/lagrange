@@ -34,14 +34,6 @@ typedef list_t(token_t) token_list_t, *token_list_p;
 typedef struct node_s   node_t, *node_p;
 typedef struct type_s   type_t, *type_p;
 
-typedef struct {
-	char* filename;
-	str_t source;
-	
-	token_list_t tokens;
-	
-} module_t, *module_p;
-
 
 
 //
@@ -67,16 +59,16 @@ struct token_s {
 size_t tokenize(str_t source, token_list_p tokens, FILE* error_stream);
 
 void token_free(token_p token);
-int  token_line(module_p module, token_p token);
-int  token_col(module_p module, token_p token);
+int  token_line(node_p module, token_p token);
+int  token_col(node_p module, token_p token);
 
 #define TP_SOURCE      (1 << 0)  // print only source
 #define TP_DUMP        (1 << 1)  // print type and source
 #define TP_INLINE_DUMP (1 << 2)  // print type and escaped and shorted source to avoid line breaks in the output
 void  token_print(FILE* stream, token_p token, uint32_t flags);
 
-void  token_print_line(FILE* stream, module_p module, token_p token);
-void  token_print_range(FILE* stream, module_p module, size_t token_start_idx, size_t token_count);
+void  token_print_line(FILE* stream, node_p module, token_p token);
+void  token_print_range(FILE* stream, node_p module, size_t token_start_idx, size_t token_count);
 char* token_type_name(token_type_t type);
 char* token_desc(token_type_t type);
 
@@ -89,7 +81,7 @@ char* token_desc(token_type_t type);
 typedef struct parser_s parser_t, *parser_p;
 typedef node_p (*parser_rule_func_t)(parser_p parser);
 
-node_p parse(module_p module, parser_rule_func_t rule, FILE* error_stream);
+void parse(node_p module, parser_rule_func_t rule, FILE* error_stream);
 
 node_p parse_module(parser_p parser);
 node_p parse_func_def(parser_p parser);
@@ -291,7 +283,7 @@ void node_last_token(node_p node, token_p token);
 
 void node_print(node_p node, pass_t pass_min, pass_t pass_max, FILE* output);
 void node_print_inline(node_p node, pass_t pass_min, pass_t pass_max, FILE* output);
-void node_error(FILE* output, node_p node, module_p module, const char* message);
+void node_error(FILE* output, node_p node, const char* message);
 
 
 
@@ -315,6 +307,6 @@ void     ast_replace_node(node_p node, ast_it_t it, node_p new_child);
 // Passes
 //
 
-void   add_buildin_ops_to_namespace(node_p module_node);
-node_p pass_resolve_uops(module_p module, node_p node);
-void   fill_namespaces(module_p module, node_p node, node_ns_p current_ns);
+void   add_buildin_ops_to_namespace(node_p module);
+node_p pass_resolve_uops(node_p node);
+void   fill_namespaces(node_p node, node_ns_p current_ns);

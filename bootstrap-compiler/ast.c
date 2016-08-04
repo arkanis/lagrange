@@ -1,3 +1,4 @@
+#include <assert.h>
 #include "common.h"
 
 //
@@ -324,22 +325,31 @@ void node_print_inline(node_p node, pass_t pass_min, pass_t pass_max, FILE* outp
 	}
 }
 
-void node_error(FILE* output, node_p node, module_p module, const char* message) {
-	token_p token = node->tokens.ptr;
+void node_error(FILE* output, node_p node, const char* message) {
+	// Find the parent module of the node so we get to the modules token list
+	node_p module;
+	for (module = node; module != NULL; module = module->parent) {
+		if (module->type == NT_MODULE)
+			break;
+	}
+	assert(module != NULL);  // Node has no module as child... crash for now...
 	
-	if (token < module->tokens.ptr || token > module->tokens.ptr + module->tokens.len) {
+	token_p token = node->tokens.ptr;
+	token_list_p mod_tokens = &module->module.tokens;
+	
+	if (token < mod_tokens->ptr || token > mod_tokens->ptr + mod_tokens->len) {
 		fprintf(stderr, "node_error(): Specified node isn't part of the modules token list!\n");
 		abort();
 	}
 	
-	fprintf(output, "%s:%d:%d: %s",
-		module->filename,
+	fprintf(output, "%.*s:%d:%d: %s",
+		module->module.filename.len, module->module.filename.ptr,
 		token_line(module, token),
 		token_col(module, token),
 		message
 	);
 	
-	size_t index = node->tokens.ptr - module->tokens.ptr;
+	size_t index = node->tokens.ptr - mod_tokens->ptr;
 	token_print_range(output, module, index, node->tokens.len);
 }
 

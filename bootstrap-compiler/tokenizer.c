@@ -1,5 +1,6 @@
 #include <ctype.h>
 #include <string.h>
+#include <assert.h>
 #include "common.h"
 
 
@@ -389,18 +390,20 @@ void token_free(token_p token) {
 	}
 }
 
-int token_line(module_p module, token_p token) {
+int token_line(node_p module, token_p token) {
+	assert(module->type == NT_MODULE);
 	int line = 1;
-	for(char* c = token->source.ptr; c >= module->source.ptr; c--) {
+	for(char* c = token->source.ptr; c >= module->module.source.ptr; c--) {
 		if (*c == '\n')
 			line++;
 	}
 	return line;
 }
 
-int token_col(module_p module, token_p token) {
+int token_col(node_p module, token_p token) {
+	assert(module->type == NT_MODULE);
 	int col = 0;
-	for(char* c = token->source.ptr; *c != '\n' && c >= module->source.ptr; c--)
+	for(char* c = token->source.ptr; *c != '\n' && c >= module->module.source.ptr; c--)
 		col++;
 	return col;
 }
@@ -486,28 +489,31 @@ void token_print(FILE* stream, token_p token, uint32_t flags) {
 	}
 }
 
-void token_print_line(FILE* stream, module_p module, token_p token) {
-	if (token < module->tokens.ptr || token > module->tokens.ptr + module->tokens.len) {
+void token_print_line(FILE* stream, node_p module, token_p token) {
+	assert(module->type == NT_MODULE);
+	token_list_p tokens = &module->module.tokens;
+	if (token < tokens->ptr || token > tokens->ptr + tokens->len) {
 		fprintf(stderr, "token_print_line(): Specified token isn't part of the modules token list!\n");
 		abort();
 	}
 	
-	size_t index = token - module->tokens.ptr;
+	size_t index = token - tokens->ptr;
 	token_print_range(stream, module, index, 1);
 }
 
-void token_print_range(FILE* stream, module_p module, size_t token_start_idx, size_t token_count) {
-	token_p start_token = &module->tokens.ptr[token_start_idx];
-	token_p end_token = &module->tokens.ptr[token_start_idx + token_count - 1];
+void token_print_range(FILE* stream, node_p module, size_t token_start_idx, size_t token_count) {
+	assert(module->type == NT_MODULE);
+	token_p start_token = &module->module.tokens.ptr[token_start_idx];
+	token_p end_token = &module->module.tokens.ptr[token_start_idx + token_count - 1];
 	
 	char* code_start = start_token->source.ptr;
 	char* code_end = end_token->source.ptr + end_token->source.len;
 	
 	char* line_start = code_start;
-	while (line_start > module->source.ptr && *(line_start-1) != '\n')
+	while (line_start > module->module.source.ptr && *(line_start-1) != '\n')
 		line_start--;
 	char* line_end = code_end;
-	while (*line_end != '\n' && line_end < module->source.ptr + module->source.len)
+	while (*line_end != '\n' && line_end < module->module.source.ptr + module->module.source.len)
 		line_end++;
 	
 	fprintf(stream, "%.*s\e[1;4m%.*s\e[0m%.*s\n",

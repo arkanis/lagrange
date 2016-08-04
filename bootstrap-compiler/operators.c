@@ -53,11 +53,11 @@ void add_buildin_ops_to_namespace(node_p module_node) {
  * the nodes it binds to with an op node. This is repeated until no operators
  * are left to replace. The uops node should just have one op child at the end.
  */
-node_p pass_resolve_uops(module_p module, node_p node) {
+node_p pass_resolve_uops(node_p node) {
 	// Frist resolve all uops in the child nodes. This needs less recursive
 	// calls than doing it afterwards.
 	for(ast_it_t it = ast_start(node); it.node != NULL; it = ast_next(node, it)) {
-		node_p new_child = pass_resolve_uops(module, it.node);
+		node_p new_child = pass_resolve_uops(it.node);
 		if (new_child != it.node)
 			ast_replace_node(node, it, new_child);
 	}
@@ -76,14 +76,14 @@ node_p pass_resolve_uops(module_p module, node_p node) {
 		for(int node_idx = 1; node_idx < (int)list->len; node_idx += 2) {
 			node_p op_slot = list->ptr[node_idx];
 			if (op_slot->type != NT_ID) {
-				node_error(stderr, op_slot, module, "pass_resolve_uops(): got non NT_ID in uops op slot!\n");
+				node_error(stderr, op_slot, "pass_resolve_uops(): got non NT_ID in uops op slot!\n");
 				abort();
 			}
 			
 			// Find operator of the current op_slot node based on the IDs name
 			node_p op_def = ns_lookup(node, op_slot->id.name);
 			if (op_def == NULL) {
-				node_error(stderr, op_slot, module, "pass_resolve_uops(): got undefined operator!\n");
+				node_error(stderr, op_slot, "pass_resolve_uops(): got undefined operator!\n");
 				abort();
 			}
 			
@@ -105,7 +105,7 @@ node_p pass_resolve_uops(module_p module, node_p node) {
 		}
 		
 		if (strongest_op_def == NULL) {
-			node_error(stderr, node, module, "pass_resolve_uops(): no operators found in uops node!\n");
+			node_error(stderr, node, "pass_resolve_uops(): no operators found in uops node!\n");
 			abort();
 		}
 		
