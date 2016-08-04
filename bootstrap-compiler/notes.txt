@@ -59,7 +59,7 @@ x Reenalble namespaces calls node_alloc(), node_print_recursive()
 	x Create a test operator in the buildin namespace
 	x Replace operator tables with buildin operator objects
 	x Migrate resolve uops pass to operator buildins
-	- Replace node_convert_to_buildin() since it overwrite the SPEC! Solve this in a different way...
+	x Replace node_convert_to_buildin() since it overwrite the SPEC! Solve this in a different way...
 - Add stuff for compilation
 	- Add compilation function to operators
 	- Add compilation functions for nodes?

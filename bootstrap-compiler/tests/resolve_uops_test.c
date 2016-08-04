@@ -69,7 +69,7 @@ void test_samples() {
 		node = pass_resolve_uops(module, node);
 		
 		output = open_memstream(&output_ptr, &output_len);
-			node_print(node, P_PARSER, output);
+			node_print(node, P_PARSER, P_PARSER, output);
 		fclose(output);
 		
 		st_check_str(output_ptr, samples[i].expected_ast_dump);

@@ -92,7 +92,7 @@ int main(int argc, char** argv) {
 	// Step 2 - Parse tokens into an AST
 	node_p node = parse(module, parse_module, stderr);
 	if (show_parser_ast)
-		node_print(node, P_PARSER, stdout);
+		node_print(node, P_PARSER, P_PARSER, stdout);
 	// Set the buildins module as parent of the new module so namespace lookups will find the buildins
 	node_append(buildins, &buildins->module.defs, node);
 	
@@ -101,12 +101,12 @@ int main(int argc, char** argv) {
 	// Step 3 - Fill namespaces
 	fill_namespaces(module, node, NULL);
 	if (show_filled_namespaces)
-		node_print(node, P_NAMESPACE, stdout);
+		node_print(node, P_PARSER, P_NAMESPACE, stdout);
 	
 	// Step 4 - Resolve uops nodes
 	node = pass_resolve_uops(module, node);
 	if (show_resloved_uops)
-		node_print(node, P_PARSER, stdout);
+		node_print(node, P_PARSER, P_PARSER, stdout);
 	
 	cleanup_tokenizer:
 		list_destroy(&module->tokens);

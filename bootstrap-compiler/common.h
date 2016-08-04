@@ -147,6 +147,7 @@ typedef enum {
 } member_type_t;
 
 typedef enum {
+	P_INPUT,
 	P_PARSER,
 	P_NAMESPACE,
 	P_TYPE,
@@ -288,8 +289,8 @@ bool node_list_contains_node(node_list_p list, node_p node);
 void node_first_token(node_p node, token_p token);
 void node_last_token(node_p node, token_p token);
 
-void node_print(node_p node, pass_t pass, FILE* output);
-void node_print_inline(node_p node, pass_t pass, FILE* output);
+void node_print(node_p node, pass_t pass_min, pass_t pass_max, FILE* output);
+void node_print_inline(node_p node, pass_t pass_min, pass_t pass_max, FILE* output);
 void node_error(FILE* output, node_p node, module_p module, const char* message);
 
 

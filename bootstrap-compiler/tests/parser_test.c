@@ -685,7 +685,7 @@ void test_samples() {
 		
 		output = open_memstream(&output_ptr, &output_len);
 			node_p node = parse(module, samples[i].rule, stderr);
-			node_print(node, P_PARSER, output);
+			node_print(node, P_PARSER, P_PARSER, output);
 		fclose(output);
 		
 		st_check_str(output_ptr, samples[i].expected_ast_dump);
@@ -795,7 +795,7 @@ void test_statement_combinations() {
 				
 				output = open_memstream(&output_ptr, &output_len);
 					node_p node = parse(module, parse_module, stderr);
-					node_print(node, P_PARSER, output);
+					node_print(node, P_PARSER, P_PARSER, output);
 				fclose(output);
 				
 				st_check_str(output_ptr, ast_dump_ptr);

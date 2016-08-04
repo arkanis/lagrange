@@ -156,7 +156,7 @@ void node_last_token(node_p node, token_p token) {
 // Printing functions
 //
 
-static void node_print_recursive(node_p node, pass_t pass, FILE* output, int level) {
+static void node_print_recursive(node_p node, pass_t pass_min, pass_t pass_max, FILE* output, int level) {
 	// Helper function to inline the value into the same line as the node type.
 	// The function contains a whitelist of member types it allows to inline.
 	// For them it skips the first linebreak and label. If our first label is
@@ -181,15 +181,50 @@ static void node_print_recursive(node_p node, pass_t pass, FILE* output, int lev
 	
 	fprintf(output, "%s: ", node->spec->name);
 	
-	if ( (node->spec->components & NC_NAME) && pass >= P_PARSER ) {
+	// Print all components before the members. This way all the stuff that can
+	// have children comes at the end.
+	if ( (node->spec->components & NC_NAME) && (pass_min <= P_PARSER && pass_max >= P_PARSER) ) {
 		print_label("name", MT_STR);
 		fprintf(output, "\"%.*s\"", node->name.len, node->name.ptr);
 	}
 	
+	if ( (node->spec->components & NC_NS) && (pass_min <= P_NAMESPACE && pass_max >= P_NAMESPACE) ) {
+		print_label("namespace", MT_NONE);
+		for(node_ns_it_p it = node_ns_start(&node->ns); it != NULL; it = node_ns_next(&node->ns, it)) {
+			fprintf(output, "\"%.*s\" ", it->key.len, it->key.ptr);
+		}
+	}
+	
+	if ( (node->spec->components & NC_VALUE) && (pass_min <= P_TYPE && pass_max >= P_TYPE) ) {
+		// TODO: print type stuff
+		/*
+		type_p type = *(type_p*)member_ptr;
+		if (type == NULL)
+			fprintf(output, "NULL");
+		else
+			fprintf(output, "%.*s (%zu bytes)", type->name.len, type->name.ptr, type->size);
+		*/
+	}
+	
+	if ( (node->spec->components & NC_STORAGE) && (pass_min <= P_COMPILER && pass_max >= P_COMPILER) ) {
+		// TODO: print storage stuff
+	}
+	
+	if ( (node->spec->components & NC_EXEC) && (pass_min <= P_COMPILER && pass_max >= P_COMPILER) ) {
+		// TODO: print exec stuff
+		/*
+		list_t(node_addr_slot_t)* asl = member_ptr;
+		for(size_t i = 0; i < asl->len; i++) {
+			fprintf(output, "\n%*soffset %zu → ", (level+2)*2, "", asl->ptr[i].offset);
+			node_print_inline(asl->ptr[i].target, pass, output);
+			fprintf(output, "\n");
+		}
+		*/
+	}
+	
 	for(member_spec_p member = node->spec->members; member->type != 0; member++) {
-		// Skip members from later passes. So we only show members up to and
-		// including the requested pass.
-		if (member->pass > pass)
+		// Skip members from earlier or later passes
+		if (member->pass < pass_min || member->pass > pass_max)
 			continue;
 		
 		// Node lists print their lables by themselfs and can't be inlined anyway
@@ -201,13 +236,13 @@ static void node_print_recursive(node_p node, pass_t pass, FILE* output, int lev
 			case MT_NODE: {
 				node_p value = *(node_p*)member_ptr;
 				if (value != NULL)
-					node_print_recursive(value, pass, output, level+1);
+					node_print_recursive(value, pass_min, pass_max, output, level+1);
 				} break;
 			case MT_NODE_LIST: {
 				node_list_p list = member_ptr;
 				for(size_t i = 0; i < list->len; i++) {
 					fprintf(output, "\n%*s%s[%zu]: ", (level+1)*2, "", member->name, i);
-					node_print_recursive(list->ptr[i], pass, output, level+1);
+					node_print_recursive(list->ptr[i], pass_min, pass_max, output, level+1);
 				}
 				} break;
 			
@@ -237,54 +272,19 @@ static void node_print_recursive(node_p node, pass_t pass, FILE* output, int lev
 				break;
 		}
 	}
-	
-	if ( (node->spec->components & NC_NS) && pass >= P_NAMESPACE ) {
-		print_label("namespace", MT_NONE);
-		for(node_ns_it_p it = node_ns_start(&node->ns); it != NULL; it = node_ns_next(&node->ns, it)) {
-			fprintf(output, "\"%.*s\" ", it->key.len, it->key.ptr);
-		}
-	}
-	
-	if ( (node->spec->components & NC_VALUE) && pass >= P_TYPE ) {
-		// TODO: print type stuff
-		/*
-		type_p type = *(type_p*)member_ptr;
-		if (type == NULL)
-			fprintf(output, "NULL");
-		else
-			fprintf(output, "%.*s (%zu bytes)", type->name.len, type->name.ptr, type->size);
-		*/
-	}
-	
-	if ( (node->spec->components & NC_STORAGE) && pass >= P_COMPILER ) {
-		// TODO: print storage stuff
-	}
-	
-	if ( (node->spec->components & NC_EXEC) && pass >= P_COMPILER ) {
-		// TODO: print exec stuff
-		/*
-		list_t(node_addr_slot_t)* asl = member_ptr;
-		for(size_t i = 0; i < asl->len; i++) {
-			fprintf(output, "\n%*soffset %zu → ", (level+2)*2, "", asl->ptr[i].offset);
-			node_print_inline(asl->ptr[i].target, pass, output);
-			fprintf(output, "\n");
-		}
-		*/
-	}
 }
 
-void node_print(node_p node, pass_t pass, FILE* output) {
-	node_print_recursive(node, pass, output, 0);
+void node_print(node_p node, pass_t pass_min, pass_t pass_max, FILE* output) {
+	node_print_recursive(node, pass_min, pass_max, output, 0);
 	fprintf(output, "\n");
 }
 
-void node_print_inline(node_p node, pass_t pass, FILE* output) {
+void node_print_inline(node_p node, pass_t pass_min, pass_t pass_max, FILE* output) {
 	fprintf(output, "%s", node->spec->name);
 	
 	for(member_spec_p member = node->spec->members; member->type != 0; member++) {
-		// Skip members from later passes. So we only show members up to and
-		// including the requested pass.
-		if (member->pass > pass)
+		// Skip members from earlier or later passes
+		if (member->pass < pass_min || member->pass > pass_max)
 			continue;
 		
 		fprintf(output, " %s: ", member->name);
