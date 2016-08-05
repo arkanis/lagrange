@@ -1,7 +1,7 @@
 Changes
 =======
 
-- Designed buildins.
+- Designed buildins
 
 
 Buildins
@@ -13,8 +13,8 @@ For operators and types:
   Also need a compile function: A C function that gets the AST and assembler and
   compiles the operator code.
 - types: name, size, initial value (ptr, len).
-  size is a normal int property. Used by compiler functions when allocating memory.
-  initial value is used when variables are defined without assignment.
+  Size is a normal int property. Used by compiler functions when allocating memory.
+  Initial value is used when variables are defined without assignment.
   Compiler C code to load and store a variable of that type? Works well for ints
   and stuff like that. But what about larger structs or arrays?
   Ok, arrays are just pointer and length... two 64 bit values.
@@ -45,15 +45,20 @@ SOLUTION: Might be a good time to go components. Make the AST nodes component
 based. This way we would have a function component and a buildin component. Each
 mutually exclusive.
 
+
+Components
+==========
+
 Rough list of components:
 
 - namespace
 - symbol (name attribute, nodes defines a thing that can be looked up by name)
-- function (assembler buffer, slots, etc. and linker stuff)
 - value (type attribute, e.g. interim results)
 - storage (aka lvalues, stuff that represents memory storage, frame_displ
   attribute). Can also be read-only storage (e.g. literals) be we need a flag
   for it so we can't assign new values.
+- exec (assembler buffer, slots, etc. and linker stuff)
+- buildin (node represents op or func provided by the compiler)
 
 But each node would also have it's own private properties to represent
 attributes of the source code.
@@ -62,6 +67,10 @@ IDEA: Have a big node struct with all the components in it. Mutually exclusive
 components can go into one union. The custom node attributes will follow after
 the components. This would make sure that one component has the same offset in
 every node. We would only need to access the component, not cast or anything.
+
+Operator and function definition nodes have an exec component. Operator and function
+buildins have the buildin component but use the AST members of the definition nodes
+(e.g. precedence and associativity).
 
 
 Types
