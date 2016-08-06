@@ -1,0 +1,83 @@
+Changes
+=======
+
+- Cleaned up types in the current compiler
+
+
+What is needed for types right now?
+===================================
+
+- Just need type buildins for now. Type definitions are something for later on.
+- For now types can only be singular type nodes (IDs, not cexpr).
+  - When we encounter a type_expr we just lookup the ID in the current namespace.
+    That should return a type node. This node should provide everything needed to
+    compile the thing at hand.
+  - The result is then stored in the nodes type member.
+  - So we just need a type inference pass that takes the type_expr members as
+    root and sets every type member further up the tree.
+
+
+Buildin types and type component
+================================
+
+Needed components:
+
+- name: Because the type is something that can be referenced by name.
+- type: Contains type information.
+
+Stuff for type component:
+
+- size: Bytes of storage required by this type.
+- init: Initial value for new variables of that type.
+- load/store: Compiler functions to load a variable of that type into registers or
+  store a variable from registers to memory.
+
+Implementation might look like this:
+
+struct {
+	size_t size;
+	str_t init;
+	
+	compile_func_t load;
+	compile_func_t store;
+}
+
+Init could also be list_t(uint8_t). Just a buffer of bytes. But str_t is simpler
+since we already have the matching initializer function for it.
+
+And a compile_func_t might look like this:
+
+allocation_info_t compile_func_t(compiler_ctx_p ctx, node_p node, reg_t requested_register);
+
+This signature might also fit for every compiler job at hand. The load and store
+functions probably will be called with the var nodes as node argument. But from
+the var node we can get the type node of it and the size of the type. So one
+generic load function will do for ALU regs and one for SSE regs, etc.
+
+
+Type definitions
+================
+
+Syntax differences:
+
+- In contrast to functions and operators they don't contains code but definitions
+  again. This requires different parser stuff.
+
+What they do:
+
+- Variable definitions are used to calculate the total size of the type.
+  Also needed to get offset to compile member access nodes.
+- Functions and operators are converted to free functions and operators:
+  An implicit first parameter "this" is added with the type pointing to the current
+  type node. Maybe "this.type" would be a fitting type expression.
+
+Implementation:
+
+- For type definitions we would need another pass first that fills out the type
+  component based on var definitions in the type.
+  - This might happens recursive. If the type definition uses another type
+    definition as member we can resolve that one first.
+  - Later on we might need to keep a stack to detect circular dependencies.
+  - Dependencies to the own type (e.g. linked list) can be resolved with
+    "this.type". But only references or pointers to this are allowed... something
+    thats size isn't determined by its content type. Something for later.
