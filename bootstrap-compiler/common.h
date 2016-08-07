@@ -58,7 +58,7 @@ struct token_s {
 
 size_t tokenize(str_t source, token_list_p tokens, FILE* error_stream);
 
-void token_free(token_p token);
+void token_cleanup(token_p token);
 int  token_line(node_p module, token_p token);
 int  token_col(node_p module, token_p token);
 

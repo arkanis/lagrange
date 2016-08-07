@@ -311,7 +311,7 @@ void test_samples() {
 		}
 		
 		for(size_t j = 0; j < tokens.len; j++)
-			token_free(&tokens.ptr[j]);
+			token_cleanup(&tokens.ptr[j]);
 		list_destroy(&tokens);
 	}
 }

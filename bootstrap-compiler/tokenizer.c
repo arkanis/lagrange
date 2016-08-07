@@ -379,7 +379,7 @@ static void tokenize_string(tokenizer_ctx_p ctx) {
 // Utility functions
 //
 
-void token_free(token_p token) {
+void token_cleanup(token_p token) {
 	token_p t = token;
 	switch(token->type) {
 		#define _
