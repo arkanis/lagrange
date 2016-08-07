@@ -491,7 +491,7 @@ void token_print(FILE* stream, token_p token, uint32_t flags) {
 
 void token_print_line(FILE* stream, node_p module, token_p token) {
 	assert(module->type == NT_MODULE);
-	token_list_p tokens = &module->module.tokens;
+	token_list_p tokens = &module->tokens;
 	if (token < tokens->ptr || token > tokens->ptr + tokens->len) {
 		fprintf(stderr, "token_print_line(): Specified token isn't part of the modules token list!\n");
 		abort();
@@ -503,8 +503,8 @@ void token_print_line(FILE* stream, node_p module, token_p token) {
 
 void token_print_range(FILE* stream, node_p module, size_t token_start_idx, size_t token_count) {
 	assert(module->type == NT_MODULE);
-	token_p start_token = &module->module.tokens.ptr[token_start_idx];
-	token_p end_token = &module->module.tokens.ptr[token_start_idx + token_count - 1];
+	token_p start_token = &module->tokens.ptr[token_start_idx];
+	token_p end_token = &module->tokens.ptr[token_start_idx + token_count - 1];
 	
 	char* code_start = start_token->source.ptr;
 	char* code_end = end_token->source.ptr + end_token->source.len;

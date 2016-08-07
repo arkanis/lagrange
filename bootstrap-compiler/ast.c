@@ -335,7 +335,7 @@ void node_error(FILE* output, node_p node, const char* message) {
 	assert(module != NULL);  // Node has no module as child... crash for now...
 	
 	token_p token = node->tokens.ptr;
-	token_list_p mod_tokens = &module->module.tokens;
+	token_list_p mod_tokens = &module->tokens;
 	
 	if (token < mod_tokens->ptr || token > mod_tokens->ptr + mod_tokens->len) {
 		fprintf(stderr, "node_error(): Specified node isn't part of the modules token list!\n");

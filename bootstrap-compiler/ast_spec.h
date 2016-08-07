@@ -16,9 +16,8 @@
 BEGIN(module, MODULE, NC_NS | NC_NAME)
 	MEMBER(module, filename, str_t,        MT_STR,  P_INPUT)
 	MEMBER(module, source,   str_t,        MT_NONE, P_INPUT)
-	MEMBER(module, tokens,   token_list_t, MT_NONE, P_INPUT)
 	
-	MEMBER(module, defs, node_list_t, MT_NODE_LIST, P_PARSER)
+	MEMBER(module, body, node_list_t, MT_NODE_LIST, P_PARSER)
 END(module)
 
 BEGIN(func_def, FUNC_DEF, NC_NS | NC_NAME | NC_EXEC)

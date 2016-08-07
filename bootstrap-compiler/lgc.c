@@ -5,7 +5,6 @@
 
 
 int buildin_syscall(node_p node, int ctx, int out) { printf("buildin_syscall\n"); return 0; }
-int buildin_op_add(node_p node, int ctx, int out)  { printf("buildin_op_add\n");  return 0; }
 
 
 int main(int argc, char** argv) {
@@ -36,16 +35,16 @@ int main(int argc, char** argv) {
 	// Initialize buildin stuff
 	node_p buildins = node_alloc(NT_MODULE);
 	buildins->name = str_from_c("buildins");
-		node_p syscall = node_alloc_append(NT_FUNC_BUILDIN, buildins, &buildins->module.defs);
+		node_p syscall = node_alloc_append(NT_FUNC_BUILDIN, buildins, &buildins->module.body);
 		syscall->name = str_from_c("syscall");
 		syscall->buildin.compile_func = buildin_syscall;
 		syscall->buildin.private = NULL;
 		
-		add_buildin_ops_to_namespace(buildins);
-	fill_namespaces(NULL, buildins, NULL);
+		add_buildin_ops_to_module(buildins);
+	fill_namespaces(buildins, NULL);
 	
 	// Initialize module
-	node_p module = node_alloc_append(NT_MODULE, buildins, &buildins->module.defs);
+	node_p module = node_alloc_append(NT_MODULE, buildins, &buildins->module.body);
 	// TODO: Set proper module name that can be used for lookups...
 	//module->name = str_from_c(...);
 	module->module.filename = str_from_c(source_file);
@@ -55,13 +54,14 @@ int main(int argc, char** argv) {
 	
 	// Step 1 - Tokenize source
 	size_t error_count = 0;
-	if ( (error_count = tokenize(module->module.source, &module->module.tokens, stderr)) > 0 ) {
+	if ( (error_count = tokenize(module->module.source, &module->tokens, stderr)) > 0 ) {
 		// Just output errors and exit
-		for(size_t i = 0; i < module->module.tokens.len; i++) {
-			token_p t = &module->module.tokens.ptr[i];
+		for(size_t i = 0; i < module->tokens.len; i++) {
+			token_p t = &module->tokens.ptr[i];
 			if (t->type == T_ERROR) {
-				fprintf(stderr, "%s:%d:%d: %s\n",
-					module->filename, token_line(module, t), token_col(module, t),
+				fprintf(stderr, "%.*s:%d:%d: %s\n",
+					module->module.filename.len, module->module.filename.ptr,
+					token_line(module, t), token_col(module, t),
 					t->str_val.ptr
 				);
 				token_print_line(stderr, module, t);
@@ -74,8 +74,8 @@ int main(int argc, char** argv) {
 	
 	// Print tokens
 	if (show_tokens) {
-		for(size_t i = 0; i < module->module.tokens.len; i++) {
-			token_p t = &module->module.tokens.ptr[i];
+		for(size_t i = 0; i < module->tokens.len; i++) {
+			token_p t = &module->tokens.ptr[i];
 			if (t->type == T_COMMENT || t->type == T_WS) {
 				token_print(stdout, t, TP_SOURCE);
 			} else if (t->type == T_WSNL || t->type == T_EOF) {
@@ -91,26 +91,23 @@ int main(int argc, char** argv) {
 	
 	
 	// Step 2 - Parse tokens into an AST
-	node_p node = parse(module, parse_module, stderr);
+	parse(module, parse_module, stderr);
 	if (show_parser_ast)
-		node_print(node, P_PARSER, P_PARSER, stdout);
-	// Set the buildins module as parent of the new module so namespace lookups will find the buildins
-	node_append(buildins, &buildins->module.defs, node);
-	
+		node_print(module, P_PARSER, P_PARSER, stdout);
 	//node_print(buildins, P_NAMESPACE, stdout);
 	
 	// Step 3 - Fill namespaces
-	fill_namespaces(module, node, NULL);
+	fill_namespaces(module, NULL);
 	if (show_filled_namespaces)
-		node_print(node, P_PARSER, P_NAMESPACE, stdout);
+		node_print(module, P_PARSER, P_NAMESPACE, stdout);
 	
 	// Step 4 - Resolve uops nodes
-	node = pass_resolve_uops(module, node);
+	module = pass_resolve_uops(module);
 	if (show_resloved_uops)
-		node_print(node, P_PARSER, P_PARSER, stdout);
+		node_print(module, P_PARSER, P_PARSER, stdout);
 	
 	cleanup_tokenizer:
 		list_destroy(&module->tokens);
-		str_free(&module->source);
+		str_free(&module->module.source);
 	return exit_code;
 }

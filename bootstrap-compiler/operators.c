@@ -24,8 +24,8 @@ struct { char* name; int precedence; op_assoc_t assoc; } operators[] = {
 };
 
 
-void add_buildin_ops_to_namespace(node_p module_node) {
-	if (module_node->type != NT_MODULE) {
+void add_buildin_ops_to_module(node_p module) {
+	if (module->type != NT_MODULE) {
 		fprintf(stderr, "add_buildin_ops_to_namespace(): Can only add buildin op definitions to a module!\n");
 		abort();
 	}
@@ -36,7 +36,7 @@ void add_buildin_ops_to_namespace(node_p module_node) {
 		if (operators[i].name == NULL)
 			continue;
 		
-		node_p op = node_alloc_append(NT_OP_BUILDIN, module_node, &module_node->module.defs);
+		node_p op = node_alloc_append(NT_OP_BUILDIN, module, &module->module.body);
 		op->name = str_from_c(operators[i].name);
 		
 		op->op_def.precedence = operators[i].precedence;
