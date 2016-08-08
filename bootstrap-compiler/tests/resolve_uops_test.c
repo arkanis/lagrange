@@ -50,26 +50,25 @@ void test_samples() {
 	FILE*  output = NULL;
 	
 	for(size_t i = 0; i < sizeof(samples) / sizeof(samples[0]); i++) {
-		module_p module = &(module_t){
-			.filename = "resolve_uops_test.c/test_samples",
-			.source   = str_from_c(samples[i].code)
-		};
-		
 		// Initialize buildin stuff
 		node_p buildins = node_alloc(NT_MODULE);
 		buildins->name = str_from_c("buildins");
-			add_buildin_ops_to_namespace(buildins);
-		fill_namespaces(NULL, buildins, NULL);
+			add_buildin_ops_to_module(buildins);
+		fill_namespaces(buildins, NULL);
 		
-		size_t errors = tokenize(module->source, &module->tokens, stderr);
+		node_p module = node_alloc_append(NT_MODULE, buildins, &buildins->module.body);
+		module->module.filename = str_from_c("resolve_uops_test.c/test_samples");
+		module->module.source = str_from_c(samples[i].code);
+		
+		size_t errors = tokenize(module->module.source, &module->tokens, stderr);
 		st_check_int(errors, 0);
 		
-		node_p node = parse(module, parse_expr, stderr);
-		node_append(buildins, &buildins->module.defs, node);
-		node = pass_resolve_uops(module, node);
+		parse(module, parse_expr, stderr);
+		pass_resolve_uops(module);
+		st_check_int(module->module.body.len, 1);
 		
 		output = open_memstream(&output_ptr, &output_len);
-			node_print(node, P_PARSER, P_PARSER, output);
+			node_print(module->module.body.ptr[0], P_PARSER, P_PARSER, output);
 		fclose(output);
 		
 		st_check_str(output_ptr, samples[i].expected_ast_dump);
