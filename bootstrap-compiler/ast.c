@@ -33,16 +33,8 @@ node_p node_alloc(node_type_t type) {
 	node->spec = node_specs[type];
 	node->parent = NULL;
 	
-	// TODO: reenable once we got namespaces to work again
-	/*
-	for(member_spec_p member = node->spec->members; member->type != 0; member++) {
-		void* member_ptr = (uint8_t*)node + member->offset;
-		if (member->type == MT_NS) {
-			node_ns_p namespace = member_ptr;
-			node_ns_new(namespace);
-		}
-	}
-	*/
+	if (node->spec->components & NC_NS)
+		node_ns_new(&node->ns);
 	
 	return node;
 }
