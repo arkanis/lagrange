@@ -68,9 +68,9 @@ x Reenalble namespaces calls node_alloc(), node_print_recursive()
 	- Compiler functions for load/store
 	- Reenalble type calls in node_print_recursive(), node_print_inline()
 - Try to get whole compilation process to work again
-- Refactor compiler module into module AST node. Put the filename, source code and tokens into
-  properties of the AST node. This way we just create one module as container and use it for the
-  whole process.
+x Refactor compiler module into module AST node. Put the filename, source code and
+  tokens into properties of the AST node. This way we just create one module as
+  container and use it for the whole process.
 
 
 For next syntax step
