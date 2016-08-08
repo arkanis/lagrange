@@ -1,3 +1,4 @@
+#include <assert.h>
 #include "common.h"
 
 
@@ -6,8 +7,12 @@
 //
 
 struct parser_s {
-	module_p module;
-	size_t   pos;
+	node_p module;
+	size_t pos;
+	
+	// Just shortcuts for fields of the module
+	token_list_p tokens;
+	str_p        filename;
 	
 	list_t(token_type_t) tried_token_types;
 	FILE* error_stream;
@@ -16,8 +21,8 @@ struct parser_s {
 
 static token_p next_filtered_token(parser_p parser, size_t start_pos, bool ignore_line_breaks) {
 	size_t pos = start_pos;
-	while (pos < parser->module->tokens.len) {
-		token_p token = &parser->module->tokens.ptr[pos];
+	while (pos < parser->tokens->len) {
+		token_p token = &parser->tokens->ptr[pos];
 		pos++;
 		
 		// Skip whitespace and comment tokens
@@ -38,7 +43,8 @@ static token_p next_filtered_token(parser_p parser, size_t start_pos, bool ignor
 static void parser_error(parser_p parser, const char* message) {
 	token_p token = next_filtered_token(parser, parser->pos, true);
 	
-	fprintf(parser->error_stream, "%s:%d:%d: ", parser->module->filename,
+	fprintf(parser->error_stream, "%.*s:%d:%d: ",
+		parser->filename->len, parser->filename->ptr,
 		token_line(parser->module, token),
 		token_col(parser->module, token)
 	);
@@ -63,7 +69,7 @@ static void parser_error(parser_p parser, const char* message) {
 	token_print(parser->error_stream, token, TP_INLINE_DUMP);
 	fputs("\n", parser->error_stream);
 	
-	size_t token_index = token - parser->module->tokens.ptr;
+	size_t token_index = token - parser->tokens->ptr;
 	token_print_range(parser->error_stream, parser->module, token_index, 1);
 }
 
@@ -91,8 +97,8 @@ static token_p try_after_token(parser_p parser, token_type_t type, token_p start
 	
 	// Don't log look ahead tokens for error messages right now. Not sure if
 	// this information is helpful to the user.
-	size_t start_token_pos = start_token - parser->module->tokens.ptr + 1;
-	if ( start_token_pos >= parser->module->tokens.len ) {
+	size_t start_token_pos = start_token - parser->tokens->ptr + 1;
+	if ( start_token_pos >= parser->tokens->len ) {
 		fprintf(stderr, "try_after_token(): Start token not part of the currently parsed module!\n");
 		abort();
 	}
@@ -103,7 +109,6 @@ static token_p try_after_token(parser_p parser, token_type_t type, token_p start
 	return NULL;
 }
 
-
 static token_p consume(parser_p parser, token_p token) {
 	if (token == NULL) {
 		fprintf(stderr, "consume(): Tried to consume NULL!\n");
@@ -112,8 +117,8 @@ static token_p consume(parser_p parser, token_p token) {
 	
 	// Since index is unsigned negative indices will wrap around to very large
 	// indices that are out of bounds, too. So the next if catches them as well.
-	size_t index = token - parser->module->tokens.ptr;
-	if ( index >= parser->module->tokens.len ) {
+	size_t index = token - parser->tokens->ptr;
+	if ( index >= parser->tokens->len ) {
 		fprintf(stderr, "consume(): Token not part of the currently parsed module!\n");
 		abort();
 	}
@@ -144,42 +149,49 @@ static token_p consume_type(parser_p parser, token_type_t type) {
 
 
 //
+// Try functions for different rules
+//
+
+static token_p try_stmt(parser_p parser);
+static token_p try_eos(parser_p parser, token_p after_token);
+static token_p try_cexpr(parser_p parser);
+
+static token_p consume_eos(parser_p parser);
+
+void parse_module(parser_p parser, node_p parent, node_list_p list);
+void parse_stmts(parser_p parser, node_p parent, node_list_p list);
+
+static node_p  complete_parser_var_def_statement(parser_p parser, node_p cexpr);
+static node_p  complete_parser_expr_statement(parser_p parser, node_p cexpr);
+static node_p  complete_parser_expr(parser_p parser, node_p cexpr);
+
+
+
+//
 // Public parser interface to parse a rule
 //
 
-node_p parse(module_p module, parser_rule_func_t rule, FILE* error_stream) {
+void parse(node_p module, parser_rule_func_t rule, FILE* error_stream) {
+	assert(module->type == NT_MODULE);
 	parser_t parser = (parser_t){
 		.module       = module,
+		.tokens       = &module->tokens,
+		.filename     = &module->module.filename,
 		.error_stream = error_stream,
 		.pos          = 0
 	};
 	
-	node_p node = rule(&parser);
+	if (rule == NULL) {
+		parse_module(&parser, module, &module->module.body);
+	} else {
+		node_p node = rule(&parser);
+		node_append(module, &module->module.body, node);
+	}
 	consume_type(&parser, T_EOF);
 	
 	list_destroy(&parser.tried_token_types);
 	parser.error_stream = NULL;
-	return node;
 }
-
-
-
-//
-// Try functions for different rules
-//
-
-node_p parse_operator_def(parser_p parser);
-void parse_stmts(parser_p parser, node_p parent, node_list_p list);
-
-static token_p try_stmt(parser_p parser);
-static node_p  complete_parser_var_def_statement(parser_p parser, node_p cexpr);
-static node_p  complete_parser_expr_statement(parser_p parser, node_p cexpr);
-static token_p try_eos(parser_p parser, token_p after_token);
-static token_p consume_eos(parser_p parser);
-
-static token_p try_cexpr(parser_p parser);
-       node_p  parse_cexpr(parser_p parser);
-static node_p  complete_parser_expr(parser_p parser, node_p cexpr);
 
 
 
@@ -187,26 +199,21 @@ static node_p  complete_parser_expr(parser_p parser, node_p cexpr);
 // Parser rules
 //
 
-node_p parse_module(parser_p parser) {
-	node_p node = node_alloc(NT_MODULE);
-	node->tokens = parser->module->tokens;
-	
+void parse_module(parser_p parser, node_p parent, node_list_p list) {
 	while ( ! try(parser, T_EOF) ) {
 		node_p def = NULL;
 		
 		if ( try(parser, T_FUNC) ) {
 			def = parse_func_def(parser);
 		} else if ( try(parser, T_OPERATOR) ) {
-			def = parse_operator_def(parser);
+			def = parse_op_def(parser);
 		} else {
 			parser_error(parser, NULL);
 			abort();
 		}
 		
-		node_append(node, &node->module.defs, def);
+		node_append(parent, list, def);
 	}
-	
-	return node;
 }
 
 
@@ -265,7 +272,7 @@ node_p parse_func_def(parser_p parser) {
 	return node;
 }
 
-node_p parse_operator_def(parser_p parser) {
+node_p parse_op_def(parser_p parser) {
 	// def     = "operator" ID [ def-mod ] "{" [ stmt ] "}"
 	// def-mod = ( "in" | "out" )  "(" ID ID? [ "," ID ID? ] ")"
 	//           "options" "(" ID ":" expr [ "," ID ":" expr ] ")"

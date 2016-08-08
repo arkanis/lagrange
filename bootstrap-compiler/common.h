@@ -29,10 +29,11 @@ compiler: reg allocator
 // Management structs for the program
 //
 
-typedef struct token_s  token_t, *token_p;
+typedef struct token_s  token_t,      *token_p;
 typedef list_t(token_t) token_list_t, *token_list_p;
-typedef struct node_s   node_t, *node_p;
-typedef struct type_s   type_t, *type_p;
+typedef struct node_s   node_t,       *node_p;
+typedef list_t(node_p)  node_list_t,  *node_list_p;
+typedef struct type_s   type_t,       *type_p;
 
 
 
@@ -81,12 +82,15 @@ char* token_desc(token_type_t type);
 typedef struct parser_s parser_t, *parser_p;
 typedef node_p (*parser_rule_func_t)(parser_p parser);
 
+// Takes the modules tokens and puts the result nodes into module.body.
+// The rule NULL parses an entire module not just a part of the grammar.
 void parse(node_p module, parser_rule_func_t rule, FILE* error_stream);
 
-node_p parse_module(parser_p parser);
 node_p parse_func_def(parser_p parser);
+node_p parse_op_def(parser_p parser);
 node_p parse_stmt(parser_p parser);
 node_p parse_expr(parser_p parser);
+node_p parse_cexpr(parser_p parser);
 
 
 
@@ -115,8 +119,6 @@ typedef struct {
 //
 // Node list
 //
-
-typedef list_t(node_p) node_list_t, *node_list_p;
 
 void node_list_replace_range_with_one(node_list_p list, size_t start_idx, size_t hole_len, node_p replacement_node);
 
