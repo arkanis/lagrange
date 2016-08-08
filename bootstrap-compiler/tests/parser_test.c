@@ -617,9 +617,9 @@ struct { parser_rule_func_t rule; char* code; char* expected_ast_dump; } samples
   	//
   	// Definition: functions
   	//
-	{ parse_module, "func foo in(int argc, int.ptr argv) out(int) { int a; a += 1 if argc < 2; { foo(a) } }",
+	{ NULL, "func foo in(int argc, int.ptr argv) out(int) { int a; a += 1 if argc < 2; { foo(a) } }",
 		"module: \"\"\n"
-		"  defs[0]: func_def: \"foo\"\n"
+		"  body[0]: func_def: \"foo\"\n"
 		"    in[0]: arg: \"argc\"\n"
 		"      expr: id: \"int\"\n"
 		"    in[1]: arg: \"argv\"\n"
@@ -646,9 +646,9 @@ struct { parser_rule_func_t rule; char* code; char* expected_ast_dump; } samples
 		"        target_expr: id: \"foo\"\n"
 		"        args[0]: id: \"a\"\n"
 	},
-	{ parse_module, "operator add in(int a, int b) out(int) options(precedence: 10, assoc: left_to_right) { return a + b; }",
+	{ NULL, "operator add in(int a, int b) out(int) options(precedence: 10, assoc: left_to_right) { return a + b; }",
 		"module: \"\"\n"
-		"  defs[0]: op_def: \"add\"\n"
+		"  body[0]: op_def: \"add\"\n"
 		"    in[0]: arg: \"a\"\n"
 		"      expr: id: \"int\"\n"
 		"    in[1]: arg: \"b\"\n"
@@ -675,16 +675,23 @@ void test_samples() {
 	FILE*  output = NULL;
 	
 	for(size_t i = 0; i < sizeof(samples) / sizeof(samples[0]); i++) {
-		module_p module = &(module_t){
-			.filename = "parser_test.c/test_samples",
-			.source   = str_from_c(samples[i].code)
-		};
+		node_p module = node_alloc(NT_MODULE);
+		module->module.filename = str_from_c("parser_test.c/test_samples");
+		module->module.source = str_from_c(samples[i].code);
 		
-		size_t errors = tokenize(module->source, &module->tokens, stderr);
+		size_t errors = tokenize(module->module.source, &module->tokens, stderr);
 		st_check_int(errors, 0);
 		
 		output = open_memstream(&output_ptr, &output_len);
-			node_p node = parse(module, samples[i].rule, stderr);
+			parse(module, samples[i].rule, stderr);
+			
+			node_p node = NULL;
+			if (samples[i].rule == NULL) {
+				node = module;
+			} else {
+				st_check_int(module->module.body.len, 1);
+				node = module->module.body.ptr[0];
+			}
 			node_print(node, P_PARSER, P_PARSER, output);
 		fclose(output);
 		
@@ -699,60 +706,60 @@ void test_samples() {
 
 struct { char* code; char* ast_dump; } statement_pool[] = {
 	{	"{ dec(x) } \n",
-		"    body[%d]: scope: \n"
-		"      stmts[0]: call: \n"
-		"        target_expr: id: \"dec\"\n"
-		"        args[0]: id: \"x\"\n"
+		"  body[%d]: scope: \n"
+		"    stmts[0]: call: \n"
+		"      target_expr: id: \"dec\"\n"
+		"      args[0]: id: \"x\"\n"
 	},
 	{	"do dec(x) end \n",
-		"    body[%d]: scope: \n"
-		"      stmts[0]: call: \n"
-		"        target_expr: id: \"dec\"\n"
-		"        args[0]: id: \"x\"\n"
+		"  body[%d]: scope: \n"
+		"    stmts[0]: call: \n"
+		"      target_expr: id: \"dec\"\n"
+		"      args[0]: id: \"x\"\n"
 	},
 	{	"while x > 0 \n dec(x) \n end \n",
-		"    body[%d]: while_stmt: \n"
-		"      cond: uops: \n"
-		"        list[0]: id: \"x\"\n"
-		"        list[1]: id: \"gt\"\n"
-		"        list[2]: intl: 0\n"
-		"      body[0]: call: \n"
-		"        target_expr: id: \"dec\"\n"
-		"        args[0]: id: \"x\"\n"
+		"  body[%d]: while_stmt: \n"
+		"    cond: uops: \n"
+		"      list[0]: id: \"x\"\n"
+		"      list[1]: id: \"gt\"\n"
+		"      list[2]: intl: 0\n"
+		"    body[0]: call: \n"
+		"      target_expr: id: \"dec\"\n"
+		"      args[0]: id: \"x\"\n"
 	},
 	{	"if x > 0 \n dec(x) \n else inc(x) end \n",
-		"    body[%d]: if_stmt: \n"
-		"      cond: uops: \n"
-		"        list[0]: id: \"x\"\n"
-		"        list[1]: id: \"gt\"\n"
-		"        list[2]: intl: 0\n"
-		"      true_case[0]: call: \n"
-		"        target_expr: id: \"dec\"\n"
-		"        args[0]: id: \"x\"\n"
-		"      false_case[0]: call: \n"
-		"        target_expr: id: \"inc\"\n"
-		"        args[0]: id: \"x\"\n"
+		"  body[%d]: if_stmt: \n"
+		"    cond: uops: \n"
+		"      list[0]: id: \"x\"\n"
+		"      list[1]: id: \"gt\"\n"
+		"      list[2]: intl: 0\n"
+		"    true_case[0]: call: \n"
+		"      target_expr: id: \"dec\"\n"
+		"      args[0]: id: \"x\"\n"
+		"    false_case[0]: call: \n"
+		"      target_expr: id: \"inc\"\n"
+		"      args[0]: id: \"x\"\n"
 	},
 	{	"return x + 1 \n",
-		"    body[%d]: return_stmt: \n"
-		"      args[0]: uops: \n"
-		"        list[0]: id: \"x\"\n"
-		"        list[1]: id: \"add\"\n"
-		"        list[2]: intl: 1\n"
-	},
-	{	"int x, y = 1 \n",
-		"    body[%d]: var: \n"
-		"      type_expr: id: \"int\"\n"
-		"      bindings[0]: binding: \"x\"\n"
-		"        value: \n"
-		"      bindings[1]: binding: \"y\"\n"
-		"        value: intl: 1\n"
-	},
-	{	"x + y \n",
-		"    body[%d]: uops: \n"
+		"  body[%d]: return_stmt: \n"
+		"    args[0]: uops: \n"
 		"      list[0]: id: \"x\"\n"
 		"      list[1]: id: \"add\"\n"
-		"      list[2]: id: \"y\"\n"
+		"      list[2]: intl: 1\n"
+	},
+	{	"int x, y = 1 \n",
+		"  body[%d]: var: \n"
+		"    type_expr: id: \"int\"\n"
+		"    bindings[0]: binding: \"x\"\n"
+		"      value: \n"
+		"    bindings[1]: binding: \"y\"\n"
+		"      value: intl: 1\n"
+	},
+	{	"x + y \n",
+		"  body[%d]: uops: \n"
+		"    list[0]: id: \"x\"\n"
+		"    list[1]: id: \"add\"\n"
+		"    list[2]: id: \"y\"\n"
 	},
 };
 
@@ -775,8 +782,7 @@ void test_statement_combinations() {
 				
 				ast_dump = open_memstream(&ast_dump_ptr, &ast_dump_len);
 					fprintf(ast_dump,
-						"module: \"\"\n"
-						"  defs[0]: func_def: \"main\"\n"
+						"func_def: \"main\"\n"
 					);
 					fprintf(ast_dump, statement_pool[i].ast_dump, 0);
 					fprintf(ast_dump, statement_pool[j].ast_dump, 1);
@@ -785,16 +791,17 @@ void test_statement_combinations() {
 				
 				
 				//printf("sample code i = %zu, j = %zu, k = %zu:\n%s\n", i, j, k, code_ptr);
-				module_p module = &(module_t){
-					.filename = "parser_test.c/test_statement_combinations",
-					.source   = str_from_c(code_ptr)
-				};
+				node_p module = node_alloc(NT_MODULE);
+				module->module.filename = str_from_c("parser_test.c/test_statement_combinations");
+				module->module.source = str_from_c(code_ptr);
 				
-				size_t errors = tokenize(module->source, &module->tokens, stderr);
+				size_t errors = tokenize(module->module.source, &module->tokens, stderr);
 				st_check_int(errors, 0);
 				
 				output = open_memstream(&output_ptr, &output_len);
-					node_p node = parse(module, parse_module, stderr);
+					parse(module, NULL, stderr);
+					st_check_int(module->module.body.len, 1);
+					node_p node = module->module.body.ptr[0];
 					node_print(node, P_PARSER, P_PARSER, output);
 				fclose(output);
 				
