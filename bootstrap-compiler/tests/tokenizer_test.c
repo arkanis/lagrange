@@ -322,11 +322,11 @@ void test_print_functions() {
 	size_t output_len = 0;
 	FILE* output = NULL;
 	
-	module_p module = &(module_t){
-		.filename = "tokenizer_test.c/test_print_functions",
-		.source   = str_from_c("x = \n1 + y\n\"next\nline\"")
-	};
-	tokenize(module->source, &module->tokens, stderr);
+	node_p module = node_alloc(NT_MODULE);
+	module->module.filename = str_from_c("tokenizer_test.c/test_print_functions");
+	module->module.source = str_from_c("x = \n1 + y\n\"next\nline\"");
+	
+	tokenize(module->module.source, &module->tokens, stderr);
 	st_check_int(module->tokens.len, 12);
 	
 	output = open_memstream(&output_ptr, &output_len);

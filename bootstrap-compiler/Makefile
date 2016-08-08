@@ -12,7 +12,7 @@ tests: $(TESTS)
 
 tests/utils_test: utils.o
 tests/asm_test: asm.o tests/disassembler_utils.o tokenizer.o utils.o
-tests/tokenizer_test: tokenizer.o utils.o
+tests/tokenizer_test: tokenizer.o utils.o ast.o namespaces.o
 tests/ast_test: ast.o utils.o namespaces.o tokenizer.o
 tests/parser_test: tokenizer.o parser.o ast.o utils.o namespaces.o
 tests/resolve_uops_test: tokenizer.o parser.o ast.o utils.o operators.o namespaces.o
