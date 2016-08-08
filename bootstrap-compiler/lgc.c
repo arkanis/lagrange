@@ -91,7 +91,7 @@ int main(int argc, char** argv) {
 	
 	
 	// Step 2 - Parse tokens into an AST
-	parse(module, parse_module, stderr);
+	parse(module, NULL, stderr);
 	if (show_parser_ast)
 		node_print(module, P_PARSER, P_PARSER, stdout);
 	//node_print(buildins, P_NAMESPACE, stdout);
