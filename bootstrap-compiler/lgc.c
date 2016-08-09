@@ -9,6 +9,7 @@ int buildin_syscall(node_p node, int ctx, int out) { printf("buildin_syscall\n")
 
 int main(int argc, char** argv) {
 	// Process command line arguments
+	const char* usage = "usage: %s [ -tpno ] source-file\n";
 	bool show_tokens = false, show_parser_ast = false, show_filled_namespaces = false;
 	bool show_resloved_uops = false;
 	int opt;
@@ -19,13 +20,13 @@ int main(int argc, char** argv) {
 			case 'n': show_filled_namespaces = true; break;
 			case 'o': show_resloved_uops = true;     break;
 			default:
-				fprintf(stderr, "usage: %s [ -tp ] source-file\n", argv[0]);
+				fprintf(stderr, usage, argv[0]);
 				return 1;
 		}
 	}
 	
 	if ( !(optind + 1 == argc) ) {
-		fprintf(stderr, "usage: %s [ -tp ] source-file\n", argv[0]);
+		fprintf(stderr, usage, argv[0]);
 		return 1;
 	}
 	
