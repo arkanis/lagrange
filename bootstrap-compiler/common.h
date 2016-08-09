@@ -33,7 +33,6 @@ typedef struct token_s  token_t,      *token_p;
 typedef list_t(token_t) token_list_t, *token_list_p;
 typedef struct node_s   node_t,       *node_p;
 typedef list_t(node_p)  node_list_t,  *node_list_p;
-typedef struct type_s   type_t,       *type_p;
 
 
 
@@ -185,12 +184,13 @@ typedef enum {
 //
 
 typedef enum {
-	NC_NAME    = (1 << 0),
-	NC_NS      = (1 << 1),
-	NC_VALUE   = (1 << 2),
-	NC_STORAGE = (1 << 3),
-	NC_EXEC    = (1 << 4),
-	NC_BUILDIN = (1 << 5)
+	NC_NAME      = (1 << 0),
+	NC_NS        = (1 << 1),
+	NC_VALUE     = (1 << 2),
+	NC_STORAGE   = (1 << 3),
+	NC_EXEC      = (1 << 4),
+	NC_BUILDIN   = (1 << 5),
+	NC_TYPE_INFO = (1 << 6)
 } node_component_t;
 
 typedef enum {
@@ -230,7 +230,7 @@ struct node_s {
 	
 	// value component: node represents an interim result
 	struct {
-		type_p type;
+		node_p type;
 	} value;
 	
 	// storage component: lvalues, node represents a memory block
@@ -256,6 +256,15 @@ struct node_s {
 		compile_func_t compile_func;
 		void*          private;
 	} buildin;
+	
+	// type component: node represents a type
+	struct {
+		size_t size;
+		str_t init;
+		
+		compile_func_t load;
+		compile_func_t store;
+	} type_info;
 };
 
 #undef BEGIN

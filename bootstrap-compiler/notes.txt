@@ -52,7 +52,7 @@ x Write a node_error() function thats like parser_error() but for AST processing
   huge error messages on function nodes and the like. Usefull to emit errors in
   passes.
 x Reenalble namespaces calls node_alloc(), node_print_recursive()
-- Create buildins for operators
+x Create buildins for operators
 	x Create AST node for operator definitions
 	x Parse operator definitions into AST nodes
 	x Create alternative to exec component: a function that's called at compile time
@@ -60,13 +60,14 @@ x Reenalble namespaces calls node_alloc(), node_print_recursive()
 	x Replace operator tables with buildin operator objects
 	x Migrate resolve uops pass to operator buildins
 	x Replace node_convert_to_buildin() since it overwrite the SPEC! Solve this in a different way...
+- Migrate type system
+	x Add component for types (size, etc.)
+	- Add pass for type inference (with whatever semantics...)
+	- Reenalble type calls in node_print_recursive(), node_print_inline()
 - Add stuff for compilation
 	- Add compilation function to operators
+	- Add load/store functions for buildin types
 	- Add compilation functions for nodes?
-- Migrate type system
-	- Add type for types (size, etc.)
-	- Compiler functions for load/store
-	- Reenalble type calls in node_print_recursive(), node_print_inline()
 - Try to get whole compilation process to work again
 x Refactor compiler module into module AST node. Put the filename, source code and
   tokens into properties of the AST node. This way we just create one module as
@@ -105,6 +106,19 @@ uops node because we wouldn't know where the uops node has to end.
 
 SOLUTION: Two token look ahead after first cexpr. If it's ID "=" we know it's a
 variable definition. Otherwise it's a normal expression. No uops node needed.
+
+
+More detailed grammar notation
+==============================
+
+Just some random thoughts right now:
+
+defs  = "func" ID
+        modifier:
+            [ ("in" | "out") "("  ID ID? [ "," ID ID? ]  ")" ]
+        body:
+            "{"  stmts "}"
+            "do" stmts "end"
 
 
 Nice to have stuff

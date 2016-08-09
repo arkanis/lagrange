@@ -189,14 +189,13 @@ static void node_print_recursive(node_p node, pass_t pass_min, pass_t pass_max, 
 	}
 	
 	if ( (node->spec->components & NC_VALUE) && (pass_min <= P_TYPE && pass_max >= P_TYPE) ) {
-		// TODO: print type stuff
-		/*
-		type_p type = *(type_p*)member_ptr;
-		if (type == NULL)
+		node_p type = node->value.type;
+		print_label("type", MT_NONE);
+		if (type) {
+			fprintf(output, "%.*s, %zu bytes", type->name.len, type->name.ptr, type->type_info.size);
+		} else {
 			fprintf(output, "NULL");
-		else
-			fprintf(output, "%.*s (%zu bytes)", type->name.len, type->name.ptr, type->size);
-		*/
+		}
 	}
 	
 	if ( (node->spec->components & NC_STORAGE) && (pass_min <= P_COMPILER && pass_max >= P_COMPILER) ) {
@@ -213,6 +212,13 @@ static void node_print_recursive(node_p node, pass_t pass_min, pass_t pass_max, 
 			fprintf(output, "\n");
 		}
 		*/
+	}
+	
+	if ( (node->spec->components & NC_TYPE_INFO) && (pass_min <= P_TYPE && pass_max >= P_TYPE) ) {
+		print_label("type_info", MT_NONE);
+		fprintf(output, "size: %zu bytes, init: 0x", node->type_info.size);
+		for(int i = 0; i < node->type_info.init.len; i++)
+			fprintf(output, "%02hhx", node->type_info.init.ptr[i]);
 	}
 	
 	for(member_spec_p member = node->spec->members; member->type != 0; member++) {

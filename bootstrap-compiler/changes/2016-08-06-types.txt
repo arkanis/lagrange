@@ -10,8 +10,8 @@ What is needed for types right now?
 - Just need type buildins for now. Type definitions are something for later on.
 - For now types can only be singular type nodes (IDs, not cexpr).
   - When we encounter a type_expr we just lookup the ID in the current namespace.
-    That should return a type node. This node should provide everything needed to
-    compile the thing at hand.
+    That should return a node with a type component. This node should provide
+    everything needed to compile the thing at hand.
   - The result is then stored in the nodes type member.
   - So we just need a type inference pass that takes the type_expr members as
     root and sets every type member further up the tree.
