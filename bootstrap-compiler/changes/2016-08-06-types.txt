@@ -55,6 +55,35 @@ the var node we can get the type node of it and the size of the type. So one
 generic load function will do for ALU regs and one for SSE regs, etc.
 
 
+Type system
+===========
+
+Types (buildin types, operators) we need for the basic compiler:
+
+- ulong: For normal variables
+- ubyte: For strings (byte arrays)
+- array: For strings
+- Type negotiation rules
+
+Stuff that's needed because every expression has a type:
+
+- function: Function type, can be called. Not sure if we need that to handle
+  calls to function definitions. But it's needed for function pointers.
+
+Useful stuff while we're at it:
+
+- struct: Compound type with multiple members (maybe a base for arrays)
+- user defined types: structs with special operators for member and index access
+
+Overview by grouping different types into families:
+
+- all: size, init
+- integer (ubyte, ulong)
+- array: base, length
+- function: address, in types (with flags like optional, etc.), out types (with flags like optional, etc.)
+- struct: members (names, types, offsets)
+
+
 Type definitions
 ================
 
