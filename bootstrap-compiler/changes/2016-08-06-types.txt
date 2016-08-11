@@ -69,10 +69,13 @@ Stuff that's needed because every expression has a type:
 
 - function: Function type, can be called. Not sure if we need that to handle
   calls to function definitions. But it's needed for function pointers.
+- void: Type of function calls to functions that have no output arguments.
+  Just a placeholder for nothing.
+- struct: Compound type with multiple members (maybe a base for arrays).
+  Return type of functions with multiple output arguments?
 
 Useful stuff while we're at it:
 
-- struct: Compound type with multiple members (maybe a base for arrays)
 - user defined types: structs with special operators for member and index access
 
 Overview by grouping different types into families:
@@ -82,6 +85,7 @@ Overview by grouping different types into families:
 - array: base, length
 - function: address, in types (with flags like optional, etc.), out types (with flags like optional, etc.)
 - struct: members (names, types, offsets)
+- void
 
 
 Type definitions
@@ -110,3 +114,18 @@ Implementation:
   - Dependencies to the own type (e.g. linked list) can be resolved with
     "this.type". But only references or pointers to this are allowed... something
     thats size isn't determined by its content type. Something for later.
+
+
+"unknown" type
+==============
+
+void represents nothing. A "void pointer" instead represents a pointer to unknown data. These are
+two different concepts.
+
+Easier to only use "void" internally and use "unkown" to signal unknown memory.
+
+- Maybe we don't need syntax to define something of "void" type. Right now only occurence is when a
+  function has no output arguments.
+- "unknown" memory also needs a size. So even a ptr(unknown) can't do out of bounds memory access.
+
+This stuff is only needed once we get to pointers...
